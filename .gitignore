@@ -102,7 +102,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/  # Commented out - was blocking src/lib in Next.js
 lib64/
 parts/
 sdist/
