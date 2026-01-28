@@ -58,6 +58,8 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
   ({ tool, gridEnabled, snapEnabled, importedDesign, strokeColor = "#000000", fillColor = "transparent", strokeWidth = 5, zoom = 100 }, ref) => {
     const [lines, setLines] = useState<LineData[]>([]);
     const [shapes, setShapes] = useState<ShapeData[]>([]);
+    const [canvasSize, setCanvasSize] = useState({ width: 1000, height: 600 });
+    const containerRef = useRef<HTMLDivElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [currentShape, setCurrentShape] = useState<ShapeData | null>(null);
     const [isPanning, setIsPanning] = useState(false);
@@ -69,8 +71,8 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       getCanvasData: () => ({
         lines,
         shapes,
-        width: 1000,
-        height: 600,
+        width: canvasSize.width,
+        height: canvasSize.height,
       }),
       clearCanvas: () => {
         setLines([]);
@@ -90,6 +92,27 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         }
       },
     }));
+    // Responsive canvas sizing
+    useEffect(() => {
+      const updateSize = () => {
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          setCanvasSize({
+            width: Math.max(200, Math.floor(rect.width)),
+            height: Math.max(200, Math.floor(rect.height)),
+          });
+        }
+      };
+      updateSize();
+      const ro = new (window as any).ResizeObserver(updateSize);
+      if (containerRef.current) {
+        ro.observe(containerRef.current);
+      }
+      return () => {
+        if (containerRef.current) ro.unobserve(containerRef.current);
+        ro.disconnect();
+      };
+    }, []);
 
     // Load imported design when available
     useEffect(() => {
@@ -247,10 +270,10 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     };
 
     return (
-      <div className="relative h-full w-full rounded-xl bg-canvas border-2 border-[#2E2E2E] shadow-panel paper-texture">
+      <div ref={containerRef} className="relative h-full w-full rounded-xl bg-canvas border-2 border-[#2E2E2E] shadow-panel paper-texture">
         <Stage
-          width={1000}
-          height={600}
+          width={canvasSize.width}
+          height={canvasSize.height}
           onMouseDown={handleMouseDown}
           onMousemove={handleMouseMove}
           onMouseup={handleMouseUp}
@@ -264,18 +287,20 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             {/* Grid Background */}
             {gridEnabled && (
               <>
-                {Array.from({ length: 50 }).map((_, i) => (
+                {/* Vertical grid lines */}
+                {Array.from({ length: Math.ceil(canvasSize.width / 20) + 1 }).map((_, i) => (
                   <Line
                     key={`v-${i}`}
-                    points={[i * 20, 0, i * 20, 600]}
+                    points={[i * 20, 0, i * 20, canvasSize.height]}
                     stroke="rgba(46, 46, 46, 0.3)"
                     strokeWidth={1}
                   />
                 ))}
-                {Array.from({ length: 30 }).map((_, i) => (
+                {/* Horizontal grid lines */}
+                {Array.from({ length: Math.ceil(canvasSize.height / 20) + 1 }).map((_, i) => (
                   <Line
                     key={`h-${i}`}
-                    points={[0, i * 20, 1000, i * 20]}
+                    points={[0, i * 20, canvasSize.width, i * 20]}
                     stroke="rgba(46, 46, 46, 0.3)"
                     strokeWidth={1}
                   />
@@ -380,7 +405,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
 
         {/* Canvas Info Overlay */}
         <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-3 rounded-lg bg-white/90 px-3 py-2 text-xs font-medium text-muted shadow-sm backdrop-blur-sm">
-          <span>1000 × 600</span>
+          <span>{canvasSize.width} × {canvasSize.height}</span>
           <span>•</span>
           <span>
             {tool === "pen"

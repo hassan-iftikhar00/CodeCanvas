@@ -12,6 +12,7 @@ interface SketchCanvasWithHistoryProps {
   strokeColor?: string;
   fillColor?: string;
   strokeWidth?: number;
+  zoom?: number;
   canvasState: { lines: any[]; shapes: any[] };
   onStateChange: (newState: { lines: any[]; shapes: any[] }) => void;
 }
@@ -37,8 +38,10 @@ const SketchCanvasWithHistory = forwardRef<SketchCanvasWithHistoryRef, SketchCan
       strokeWidth,
       canvasState,
       onStateChange,
-    },
-    ref
+    zoom,
+    ...props
+  },
+  ref
   ) => {
     const canvasRef = React.useRef<SketchCanvasRef>(null);
 
@@ -110,6 +113,8 @@ const SketchCanvasWithHistory = forwardRef<SketchCanvasWithHistoryRef, SketchCan
         strokeColor={strokeColor}
         fillColor={fillColor}
         strokeWidth={strokeWidth}
+        zoom={zoom}
+        {...props}
       />
     );
   }
