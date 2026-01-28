@@ -7,7 +7,14 @@ import {
   useImperativeHandle,
   forwardRef,
 } from "react";
-import { Stage, Layer, Line, Rect, Circle, Text as KonvaText } from "react-konva";
+import {
+  Stage,
+  Layer,
+  Line,
+  Rect,
+  Circle,
+  Text as KonvaText,
+} from "react-konva";
 import type Konva from "konva";
 
 interface SketchCanvasProps {
@@ -19,7 +26,7 @@ interface SketchCanvasProps {
   strokeColor?: string;
   fillColor?: string;
   strokeWidth?: number;
-  zoom?: number;  // Add zoom prop
+  zoom?: number; // Add zoom prop
 }
 
 interface LineData {
@@ -55,10 +62,22 @@ export interface SketchCanvasRef {
 }
 
 const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
-  ({ tool, gridEnabled, snapEnabled, importedDesign, strokeColor = "#000000", fillColor = "transparent", strokeWidth = 5, zoom = 100 }, ref) => {
+  (
+    {
+      tool,
+      gridEnabled,
+      snapEnabled,
+      importedDesign,
+      strokeColor = "#000000",
+      fillColor = "transparent",
+      strokeWidth = 5,
+      zoom = 100,
+    },
+    ref
+  ) => {
     const [lines, setLines] = useState<LineData[]>([]);
     const [shapes, setShapes] = useState<ShapeData[]>([]);
-    const [canvasSize, setCanvasSize] = useState({ width: 1000, height: 600 });
+    const [canvasSize, setCanvasSize] = useState({ width: 3000, height: 2000 });
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [currentShape, setCurrentShape] = useState<ShapeData | null>(null);
@@ -86,7 +105,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             id: s.id || `shape-${Date.now()}-${Math.random()}`,
             stroke: s.stroke || strokeColor,
             strokeWidth: s.strokeWidth || 2,
-            fill: s.fill || "transparent"
+            fill: s.fill || "transparent",
           }));
           setShapes((prev) => [...prev, ...newShapes]);
         }
@@ -121,7 +140,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           tool: "pen",
           points: stroke.flatMap((point) => [point.x * 2.5, point.y * 2]), // Scale up
           color: "#000000",
-          width: 5
+          width: 5,
         }));
         setLines(convertedLines);
       }
@@ -130,64 +149,86 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     // Spacebar pan controls
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.code === 'Space' && !spacePressed) {
+        if (e.code === "Space" && !spacePressed) {
           e.preventDefault();
           setSpacePressed(true);
           if (stageRef.current) {
-            stageRef.current.container().style.cursor = 'grab';
+            stageRef.current.container().style.cursor = "grab";
           }
         }
       };
 
       const handleKeyUp = (e: KeyboardEvent) => {
-        if (e.code === 'Space') {
+        if (e.code === "Space") {
           e.preventDefault();
           setSpacePressed(false);
           setIsPanning(false);
           if (stageRef.current) {
-            stageRef.current.container().style.cursor = 'default';
+            stageRef.current.container().style.cursor = "default";
           }
         }
       };
 
-      window.addEventListener('keydown', handleKeyDown);
-      window.addEventListener('keyup', handleKeyUp);
+      window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("keyup", handleKeyUp);
 
       return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-        window.removeEventListener('keyup', handleKeyUp);
+        window.removeEventListener("keydown", handleKeyDown);
+        window.removeEventListener("keyup", handleKeyUp);
       };
     }, [spacePressed]);
+
+    // Helper function to get mouse position adjusted for zoom and pan
+    const getTransformedPointerPosition = (stage: Konva.Stage | null) => {
+      if (!stage) return null;
+      const pos = stage.getPointerPosition();
+      if (!pos) return null;
+
+      const scale = zoom / 100;
+      const stagePos = stage.position();
+
+      return {
+        x: (pos.x - stagePos.x) / scale,
+        y: (pos.y - stagePos.y) / scale,
+      };
+    };
 
     const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
       // Pan mode with spacebar
       if (spacePressed) {
         setIsPanning(true);
         if (stageRef.current) {
-          stageRef.current.container().style.cursor = 'grabbing';
+          stageRef.current.container().style.cursor = "grabbing";
         }
         return;
       }
 
-      const pos = e.target.getStage()?.getPointerPosition();
+      const pos = getTransformedPointerPosition(e.target.getStage());
       if (!pos) return;
 
       if (tool === "pen" || tool === "erase") {
         setIsDrawing(true);
-        setLines([...lines, { 
-          tool: tool === "erase" ? "erase" : "pen", 
-          points: [pos.x, pos.y],
-          color: tool === "erase" ? "#FFFFFF" : strokeColor,
-          width: tool === "erase" ? 20 : strokeWidth
-        }]);
-      } else if (tool === "shape" || tool === "rectangle" || tool === "circle") {
+        setLines([
+          ...lines,
+          {
+            tool: tool === "erase" ? "erase" : "pen",
+            points: [pos.x, pos.y],
+            color: tool === "erase" ? "#FFFFFF" : strokeColor,
+            width: tool === "erase" ? 20 : strokeWidth,
+          },
+        ]);
+      } else if (
+        tool === "shape" ||
+        tool === "rectangle" ||
+        tool === "circle"
+      ) {
         // Handle Shape Tools (assuming 'shape' maps to rectangle for now if specific tool logic used)
-        const shapeType = tool === "circle" ? "circle" : "rectangle"; 
+        const shapeType = tool === "circle" ? "circle" : "rectangle";
         // If tool is generic 'shape', default to rectangle or check submodule
         // For simplicity in this demo, let's assume specific tools are passed or we map them.
         // The user only has "shape" in the tool list in page.tsx currently.
         // Let's assume the 'shape' tool creates a rectangle by default for now
-        
+
         setIsDrawing(true);
         const newShape: ShapeData = {
           id: `shape-${Date.now()}`,
@@ -199,7 +240,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           radius: 0,
           stroke: strokeColor,
           strokeWidth: strokeWidth,
-          fill: fillColor
+          fill: fillColor,
         };
         setCurrentShape(newShape);
       } else if (tool === "text") {
@@ -212,7 +253,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             y: pos.y,
             text: text,
             stroke: strokeColor,
-            fill: strokeColor
+            fill: strokeColor,
           };
           setShapes([...shapes, newText]);
         }
@@ -222,7 +263,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
       if (!isDrawing) return;
       const stage = e.target.getStage();
-      const point = stage?.getPointerPosition();
+      const point = getTransformedPointerPosition(stage);
       if (!point) return;
 
       if (tool === "pen" || tool === "erase") {
@@ -232,26 +273,29 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           points: lastLine.points.concat([point.x, point.y]),
         };
         setLines([...lines.slice(0, -1), updatedLine]);
-      } else if (currentShape && (tool === "shape" || tool === "rectangle" || tool === "circle")) {
+      } else if (
+        currentShape &&
+        (tool === "shape" || tool === "rectangle" || tool === "circle")
+      ) {
         // Update current shape dimensions
         const startX = currentShape.x;
         const startY = currentShape.y;
-        
+
         if (currentShape.type === "rectangle") {
           const width = point.x - startX;
           const height = point.y - startY;
           setCurrentShape({
             ...currentShape,
             width,
-            height
+            height,
           });
         } else if (currentShape.type === "circle") {
           const dx = point.x - startX;
           const dy = point.y - startY;
-          const radius = Math.sqrt(dx*dx + dy*dy);
+          const radius = Math.sqrt(dx * dx + dy * dy);
           setCurrentShape({
             ...currentShape,
-            radius
+            radius,
           });
         }
       }
@@ -261,16 +305,25 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       setIsDrawing(false);
       if (currentShape) {
         // Prevent adding 0-size shapes
-        if ((currentShape.type === "rectangle" && currentShape.width !== 0) || 
-            (currentShape.type === "circle" && currentShape.radius !== 0)) {
-           setShapes([...shapes, currentShape]);
+        if (
+          (currentShape.type === "rectangle" && currentShape.width !== 0) ||
+          (currentShape.type === "circle" && currentShape.radius !== 0)
+        ) {
+          setShapes([...shapes, currentShape]);
         }
         setCurrentShape(null);
       }
     };
 
+    // Calculate scaled dimensions for proper zoom behavior
+    const scale = zoom / 100;
+
     return (
-      <div ref={containerRef} className="relative h-full w-full rounded-xl bg-canvas border-2 border-[#2E2E2E] shadow-panel paper-texture">
+      <div
+        ref={containerRef}
+        className="relative h-full w-full rounded-xl border-2 border-[#2E2E2E] shadow-panel overflow-hidden"
+        style={{ background: "#ffffff" }}
+      >
         <Stage
           width={canvasSize.width}
           height={canvasSize.height}
@@ -280,15 +333,16 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           ref={stageRef}
           className="rounded-xl"
           draggable={spacePressed}
-          scaleX={zoom / 100}
-          scaleY={zoom / 100}
         >
+          {/* Background Layer - Grid doesn't scale with zoom */}
           <Layer>
-            {/* Grid Background */}
+            {/* Grid Lines - Visual guide for drawing */}
             {gridEnabled && (
               <>
                 {/* Vertical grid lines */}
-                {Array.from({ length: Math.ceil(canvasSize.width / 20) + 1 }).map((_, i) => (
+                {Array.from({
+                  length: Math.ceil(canvasSize.width / 20) + 1,
+                }).map((_, i) => (
                   <Line
                     key={`v-${i}`}
                     points={[i * 20, 0, i * 20, canvasSize.height]}
@@ -297,7 +351,9 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                   />
                 ))}
                 {/* Horizontal grid lines */}
-                {Array.from({ length: Math.ceil(canvasSize.height / 20) + 1 }).map((_, i) => (
+                {Array.from({
+                  length: Math.ceil(canvasSize.height / 20) + 1,
+                }).map((_, i) => (
                   <Line
                     key={`h-${i}`}
                     points={[0, i * 20, canvasSize.width, i * 20]}
@@ -307,7 +363,10 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                 ))}
               </>
             )}
+          </Layer>
 
+          {/* Content Layer - Scales with zoom */}
+          <Layer scaleX={scale} scaleY={scale}>
             {/* Drawn Lines */}
             {lines.map((line, i) => (
               <Line
@@ -323,7 +382,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
 
             {/* Drawn Shapes */}
             {shapes.map((shape, i) => {
-              if (shape.type === 'rectangle') {
+              if (shape.type === "rectangle") {
                 return (
                   <Rect
                     key={shape.id || i}
@@ -337,7 +396,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                     cornerRadius={5}
                   />
                 );
-              } else if (shape.type === 'circle') {
+              } else if (shape.type === "circle") {
                 return (
                   <Circle
                     key={shape.id || i}
@@ -349,7 +408,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                     fill={shape.fill || "transparent"}
                   />
                 );
-              } else if (shape.type === 'text') {
+              } else if (shape.type === "text") {
                 return (
                   <KonvaText
                     key={shape.id || i}
@@ -366,8 +425,8 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             })}
 
             {/* Current Shape (Being Drawn) */}
-            {currentShape && (
-              currentShape.type === 'rectangle' ? (
+            {currentShape &&
+              (currentShape.type === "rectangle" ? (
                 <Rect
                   x={currentShape.x}
                   y={currentShape.y}
@@ -378,7 +437,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                   fill={currentShape.fill || "transparent"}
                   cornerRadius={5}
                 />
-              ) : currentShape.type === 'circle' ? (
+              ) : currentShape.type === "circle" ? (
                 <Circle
                   x={currentShape.x}
                   y={currentShape.y}
@@ -387,8 +446,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                   strokeWidth={currentShape.strokeWidth || 2}
                   fill={currentShape.fill || "transparent"}
                 />
-              ) : null
-            )}
+              ) : null)}
 
             {/* Empty State Hint */}
             {lines.length === 0 && shapes.length === 0 && !currentShape && (
@@ -405,7 +463,9 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
 
         {/* Canvas Info Overlay */}
         <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-3 rounded-lg bg-white/90 px-3 py-2 text-xs font-medium text-muted shadow-sm backdrop-blur-sm">
-          <span>{canvasSize.width} × {canvasSize.height}</span>
+          <span>
+            {canvasSize.width} × {canvasSize.height}
+          </span>
           <span>•</span>
           <span>
             {tool === "pen"
