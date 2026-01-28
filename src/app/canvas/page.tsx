@@ -536,7 +536,7 @@ export default function CanvasPage() {
             <button
               key={mode}
               onClick={() => setCurrentMode(mode)}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition-all duration-[var(--duration-fast)] ${
+              className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition-all duration-(--duration-fast) ${
                 currentMode === mode
                   ? "bg-white text-[#0A0A0A] shadow-sm"
                   : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
@@ -606,7 +606,7 @@ export default function CanvasPage() {
           <button
             onClick={handleRunDetection}
             disabled={isGenerating}
-            className="flex items-center gap-2 rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 backdrop-blur-md px-4 py-2 text-sm font-semibold text-white transition-all duration-[var(--duration-fast)] hover:bg-[#FF6B00]/30 hover:border-[#FF6B00] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,107,0,0.3)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="flex items-center gap-2 rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 backdrop-blur-md px-4 py-2 text-sm font-semibold text-white transition-all duration-(--duration-fast) hover:bg-[#FF6B00]/30 hover:border-[#FF6B00] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,107,0,0.3)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             {isGenerating ? (
               <>
@@ -652,7 +652,7 @@ export default function CanvasPage() {
 
           <button 
             onClick={() => setShowExport(true)}
-            className="rounded-lg bg-[#2E2E2E] px-4 py-2 text-sm font-semibold text-white transition-all duration-[var(--duration-fast)] hover:bg-white hover:text-[#0A0A0A]"
+            className="rounded-lg bg-[#2E2E2E] px-4 py-2 text-sm font-semibold text-white transition-all duration-(--duration-fast) hover:bg-white hover:text-[#0A0A0A]"
           >
             Export
           </button>
@@ -701,7 +701,7 @@ export default function CanvasPage() {
           </button>
 
           {/* Phase 1: Save Indicator - Fixed position to prevent layout shifts */}
-          <div className="w-32 flex-shrink-0">
+          <div className="w-32 shrink-0">
              <SaveIndicator isSaving={isSaving} lastSaved={lastSaved} error={error} />
           </div>
 
@@ -765,7 +765,7 @@ export default function CanvasPage() {
               key={tool}
               onClick={() => setCurrentTool(tool)}
               title={label}
-              className={`group relative flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-[var(--duration-fast)] ${
+              className={`group relative flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) ${
                 currentTool === tool
                   ? "bg-white text-[#0A0A0A] shadow-md"
                   : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
@@ -786,57 +786,40 @@ export default function CanvasPage() {
               </svg>
             </button>
           ))}
+            {/* Templates, Components, and Tools buttons below main tool options */}
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+              title="Templates"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowExport(true)}
+              className="flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+              title="Components"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setShowCodePanel(true)}
+              className="flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+              title="Tools"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 21m5.25-4l.75 4M4.5 10.5l15 0M6.75 7.5l10.5 0" />
+              </svg>
+            </button>
 
           <div className="my-2 h-px w-8 bg-[#2E2E2E]" />
-
           {/* Grid & Snap Toggles */}
-          <button
-            onClick={() => setGridEnabled(!gridEnabled)}
-            title="Toggle Grid (G)"
-            className={`flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-[var(--duration-fast)] ${
-              gridEnabled
-                ? "bg-white/10 text-white"
-                : "text-[#A0A0A0] hover:bg-[#2E2E2E]"
-            }`}
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"
-              />
-            </svg>
-          </button>
+          {/* Removed duplicate shape icon button here */}
 
-          <button
-            onClick={() => setSnapEnabled(!snapEnabled)}
-            title="Toggle Snap (Shift+S)"
-            className={`flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-[var(--duration-fast)] ${
-              snapEnabled
-                ? "bg-white/10 text-white"
-                : "text-[#A0A0A0] hover:bg-[#2E2E2E]"
-            }`}
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-              />
-            </svg>
-          </button>
+          {/* Removed Toggle Snap button from sidebar */}
         </aside>
 
         {/* Center: Canvas Area */}
@@ -852,6 +835,7 @@ export default function CanvasPage() {
               strokeColor={strokeColor}
               fillColor={fillColor}
               strokeWidth={strokeWidth}
+              zoom={zoom}
               canvasState={history.state}
               onStateChange={history.setState}
             />

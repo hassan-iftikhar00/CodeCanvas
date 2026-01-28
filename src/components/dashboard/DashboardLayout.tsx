@@ -28,11 +28,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="flex h-screen bg-[#0A0A0A] text-white">
+
       {/* Sidebar */}
       <aside className="w-64 border-r border-[#2E2E2E] flex flex-col">
         <div className="p-6 border-b border-[#2E2E2E]">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#FF6B00] to-[#FF8833]" />
+            <div className="h-8 w-8 rounded-lg bg-linear-to-br from-[#FF6B00] to-[#FF8833]" />
             <span className="text-lg font-bold">CodeCanvas</span>
           </Link>
         </div>
@@ -47,7 +48,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </svg>
             Projects
           </Link>
-          
+
+          {/* Templates Option */}
           <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#A0A0A0] hover:bg-[#1A1A1A] hover:text-white transition-colors">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -55,6 +57,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             Templates
           </button>
 
+          {/* Tools Option - new icon, with tools functionality */}
+          <button
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#A0A0A0] hover:bg-[#1A1A1A] hover:text-white transition-colors"
+            title="Tools"
+            onClick={() => window.location.href = '/canvas'}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 21m5.25-4l.75 4M4.5 10.5l15 0M6.75 7.5l10.5 0" />
+            </svg>
+            Tools
+          </button>
+
+          {/* Settings Option */}
           <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#A0A0A0] hover:bg-[#1A1A1A] hover:text-white transition-colors">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
