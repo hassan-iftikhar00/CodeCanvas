@@ -4,17 +4,18 @@ import { useState } from "react";
 import { templates, TEMPLATE_CATEGORIES, type Template } from "@/data/templates";
 
 interface TemplatesPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
   onInsertTemplate: (template: Template) => void;
 }
 
-export default function TemplatesPanel({ onInsertTemplate }: TemplatesPanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function TemplatesPanel({ isOpen, onClose, onInsertTemplate }: TemplatesPanelProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredTemplates = templates.filter((template) => {
     const matchesCategory = selectedCategory === "all" || template.category === selectedCategory;
-    const matchesSearch = 
+    const matchesSearch =
       template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       template.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       template.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -22,15 +23,7 @@ export default function TemplatesPanel({ onInsertTemplate }: TemplatesPanelProps
   });
 
   if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed left-4 top-1/2 z-20 -translate-y-1/2 rotate-180 rounded-l-xl glass-orange px-3 py-6 shadow-xl transition-all hover:px-4 [writing-mode:vertical-lr]"
-        title="Templates Library (T)"
-      >
-        <span className="text-sm font-bold text-white">Templates</span>
-      </button>
-    );
+    return null;
   }
 
   return (
@@ -38,17 +31,17 @@ export default function TemplatesPanel({ onInsertTemplate }: TemplatesPanelProps
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-10 bg-black/30 backdrop-blur-sm animate-fade-in"
-        onClick={() => setIsOpen(false)}
+        onClick={onClose}
       />
 
-      {/* Panel */}
-      <div className="fixed left-0 top-0 z-30 h-screen w-80 animate-slide-in-left glass-strong shadow-2xl">
+      {/* Panel - positioned next to left sidebar */}
+      <div className="fixed left-16 top-0 z-30 h-screen w-80 animate-slide-in-left glass-strong shadow-2xl">
         {/* Header */}
         <div className="border-b border-[var(--grey-700)] p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-xl font-bold text-white">Templates</h2>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={onClose}
               className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--grey-700)] hover:text-white"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -82,11 +75,10 @@ export default function TemplatesPanel({ onInsertTemplate }: TemplatesPanelProps
           <div className="flex gap-2">
             <button
               onClick={() => setSelectedCategory("all")}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                selectedCategory === "all"
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${selectedCategory === "all"
                   ? "bg-[var(--orange-primary)] text-white shadow-[var(--shadow-orange-glow-sm)]"
                   : "bg-[var(--grey-800)] text-[var(--text-secondary)] hover:bg-[var(--grey-700)] hover:text-white"
-              }`}
+                }`}
             >
               All
             </button>
@@ -94,11 +86,10 @@ export default function TemplatesPanel({ onInsertTemplate }: TemplatesPanelProps
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                  selectedCategory === cat.id
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${selectedCategory === cat.id
                     ? "bg-[var(--orange-primary)] text-white shadow-[var(--shadow-orange-glow-sm)]"
                     : "bg-[var(--grey-800)] text-[var(--text-secondary)] hover:bg-[var(--grey-700)] hover:text-white"
-                }`}
+                  }`}
               >
                 {cat.icon} {cat.label}
               </button>
@@ -127,7 +118,7 @@ export default function TemplatesPanel({ onInsertTemplate }: TemplatesPanelProps
                   key={template.id}
                   onClick={() => {
                     onInsertTemplate(template);
-                    setIsOpen(false);
+                    onClose();
                   }}
                   className="group w-full rounded-xl border border-[var(--grey-700)] bg-[var(--grey-900)] p-4 text-left transition-all hover:border-[var(--orange-primary)] hover:bg-[var(--grey-800)] hover:shadow-[var(--shadow-orange-glow-sm)]"
                 >
@@ -164,3 +155,4 @@ export default function TemplatesPanel({ onInsertTemplate }: TemplatesPanelProps
     </>
   );
 }
+
