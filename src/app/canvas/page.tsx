@@ -28,18 +28,23 @@ import ComponentPalette from "@/components/canvas/ComponentPalette";
 import { useVersionHistory } from "@/hooks/useVersionHistory";
 
 // Dynamically import canvas to avoid SSR issues
-const SketchCanvas = dynamic(() => import("@/components/canvas/SketchCanvasWithHistory"), {
-  ssr: false,
-});
+const SketchCanvas = dynamic(
+  () => import("@/components/canvas/SketchCanvasWithHistory"),
+  {
+    ssr: false,
+  }
+);
 
-type Tool = "pen" | "shape" | "text" | "select" | "bin";
+type Tool = "pen" | "shape" | "text" | "erase" | "select";
 type Mode = "sketch" | "detect" | "refine" | "preview";
 
 export default function CanvasPage() {
   const [currentTool, setCurrentTool] = useState<Tool>("pen");
   const [currentMode, setCurrentMode] = useState<Mode>("sketch");
-  const [activeSidebar, setActiveSidebar] = useState<"inspector" | "chat" | "history" | null>("inspector");
-  const [showCodePanel, setShowCodePanel] = useState(false);  // Start minimized to show more canvas space
+  const [activeSidebar, setActiveSidebar] = useState<
+    "inspector" | "chat" | "history" | null
+  >("inspector");
+  const [showCodePanel, setShowCodePanel] = useState(false); // Start minimized to show more canvas space
   const [gridEnabled, setGridEnabled] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
@@ -50,13 +55,22 @@ export default function CanvasPage() {
   // NEW: Enhanced feature states
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showExport, setShowExport] = useState(false);
-  const [showComponentPalette, setShowComponentPalette] = useState(false);
-  const [showToolPalette, setShowToolPalette] = useState(false);
-  const [showTemplatesPanel, setShowTemplatesPanel] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showTools, setShowTools] = useState(false);
+  const [showComponents, setShowComponents] = useState(false);
   const [layers, setLayers] = useState<Layer[]>([
-    { id: "layer-1", name: "Layer 1", type: "pen", visible: true, locked: false, opacity: 1 },
+    {
+      id: "layer-1",
+      name: "Layer 1",
+      type: "pen",
+      visible: true,
+      locked: false,
+      opacity: 1,
+    },
   ]);
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>("layer-1");
+  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(
+    "layer-1"
+  );
 
   // NEW: Tool properties
   const [strokeColor, setStrokeColor] = useState("#000000");
@@ -64,10 +78,19 @@ export default function CanvasPage() {
   const [strokeWidth, setStrokeWidth] = useState(5);
   const [zoom, setZoom] = useState(100);
 
-  const { saveProject, updateProject, updateProjectName, loadProject, isSaving: isManualSaving, lastSaved, error } = useProjectSave();
+  const {
+    saveProject,
+    updateProject,
+    updateProjectName,
+    loadProject,
+    isSaving: isManualSaving,
+    lastSaved,
+    error,
+  } = useProjectSave();
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("Untitled Project");
-  const [originalProjectName, setOriginalProjectName] = useState("Untitled Project");
+  const [originalProjectName, setOriginalProjectName] =
+    useState("Untitled Project");
   const [isSavingName, setIsSavingName] = useState(false);
 
   const [isGenerating, setIsGenerating] = useState(false);
@@ -90,12 +113,19 @@ export default function CanvasPage() {
   });
 
   // Enable Auto-save
-  const { isSaving: isAutoSaving } = useAutoSave(currentProject?.id || null, history.state);
+  const { isSaving: isAutoSaving } = useAutoSave(
+    currentProject?.id || null,
+    history.state
+  );
   const isSaving = isManualSaving || isAutoSaving;
 
   // Phase 1: Code editor and preview states
-  const [codeViewMode, setCodeViewMode] = useState<"code" | "preview" | "split">("code");
-  const [codeLanguage, setCodeLanguage] = useState<"html" | "css" | "javascript" | "typescript">("html");
+  const [codeViewMode, setCodeViewMode] = useState<
+    "code" | "preview" | "split"
+  >("code");
+  const [codeLanguage, setCodeLanguage] = useState<
+    "html" | "css" | "javascript" | "typescript"
+  >("html");
   const [editedCode, setEditedCode] = useState<string>("");
 
   // Phase 1: Version history states
@@ -134,7 +164,7 @@ export default function CanvasPage() {
         if (project) {
           setCurrentProject({ id: project.id, name: project.name });
           setProjectName(project.name);
-          setOriginalProjectName(project.name);  // Track original for comparison
+          setOriginalProjectName(project.name); // Track original for comparison
           if (project.canvas_data) {
             // Load canvas data into history/state
             // If we have a ref, load it directly
@@ -200,7 +230,6 @@ export default function CanvasPage() {
       // Update code with refinement
       setGeneratedCode(result.code);
       setEditedCode(result.code);
-
     } catch (err) {
       console.error(err);
       throw err;
@@ -215,10 +244,13 @@ export default function CanvasPage() {
 
     setIsSavingName(true);
     try {
-      const success = await updateProjectName(currentProject.id, projectName.trim());
+      const success = await updateProjectName(
+        currentProject.id,
+        projectName.trim()
+      );
       if (success) {
         setCurrentProject({ ...currentProject, name: projectName.trim() });
-        setOriginalProjectName(projectName.trim());  // Update original after save
+        setOriginalProjectName(projectName.trim()); // Update original after save
       }
     } finally {
       setIsSavingName(false);
@@ -236,7 +268,11 @@ export default function CanvasPage() {
     const canvasData = canvasRef.current?.getCanvasData();
 
     if (canvasData) {
-      await versionHistory.createVersion(currentProject.id, canvasData, description || undefined);
+      await versionHistory.createVersion(
+        currentProject.id,
+        canvasData,
+        description || undefined
+      );
     }
   };
 
@@ -273,12 +309,24 @@ export default function CanvasPage() {
       // Tool shortcuts (no modifiers)
       if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
         switch (e.key.toLowerCase()) {
-          case "p": setCurrentTool("pen"); break;
-          case "s": setCurrentTool("shape"); break;
-          case "t": setCurrentTool("text"); break;
-          case "v": setCurrentTool("select"); break;
-          case "d": setCurrentTool("bin"); break;
-          case "g": setGridEnabled((prev) => !prev); break;
+          case "p":
+            setCurrentTool("pen");
+            break;
+          case "s":
+            setCurrentTool("shape");
+            break;
+          case "t":
+            setCurrentTool("text");
+            break;
+          case "e":
+            setCurrentTool("erase");
+            break;
+          case "v":
+            setCurrentTool("select");
+            break;
+          case "g":
+            setGridEnabled((prev) => !prev);
+            break;
         }
       }
 
@@ -286,7 +334,9 @@ export default function CanvasPage() {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === "\\") {
           e.preventDefault();
-          setActiveSidebar((prev) => (prev === "inspector" ? null : "inspector"));
+          setActiveSidebar((prev) =>
+            prev === "inspector" ? null : "inspector"
+          );
         }
         if (e.key === "`") {
           e.preventDefault();
@@ -476,8 +526,18 @@ export default function CanvasPage() {
             className="flex items-center gap-2 text-[#A0A0A0] transition-colors hover:text-white"
             title="Back to Dashboard"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
             </svg>
           </Link>
           <div className="h-6 w-px bg-[#2E2E2E]" />
@@ -494,7 +554,11 @@ export default function CanvasPage() {
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && currentProject?.id && projectName !== originalProjectName) {
+                if (
+                  e.key === "Enter" &&
+                  currentProject?.id &&
+                  projectName !== originalProjectName
+                ) {
                   handleSaveProjectName();
                 }
               }}
@@ -510,13 +574,38 @@ export default function CanvasPage() {
                 title="Save project name (Enter)"
               >
                 {isSavingName ? (
-                  <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  <svg
+                    className="h-3.5 w-3.5 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
                   </svg>
                 ) : (
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  <svg
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={3}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 )}
               </button>
@@ -539,10 +628,11 @@ export default function CanvasPage() {
             <button
               key={mode}
               onClick={() => setCurrentMode(mode)}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition-all duration-(--duration-fast) ${currentMode === mode
-                ? "bg-white text-[#0A0A0A] shadow-sm"
-                : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
-                }`}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition-all duration-(--duration-fast) ${
+                currentMode === mode
+                  ? "bg-white text-[#0A0A0A] shadow-sm"
+                  : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+              }`}
             >
               {mode}
             </button>
@@ -555,10 +645,11 @@ export default function CanvasPage() {
             <button
               onClick={history.undo}
               disabled={!history.canUndo}
-              className={`rounded-lg p-2 transition-colors ${history.canUndo
-                ? "text-white hover:bg-[#2E2E2E]"
-                : "text-[#4A4A4A] cursor-not-allowed opacity-50"
-                }`}
+              className={`rounded-lg p-2 transition-colors ${
+                history.canUndo
+                  ? "text-white hover:bg-[#2E2E2E]"
+                  : "text-[#4A4A4A] cursor-not-allowed opacity-50"
+              }`}
               title="Undo (Ctrl+Z)"
             >
               <svg
@@ -578,10 +669,11 @@ export default function CanvasPage() {
             <button
               onClick={history.redo}
               disabled={!history.canRedo}
-              className={`rounded-lg p-2 transition-colors ${history.canRedo
-                ? "text-white hover:bg-[#2E2E2E]"
-                : "text-[#4A4A4A] cursor-not-allowed opacity-50"
-                }`}
+              className={`rounded-lg p-2 transition-colors ${
+                history.canRedo
+                  ? "text-white hover:bg-[#2E2E2E]"
+                  : "text-[#4A4A4A] cursor-not-allowed opacity-50"
+              }`}
               title="Redo (Ctrl+Shift+Z)"
             >
               <svg
@@ -660,26 +752,42 @@ export default function CanvasPage() {
           {/* Phase 1: Version History Button */}
           {/* Phase 2: Chat Button */}
           <button
-            onClick={() => setActiveSidebar(activeSidebar === "chat" ? null : "chat")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${activeSidebar === "chat"
-              ? "bg-white text-[#0A0A0A]"
-              : "bg-[#2E2E2E] text-white hover:bg-white hover:text-[#0A0A0A]"
-              }`}
+            onClick={() =>
+              setActiveSidebar(activeSidebar === "chat" ? null : "chat")
+            }
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+              activeSidebar === "chat"
+                ? "bg-white text-[#0A0A0A]"
+                : "bg-[#2E2E2E] text-white hover:bg-white hover:text-[#0A0A0A]"
+            }`}
             title="AI Chat"
           >
-            <svg className="mr-2 inline-block h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            <svg
+              className="mr-2 inline-block h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+              />
             </svg>
             Chat
           </button>
 
           {/* Phase 1: Version History Button */}
           <button
-            onClick={() => setActiveSidebar(activeSidebar === "history" ? null : "history")}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${activeSidebar === "history"
-              ? "bg-white text-[#0A0A0A]"
-              : "bg-[#2E2E2E] text-white hover:bg-white hover:text-[#0A0A0A]"
-              }`}
+            onClick={() =>
+              setActiveSidebar(activeSidebar === "history" ? null : "history")
+            }
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+              activeSidebar === "history"
+                ? "bg-white text-[#0A0A0A]"
+                : "bg-[#2E2E2E] text-white hover:bg-white hover:text-[#0A0A0A]"
+            }`}
             title="Version History"
           >
             <svg
@@ -700,7 +808,11 @@ export default function CanvasPage() {
 
           {/* Phase 1: Save Indicator - Fixed position to prevent layout shifts */}
           <div className="w-32 shrink-0">
-            <SaveIndicator isSaving={isSaving} lastSaved={lastSaved} error={error} />
+            <SaveIndicator
+              isSaving={isSaving}
+              lastSaved={lastSaved}
+              error={error}
+            />
           </div>
 
           <div className="h-6 w-px bg-[#2E2E2E]" />
@@ -749,24 +861,25 @@ export default function CanvasPage() {
               label: "Text (T)",
             },
             {
+              tool: "erase" as Tool,
+              icon: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
+              label: "Erase (E)",
+            },
+            {
               tool: "select" as Tool,
               icon: "M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122",
               label: "Select (V)",
-            },
-            {
-              tool: "bin" as Tool,
-              icon: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
-              label: "Delete (D)",
             },
           ].map(({ tool, icon, label }) => (
             <button
               key={tool}
               onClick={() => setCurrentTool(tool)}
               title={label}
-              className={`group relative flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) ${currentTool === tool
-                ? "bg-white text-[#0A0A0A] shadow-md"
-                : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
-                }`}
+              className={`group relative flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) ${
+                currentTool === tool
+                  ? "bg-white text-[#0A0A0A] shadow-md"
+                  : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+              }`}
             >
               <svg
                 className="h-5 w-5"
@@ -783,47 +896,90 @@ export default function CanvasPage() {
               </svg>
             </button>
           ))}
-          {/* Templates, Components, and Tools buttons below main tool options */}
-          <button
-            onClick={() => setShowTemplatesPanel(true)}
-            className={`flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) ${showTemplatesPanel
-              ? "bg-white text-[#0A0A0A] shadow-md"
-              : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
-              }`}
-            title="Templates"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-          </button>
-          {/* Components Button */}
-          <button
-            onClick={() => setShowComponentPalette(true)}
-            className={`flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) ${showComponentPalette
-              ? "bg-white text-[#0A0A0A] shadow-md"
-              : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
-              }`}
-            title="Components (C)"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-          {/* Tools Button */}
-          <button
-            onClick={() => setShowToolPalette(true)}
-            className={`flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) ${showToolPalette
-              ? "bg-white text-[#0A0A0A] shadow-md"
-              : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
-              }`}
-            title="Tools"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-            </svg>
-          </button>
+
+          {/* Spacer to push buttons to bottom */}
+          <div className="flex-1" />
 
           <div className="my-2 h-px w-8 bg-[#2E2E2E]" />
+
+          {/* Templates, Components, and Tools buttons at bottom of sidebar */}
+          <button
+            onClick={() => setShowTemplates(true)}
+            className="flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+            title="Templates"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 10h16M4 14h16M4 18h16"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => setShowComponents(true)}
+            className="flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+            title="Components"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={() => setShowTools(true)}
+            className="flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+            title="Tools"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+              />
+            </svg>
+          </button>
+          {/* <button
+            onClick={() => setShowCodePanel(true)}
+            className="flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+            title="Tools"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.75 17L9 21m5.25-4l.75 4M4.5 10.5l15 0M6.75 7.5l10.5 0"
+              />
+            </svg>
+          </button> */}
+
           {/* Grid & Snap Toggles */}
           {/* Removed duplicate shape icon button here */}
 
@@ -1036,28 +1192,31 @@ export default function CanvasPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setCodeViewMode("code")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${codeViewMode === "code"
-                    ? "bg-white text-[#0A0A0A]"
-                    : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
-                    }`}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    codeViewMode === "code"
+                      ? "bg-white text-[#0A0A0A]"
+                      : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+                  }`}
                 >
                   Code
                 </button>
                 <button
                   onClick={() => setCodeViewMode("preview")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${codeViewMode === "preview"
-                    ? "bg-white text-[#0A0A0A]"
-                    : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
-                    }`}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    codeViewMode === "preview"
+                      ? "bg-white text-[#0A0A0A]"
+                      : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+                  }`}
                 >
                   Preview
                 </button>
                 <button
                   onClick={() => setCodeViewMode("split")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${codeViewMode === "split"
-                    ? "bg-white text-[#0A0A0A]"
-                    : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
-                    }`}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    codeViewMode === "split"
+                      ? "bg-white text-[#0A0A0A]"
+                      : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
+                  }`}
                 >
                   Split
                 </button>
@@ -1096,7 +1255,10 @@ export default function CanvasPage() {
                     />
                   )}
                   {codeViewMode === "preview" && (
-                    <LivePreview code={editedCode || generatedCode} language="html" />
+                    <LivePreview
+                      code={editedCode || generatedCode}
+                      language="html"
+                    />
                   )}
                   {codeViewMode === "split" && (
                     <div className="flex h-full">
@@ -1109,7 +1271,10 @@ export default function CanvasPage() {
                         />
                       </div>
                       <div className="flex-1">
-                        <LivePreview code={editedCode || generatedCode} language="html" />
+                        <LivePreview
+                          code={editedCode || generatedCode}
+                          language="html"
+                        />
                       </div>
                     </div>
                   )}
@@ -1131,7 +1296,8 @@ export default function CanvasPage() {
                       />
                     </svg>
                     <p className="text-sm">
-                      Draw on the canvas and click &quot;Run Detection&quot; to generate code
+                      Draw on the canvas and click &quot;Run Detection&quot; to
+                      generate code
                     </p>
                   </div>
                 </div>
@@ -1256,8 +1422,8 @@ export default function CanvasPage() {
 
       {/* NEW: Tool Palette */}
       <ToolPalette
-        isOpen={showToolPalette}
-        onClose={() => setShowToolPalette(false)}
+        isOpen={showTools}
+        onClose={() => setShowTools(false)}
         strokeColor={strokeColor}
         fillColor={fillColor}
         strokeWidth={strokeWidth}
@@ -1268,15 +1434,15 @@ export default function CanvasPage() {
 
       {/* NEW: Templates Panel */}
       <TemplatesPanel
-        isOpen={showTemplatesPanel}
-        onClose={() => setShowTemplatesPanel(false)}
+        isOpen={showTemplates}
+        onClose={() => setShowTemplates(false)}
         onInsertTemplate={handleInsertTemplate}
       />
 
       {/* Phase 3: Component Palette */}
       <ComponentPalette
-        isOpen={showComponentPalette}
-        onClose={() => setShowComponentPalette(false)}
+        isOpen={showComponents}
+        onClose={() => setShowComponents(false)}
         onInsertComponent={handleInsertComponent}
       />
 
