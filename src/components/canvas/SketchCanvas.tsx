@@ -14,6 +14,7 @@ import {
   Rect,
   Circle,
   Text as KonvaText,
+  Group,
 } from "react-konva";
 import type Konva from "konva";
 
@@ -84,6 +85,16 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const [isPanning, setIsPanning] = useState(false);
     const [spacePressed, setSpacePressed] = useState(false);
     const stageRef = useRef<Konva.Stage>(null);
+
+    // Text input modal state
+    const [showTextInput, setShowTextInput] = useState(false);
+    const [textInputValue, setTextInputValue] = useState("");
+    const [textInputPosition, setTextInputPosition] = useState({ x: 0, y: 0 });
+    const [pendingTextPosition, setPendingTextPosition] = useState({ x: 0, y: 0 });
+    const textInputRef = useRef<HTMLInputElement>(null);
+
+    // Track which text element is being hovered for delete button
+    const [hoveredTextId, setHoveredTextId] = useState<string | null>(null);
 
     // Expose methods to parent component via ref
     useImperativeHandle(ref, () => ({
@@ -193,6 +204,51 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       };
     };
 
+    // Focus text input when shown
+    useEffect(() => {
+      if (showTextInput && textInputRef.current) {
+        textInputRef.current.focus();
+      }
+    }, [showTextInput]);
+
+    // Handle text submission
+    const handleTextSubmit = () => {
+      if (textInputValue.trim()) {
+        const newText: ShapeData = {
+          id: `text-${Date.now()}`,
+          type: "text",
+          x: pendingTextPosition.x,
+          y: pendingTextPosition.y,
+          text: textInputValue.trim(),
+          stroke: strokeColor,
+          fill: strokeColor,
+        };
+        setShapes([...shapes, newText]);
+      }
+      setShowTextInput(false);
+      setTextInputValue("");
+    };
+
+    // Handle text cancellation
+    const handleTextCancel = () => {
+      setShowTextInput(false);
+      setTextInputValue("");
+    };
+
+    // Handle text element deletion
+    const handleDeleteText = (id: string) => {
+      setShapes(shapes => shapes.filter(shape => shape.id !== id));
+    };
+
+    // Handle text drag
+    const handleTextDragEnd = (id: string, newX: number, newY: number) => {
+      setShapes(shapes =>
+        shapes.map(shape =>
+          shape.id === id ? { ...shape, x: newX, y: newY } : shape
+        )
+      );
+    };
+
     const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
       // Pan mode with spacebar
       if (spacePressed) {
@@ -206,15 +262,76 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       const pos = getTransformedPointerPosition(e.target.getStage());
       if (!pos) return;
 
-      if (tool === "pen" || tool === "erase") {
+      if (tool === "bin") {
+        // Check for hit on shapes first (reverse for topmost first)
+        for (let i = shapes.length - 1; i >= 0; i--) {
+          const shape = shapes[i];
+          if (shape.type === "rectangle") {
+            const x1 = shape.x;
+            const y1 = shape.y;
+            const x2 = shape.x + (shape.width || 0);
+            const y2 = shape.y + (shape.height || 0);
+            if (pos.x >= Math.min(x1, x2) && pos.x <= Math.max(x1, x2) && pos.y >= Math.min(y1, y2) && pos.y <= Math.max(y1, y2)) {
+              setShapes(shapes => shapes.filter((_, idx) => idx !== i));
+              return;
+            }
+          } else if (shape.type === "circle") {
+            const dx = pos.x - shape.x;
+            const dy = pos.y - shape.y;
+            const r = shape.radius || 0;
+            if (dx * dx + dy * dy <= r * r) {
+              setShapes(shapes => shapes.filter((_, idx) => idx !== i));
+              return;
+            }
+          } else if (shape.type === "text") {
+            // Assume text is 100x30 box for hit area (can be improved)
+            const x1 = shape.x;
+            const y1 = shape.y;
+            const x2 = shape.x + 100;
+            const y2 = shape.y + 30;
+            if (pos.x >= x1 && pos.x <= x2 && pos.y >= y1 && pos.y <= y2) {
+              setShapes(shapes => shapes.filter((_, idx) => idx !== i));
+              return;
+            }
+          }
+        }
+
+        // Check for hit on lines (pen drawings)
+        const hitThreshold = 10; // pixels distance threshold for line hit detection
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const line = lines[i];
+          const points = line.points;
+          // Check each segment of the line
+          for (let j = 0; j < points.length - 2; j += 2) {
+            const x1 = points[j];
+            const y1 = points[j + 1];
+            const x2 = points[j + 2];
+            const y2 = points[j + 3];
+            // Calculate distance from point to line segment
+            const lineLen = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+            if (lineLen === 0) continue;
+            const t = Math.max(0, Math.min(1, ((pos.x - x1) * (x2 - x1) + (pos.y - y1) * (y2 - y1)) / (lineLen ** 2)));
+            const projX = x1 + t * (x2 - x1);
+            const projY = y1 + t * (y2 - y1);
+            const dist = Math.sqrt((pos.x - projX) ** 2 + (pos.y - projY) ** 2);
+            if (dist <= hitThreshold + (line.width || 5) / 2) {
+              setLines(lines => lines.filter((_, idx) => idx !== i));
+              return;
+            }
+          }
+        }
+        return;
+      }
+
+      if (tool === "pen") {
         setIsDrawing(true);
         setLines([
           ...lines,
           {
-            tool: tool === "erase" ? "erase" : "pen",
+            tool: "pen",
             points: [pos.x, pos.y],
-            color: tool === "erase" ? "#FFFFFF" : strokeColor,
-            width: tool === "erase" ? 20 : strokeWidth,
+            color: strokeColor,
+            width: strokeWidth,
           },
         ]);
       } else if (
@@ -224,11 +341,6 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       ) {
         // Handle Shape Tools (assuming 'shape' maps to rectangle for now if specific tool logic used)
         const shapeType = tool === "circle" ? "circle" : "rectangle";
-        // If tool is generic 'shape', default to rectangle or check submodule
-        // For simplicity in this demo, let's assume specific tools are passed or we map them.
-        // The user only has "shape" in the tool list in page.tsx currently.
-        // Let's assume the 'shape' tool creates a rectangle by default for now
-
         setIsDrawing(true);
         const newShape: ShapeData = {
           id: `shape-${Date.now()}`,
@@ -244,18 +356,21 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         };
         setCurrentShape(newShape);
       } else if (tool === "text") {
-        const text = prompt("Enter text:", "New Text");
-        if (text) {
-          const newText: ShapeData = {
-            id: `text-${Date.now()}`,
-            type: "text",
-            x: pos.x,
-            y: pos.y,
-            text: text,
-            stroke: strokeColor,
-            fill: strokeColor,
-          };
-          setShapes([...shapes, newText]);
+        // Show the text input modal at the clicked position
+        const stage = e.target.getStage();
+        if (stage && containerRef.current) {
+          const containerRect = containerRef.current.getBoundingClientRect();
+          const stagePos = stage.position();
+          const scale = zoom / 100;
+
+          // Calculate screen position for the input
+          const screenX = pos.x * scale + stagePos.x + containerRect.left;
+          const screenY = pos.y * scale + stagePos.y + containerRect.top;
+
+          setTextInputPosition({ x: screenX, y: screenY });
+          setPendingTextPosition({ x: pos.x, y: pos.y });
+          setTextInputValue("");
+          setShowTextInput(true);
         }
       }
     };
@@ -266,7 +381,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       const point = getTransformedPointerPosition(stage);
       if (!point) return;
 
-      if (tool === "pen" || tool === "erase") {
+      if (tool === "pen") {
         const lastLine = lines[lines.length - 1];
         const updatedLine = {
           ...lastLine,
@@ -409,16 +524,59 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                   />
                 );
               } else if (shape.type === "text") {
+                const isHovered = hoveredTextId === shape.id;
                 return (
-                  <KonvaText
+                  <Group
                     key={shape.id || i}
                     x={shape.x}
                     y={shape.y}
-                    text={shape.text || "Text"}
-                    fontSize={16}
-                    fontFamily="Inter, sans-serif"
-                    fill={shape.stroke || "#000000"}
-                  />
+                    draggable={tool !== "bin"}
+                    onDragEnd={(e) => {
+                      handleTextDragEnd(shape.id, e.target.x(), e.target.y());
+                    }}
+                    onMouseEnter={() => setHoveredTextId(shape.id)}
+                    onMouseLeave={() => setHoveredTextId(null)}
+                  >
+                    <KonvaText
+                      text={shape.text || "Text"}
+                      fontSize={16}
+                      fontFamily="Inter, sans-serif"
+                      fill={shape.stroke || "#000000"}
+                    />
+                    {/* Delete button - shown on hover */}
+                    {isHovered && (
+                      <>
+                        {/* Delete button background */}
+                        <Rect
+                          x={-8}
+                          y={-24}
+                          width={20}
+                          height={20}
+                          fill="#FF4444"
+                          cornerRadius={4}
+                          onClick={() => handleDeleteText(shape.id)}
+                          onTap={() => handleDeleteText(shape.id)}
+                        />
+                        {/* Delete icon (X shape using lines) */}
+                        <Line
+                          points={[-3, -19, 7, -9]}
+                          stroke="white"
+                          strokeWidth={2}
+                          lineCap="round"
+                          onClick={() => handleDeleteText(shape.id)}
+                          onTap={() => handleDeleteText(shape.id)}
+                        />
+                        <Line
+                          points={[7, -19, -3, -9]}
+                          stroke="white"
+                          strokeWidth={2}
+                          lineCap="round"
+                          onClick={() => handleDeleteText(shape.id)}
+                          onTap={() => handleDeleteText(shape.id)}
+                        />
+                      </>
+                    )}
+                  </Group>
                 );
               }
               return null;
@@ -461,6 +619,49 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           </Layer>
         </Stage>
 
+        {/* Floating Text Input Modal */}
+        {showTextInput && (
+          <div
+            className="fixed z-50 flex flex-col gap-2 rounded-lg bg-white p-3 shadow-xl border border-gray-300"
+            style={{
+              left: textInputPosition.x,
+              top: textInputPosition.y,
+              transform: 'translate(-50%, -100%)',
+              marginTop: -8,
+            }}
+          >
+            <input
+              ref={textInputRef}
+              type="text"
+              value={textInputValue}
+              onChange={(e) => setTextInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleTextSubmit();
+                } else if (e.key === 'Escape') {
+                  handleTextCancel();
+                }
+              }}
+              placeholder="Enter your text"
+              className="w-48 rounded border border-gray-300 px-3 py-2 text-sm text-black placeholder-gray-400 focus:border-[#FF6B00] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/20"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleTextSubmit}
+                className="flex-1 rounded bg-[#FF6B00] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#FF8533]"
+              >
+                Add
+              </button>
+              <button
+                onClick={handleTextCancel}
+                className="flex-1 rounded bg-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Canvas Info Overlay */}
         <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-3 rounded-lg bg-white/90 px-3 py-2 text-xs font-medium text-muted shadow-sm backdrop-blur-sm">
           <span>
@@ -472,7 +673,9 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
               ? "Drawing"
               : tool === "select"
                 ? "Selection"
-                : tool.charAt(0).toUpperCase() + tool.slice(1)}{" "}
+                : tool === "bin"
+                  ? "Delete"
+                  : tool.charAt(0).toUpperCase() + tool.slice(1)}{" "}
             Mode
           </span>
           {gridEnabled && (

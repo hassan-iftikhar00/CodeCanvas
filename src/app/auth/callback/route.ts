@@ -16,6 +16,13 @@ export async function GET(request: Request) {
       console.log("✅ Callback - Session created for:", data.user?.email);
       console.log("🍪 Callback - Session expires:", data.session?.expires_at);
 
+      // Check if this is a password recovery flow
+      // The 'next' param will be /auth/reset-password for recovery
+      if (next === "/auth/reset-password") {
+        console.log("🔑 Callback - Password recovery flow detected");
+        return NextResponse.redirect(`${origin}/auth/reset-password`);
+      }
+
       return NextResponse.redirect(`${origin}${next}`);
     } else {
       console.error(

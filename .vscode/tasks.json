@@ -1,0 +1,22 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build and Lint",
+			"type": "shell",
+			"command": "pnpm run build && pnpm run lint",
+			"problemMatcher": [
+				"$tsc",
+				"$eslint-stylish"
+			]
+		},
+		{
+			"label": "Build",
+			"type": "shell",
+			"command": "pnpm run build",
+			"problemMatcher": [
+				"$tsc"
+			]
+		}
+	]
+}
