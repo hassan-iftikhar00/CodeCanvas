@@ -111,22 +111,14 @@ const COMPONENTS: Component[] = [
 ];
 
 interface ComponentPaletteProps {
+  isOpen: boolean;
+  onClose: () => void;
   onInsertComponent: (component: Component) => void;
 }
 
-export default function ComponentPalette({ onInsertComponent }: ComponentPaletteProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
+export default function ComponentPalette({ isOpen, onClose, onInsertComponent }: ComponentPaletteProps) {
   if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed right-4 top-1/2 z-20 -translate-y-1/2 rounded-r-xl bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-3 py-6 shadow-xl transition-all hover:px-4 hover:bg-[#FF6B00]/30 [writing-mode:vertical-lr]"
-        title="Component Library (C)"
-      >
-        <span className="text-sm font-bold text-white">Components</span>
-      </button>
-    );
+    return null;
   }
 
   return (
@@ -134,17 +126,17 @@ export default function ComponentPalette({ onInsertComponent }: ComponentPalette
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-10 bg-black/30 backdrop-blur-sm animate-fade-in"
-        onClick={() => setIsOpen(false)}
+        onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 z-30 h-screen w-80 animate-slide-in-right border-l border-[#2E2E2E] bg-[#1A1A1A] shadow-2xl">
+      <div className="fixed left-16 top-0 z-30 h-screen w-80 animate-slide-in-right border-r border-[#2E2E2E] bg-[#1A1A1A] shadow-2xl">
         {/* Header */}
         <div className="border-b border-[#2E2E2E] p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-xl font-bold text-white">Components</h2>
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={onClose}
               className="rounded-lg p-1.5 text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -163,7 +155,7 @@ export default function ComponentPalette({ onInsertComponent }: ComponentPalette
                 key={component.id}
                 onClick={() => {
                   onInsertComponent(component);
-                  setIsOpen(false);
+                  onClose();
                 }}
                 className="group flex flex-col items-center gap-2 rounded-xl border border-[#2E2E2E] bg-[#0A0A0A] p-4 text-center transition-all hover:border-[#FF6B00] hover:bg-[#1A1A1A] hover:shadow-[0_0_20px_rgba(255,107,0,0.2)]"
               >
