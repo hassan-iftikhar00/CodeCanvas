@@ -543,8 +543,9 @@ export default function CanvasPage() {
           <div className="h-6 w-px bg-[#2E2E2E]" />
           <Link
             href="/dashboard"
-            className="text-xl font-bold text-white transition-colors hover:text-[#FF6B00]"
+            className="flex items-center gap-2 text-xl font-bold text-white transition-colors hover:text-[#FF6B00]"
           >
+            <img src="/logo.png" alt="CodeCanvas Logo" className="w-10 h-10" />
             CodeCanvas
           </Link>
           <div className="h-6 w-px bg-[#2E2E2E]" />
