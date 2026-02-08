@@ -34,7 +34,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <aside className="w-64 border-r border-[#2E2E2E] flex flex-col">
         <div className="p-6 border-b border-[#2E2E2E]">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-linear-to-br from-[#FF6B00] to-[#FF8833]" />
+            <img src="/logo.png" alt="CodeCanvas Logo" className="w-8 h-8" />
             <span className="text-lg font-bold">CodeCanvas</span>
           </Link>
         </div>

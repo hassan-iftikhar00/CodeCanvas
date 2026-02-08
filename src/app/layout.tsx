@@ -19,6 +19,9 @@ export const metadata: Metadata = {
     "frontend development",
     "UI builder",
   ],
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({

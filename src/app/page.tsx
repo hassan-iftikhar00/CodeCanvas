@@ -118,6 +118,36 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
+      {/* Navigation Header */}
+      <nav className="relative z-20 border-b border-[#2E2E2E]">
+        <div className="mx-auto max-w-7xl px-6 py-4 lg:px-8">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2">
+              <img
+                src="/logo.png"
+                alt="CodeCanvas Logo"
+                className="w-10 h-10"
+              />
+              <span className="text-xl font-bold text-white">CodeCanvas</span>
+            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href="/auth/login"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-[#A0A0A0] transition-colors hover:text-white"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/canvas"
+                className="rounded-lg bg-[#FF6B00] px-4 py-2 text-sm font-bold text-white transition-all hover:bg-[#E66000] hover:shadow-[0_0_20px_rgba(255,107,0,0.3)]"
+              >
+                Get Started
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
       {/* Hero Section */}
       <main className="relative overflow-hidden">
         {/* Grid Scan Background - Subtle Energy Pulse */}
@@ -145,23 +175,46 @@ export default function Home() {
               </div>
 
               <div className="space-y-0">
-                <h1 className="text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl animate-slide-in-up" style={{ animationDelay: '0.1s' }}>
+                <h1
+                  className="text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl animate-slide-in-up"
+                  style={{ animationDelay: "0.1s" }}
+                >
                   Draw.
                 </h1>
-                <h1 className="text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl animate-slide-in-up" style={{ animationDelay: '0.2s' }}>
+                <h1
+                  className="text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl animate-slide-in-up"
+                  style={{ animationDelay: "0.2s" }}
+                >
                   Describe.
                 </h1>
-                <h1 className="text-5xl font-bold tracking-tight text-[#FF6B00] sm:text-6xl lg:text-7xl animate-slide-in-up animate-glow-pulse" style={{ animationDelay: '0.3s' }}>
+                <h1
+                  className="text-5xl font-bold tracking-tight text-[#FF6B00] sm:text-6xl lg:text-7xl animate-slide-in-up animate-glow-pulse"
+                  style={{ animationDelay: "0.3s" }}
+                >
                   Ship.
                 </h1>
               </div>
 
-              <p className="text-xl leading-relaxed text-[#A0A0A0] max-w-lg animate-fade-in" style={{ animationDelay: '0.5s', opacity: 0, animationFillMode: 'forwards' }}>
+              <p
+                className="text-xl leading-relaxed text-[#A0A0A0] max-w-lg animate-fade-in"
+                style={{
+                  animationDelay: "0.5s",
+                  opacity: 0,
+                  animationFillMode: "forwards",
+                }}
+              >
                 Convert rough sketches into production-ready frontends - live
                 preview and one-click export.
               </p>
 
-              <div className="flex flex-col gap-4 sm:flex-row animate-slide-in-up" style={{ animationDelay: '0.6s', opacity: 0, animationFillMode: 'forwards' }}>
+              <div
+                className="flex flex-col gap-4 sm:flex-row animate-slide-in-up"
+                style={{
+                  animationDelay: "0.6s",
+                  opacity: 0,
+                  animationFillMode: "forwards",
+                }}
+              >
                 <Link
                   href="/canvas"
                   className="btn-base ripple group inline-flex items-center justify-center rounded-xl glass-orange px-8 py-4 text-base font-semibold text-white glow-orange-hover focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-offset-2 focus:ring-offset-[#0A0A0A]"
