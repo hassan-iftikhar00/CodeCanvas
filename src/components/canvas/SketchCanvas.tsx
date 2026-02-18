@@ -72,6 +72,8 @@ export interface SketchCanvasRef {
   };
   clearCanvas: () => void;
   insertTemplate: (data: any) => void;
+  exportAsPNG: () => string;
+  exportAsDataURL: (mimeType?: string, quality?: number) => string;
 }
 
 const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
@@ -146,6 +148,39 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           }));
           setShapes((prev) => [...prev, ...newShapes]);
         }
+      },
+      exportAsPNG: () => {
+        if (!stageRef.current) return '';
+        // Deselect any selected shapes before export
+        const prevSelectedId = selectedShapeId;
+        setSelectedShapeId(null);
+        // Small delay to ensure transformer is removed
+        setTimeout(() => {
+          if (stageRef.current) {
+            const dataURL = stageRef.current.toDataURL({ pixelRatio: 2 });
+            // Restore selection
+            setSelectedShapeId(prevSelectedId);
+            return dataURL;
+          }
+        }, 50);
+        return '';
+      },
+      exportAsDataURL: (mimeType = 'image/png', quality = 1) => {
+        if (!stageRef.current) return '';
+        const prevSelectedId = selectedShapeId;
+        setSelectedShapeId(null);
+        setTimeout(() => {
+          if (stageRef.current) {
+            const dataURL = stageRef.current.toDataURL({ 
+              mimeType, 
+              quality,
+              pixelRatio: 2 
+            });
+            setSelectedShapeId(prevSelectedId);
+            return dataURL;
+          }
+        }, 50);
+        return '';
       },
     }));
     // Responsive canvas sizing
@@ -239,10 +274,19 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       const scale = zoom / 100;
       const stagePos = stage.position();
 
-      return {
+      const transformed = {
         x: (pos.x - stagePos.x) / scale,
         y: (pos.y - stagePos.y) / scale,
       };
+
+      // Apply snap to grid if enabled
+      if (snapEnabled && gridEnabled) {
+        const gridSize = 20;
+        transformed.x = Math.round(transformed.x / gridSize) * gridSize;
+        transformed.y = Math.round(transformed.y / gridSize) * gridSize;
+      }
+
+      return transformed;
     };
 
     // Focus text input when shown
@@ -1082,13 +1126,39 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                 ? "Selection"
                 : tool === "bin"
                   ? "Delete"
-                  : tool.charAt(0).toUpperCase() + tool.slice(1)}{" "}
+                  : tool === "erase"
+                    ? "Eraser"
+                    : tool === "ellipse"
+                      ? "Ellipse"
+                      : tool === "triangle"
+                        ? "Triangle"
+                        : tool === "arrow"
+                          ? "Arrow"
+                          : tool.charAt(0).toUpperCase() + tool.slice(1)}{" "}
             Mode
           </span>
           {gridEnabled && (
             <>
               <span>•</span>
               <span className="text-accent">Grid On</span>
+            </>
+          )}
+          {snapEnabled && gridEnabled && (
+            <>
+              <span>•</span>
+              <span className="text-accent">Snap On</span>
+            </>
+          )}
+          {zoom !== 100 && (
+            <>
+              <span>•</span>
+              <span>Zoom: {zoom}%</span>
+            </>
+          )}
+          {selectedShapeId && (
+            <>
+              <span>•</span>
+              <span className="text-[#FF6B00]">Shape Selected</span>
             </>
           )}
         </div>
