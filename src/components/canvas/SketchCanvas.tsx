@@ -151,36 +151,18 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       },
       exportAsPNG: () => {
         if (!stageRef.current) return '';
-        // Deselect any selected shapes before export
-        const prevSelectedId = selectedShapeId;
-        setSelectedShapeId(null);
-        // Small delay to ensure transformer is removed
-        setTimeout(() => {
-          if (stageRef.current) {
-            const dataURL = stageRef.current.toDataURL({ pixelRatio: 2 });
-            // Restore selection
-            setSelectedShapeId(prevSelectedId);
-            return dataURL;
-          }
-        }, 50);
-        return '';
+        // Export immediately without selection - transformer won't be included in export
+        const dataURL = stageRef.current.toDataURL({ pixelRatio: 2 });
+        return dataURL;
       },
       exportAsDataURL: (mimeType = 'image/png', quality = 1) => {
         if (!stageRef.current) return '';
-        const prevSelectedId = selectedShapeId;
-        setSelectedShapeId(null);
-        setTimeout(() => {
-          if (stageRef.current) {
-            const dataURL = stageRef.current.toDataURL({ 
-              mimeType, 
-              quality,
-              pixelRatio: 2 
-            });
-            setSelectedShapeId(prevSelectedId);
-            return dataURL;
-          }
-        }, 50);
-        return '';
+        const dataURL = stageRef.current.toDataURL({ 
+          mimeType, 
+          quality,
+          pixelRatio: 2 
+        });
+        return dataURL;
       },
     }));
     // Responsive canvas sizing
