@@ -16,6 +16,7 @@ import ToolPalette from "@/components/canvas/ToolPalette";
 import TemplatesPanel from "@/components/canvas/TemplatesPanel";
 import SaveIndicator from "@/components/SaveIndicator";
 import ZoomControls from "@/components/canvas/ZoomControls";
+import Navbar from "@/components/Navbar";
 import { useProjectSave, useAutoSave } from "@/hooks/useProjectSave";
 import type { Template } from "@/data/templates";
 
@@ -138,9 +139,43 @@ export default function CanvasPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // User state
+  const [user, setUser] = useState<any>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        setUser(user);
+
+        // Fetch profile data from database
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single();
+
+          if (profile) {
+            setUserProfile(profile);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        // Allow page to work without authentication
+        setUser(null);
+      }
+    };
+    getUser();
+  }, [supabase]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push("/auth/login");
+    router.push("/");
     router.refresh();
   };
 
@@ -519,332 +554,33 @@ export default function CanvasPage() {
   return (
     <div className="flex h-screen flex-col bg-[#0A0A0A] overflow-hidden">
       {/* Top Toolbar */}
-      <header className="flex items-center justify-between border-b border-[#2E2E2E] bg-[#1A1A1A] px-4 py-3 shadow-sm overflow-hidden">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 text-[#A0A0A0] transition-colors hover:text-white"
-            title="Back to Dashboard"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-          </Link>
-          <div className="h-6 w-px bg-[#2E2E2E]" />
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 text-xl font-bold text-white transition-colors hover:text-[#FF6B00]"
-          >
-            <img src="/logo.png" alt="CodeCanvas Logo" className="w-10 h-10" />
-            CodeCanvas
-          </Link>
-          <div className="h-6 w-px bg-[#2E2E2E]" />
-          <div className="relative">
-            <input
-              type="text"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  currentProject?.id &&
-                  projectName !== originalProjectName
-                ) {
-                  handleSaveProjectName();
-                }
-              }}
-              className="rounded-lg border border-[#2E2E2E] bg-[#0A0A0A] px-3 py-1.5 pr-10 text-sm font-medium text-white focus:border-[#FF6B00] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/20"
-              placeholder="Project Name"
-            />
-            {/* Save button - only shows when name changed */}
-            {projectName !== originalProjectName && projectName.trim() && (
-              <button
-                onClick={handleSaveProjectName}
-                disabled={isSavingName || !currentProject?.id}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#0A0A0A] transition-all hover:bg-[#FF6B00] hover:text-white disabled:opacity-50"
-                title="Save project name (Enter)"
-              >
-                {isSavingName ? (
-                  <svg
-                    className="h-3.5 w-3.5 animate-spin"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                )}
-              </button>
-            )}
-          </div>
-
-          {/* NEW: Shortcuts Button */}
-          <button
-            onClick={() => setShowShortcuts(true)}
-            className="rounded-lg bg-[#2E2E2E] px-3 py-1.5 text-xs font-medium text-[#A0A0A0] transition-colors hover:bg-white hover:text-[#0A0A0A]"
-            title="Keyboard Shortcuts (?)"
-          >
-            <kbd className="font-mono">?</kbd> Shortcuts
-          </button>
-        </div>
-
-        {/* Mode Switcher */}
-        <div className="flex items-center gap-2 rounded-xl bg-[#0A0A0A] border border-[#2E2E2E] p-1">
-          {(["sketch", "detect", "refine", "preview"] as Mode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setCurrentMode(mode)}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition-all duration-(--duration-fast) ${
-                currentMode === mode
-                  ? "bg-white text-[#0A0A0A] shadow-sm"
-                  : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Undo/Redo */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={history.undo}
-              disabled={!history.canUndo}
-              className={`rounded-lg p-2 transition-colors ${
-                history.canUndo
-                  ? "text-white hover:bg-[#2E2E2E]"
-                  : "text-[#4A4A4A] cursor-not-allowed opacity-50"
-              }`}
-              title="Undo (Ctrl+Z)"
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                />
-              </svg>
-            </button>
-            <button
-              onClick={history.redo}
-              disabled={!history.canRedo}
-              className={`rounded-lg p-2 transition-colors ${
-                history.canRedo
-                  ? "text-white hover:bg-[#2E2E2E]"
-                  : "text-[#4A4A4A] cursor-not-allowed opacity-50"
-              }`}
-              title="Redo (Ctrl+Shift+Z)"
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"
-                />
-              </svg>
-            </button>
-          </div>
-
-          <div className="h-6 w-px bg-[#2E2E2E]" />
-
-          {/* Run Detection Button */}
-          <button
-            onClick={handleRunDetection}
-            disabled={isGenerating}
-            className="flex items-center gap-2 rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 backdrop-blur-md px-4 py-2 text-sm font-semibold text-white transition-all duration-(--duration-fast) hover:bg-[#FF6B00]/30 hover:border-[#FF6B00] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,107,0,0.3)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-          >
-            {isGenerating ? (
-              <>
-                <svg
-                  className="h-4 w-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Analyzing...
-              </>
-            ) : (
-              <>
-                <svg
-                  className="h-4 w-4"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path d="M13 7H7v6h6V7z" />
-                  <path
-                    fillRule="evenodd"
-                    d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Run Detection
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={() => setShowExport(true)}
-            className="rounded-lg bg-[#2E2E2E] px-4 py-2 text-sm font-semibold text-white transition-all duration-(--duration-fast) hover:bg-white hover:text-[#0A0A0A]"
-          >
-            Export
-          </button>
-
-          {/* Phase 1: Version History Button */}
-          {/* Phase 2: Chat Button */}
-          <button
-            onClick={() =>
-              setActiveSidebar(activeSidebar === "chat" ? null : "chat")
-            }
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
-              activeSidebar === "chat"
-                ? "bg-white text-[#0A0A0A]"
-                : "bg-[#2E2E2E] text-white hover:bg-white hover:text-[#0A0A0A]"
-            }`}
-            title="AI Chat"
-          >
-            <svg
-              className="mr-2 inline-block h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-              />
-            </svg>
-            Chat
-          </button>
-
-          {/* Phase 1: Version History Button */}
-          <button
-            onClick={() =>
-              setActiveSidebar(activeSidebar === "history" ? null : "history")
-            }
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
-              activeSidebar === "history"
-                ? "bg-white text-[#0A0A0A]"
-                : "bg-[#2E2E2E] text-white hover:bg-white hover:text-[#0A0A0A]"
-            }`}
-            title="Version History"
-          >
-            <svg
-              className="mr-2 inline-block h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            History
-          </button>
-
-          {/* Phase 1: Save Indicator - Fixed position to prevent layout shifts */}
-          <div className="w-32 shrink-0">
-            <SaveIndicator
-              isSaving={isSaving}
-              lastSaved={lastSaved}
-              error={error}
-            />
-          </div>
-
-          <div className="h-6 w-px bg-[#2E2E2E]" />
-
-          {/* Logout Button */}
-          <button
-            onClick={handleLogout}
-            className="rounded-lg p-2 text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white"
-            title="Logout"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-          </button>
-        </div>
-      </header>
+      <Navbar
+        projectName={projectName}
+        originalProjectName={originalProjectName}
+        onProjectNameChange={setProjectName}
+        onSaveProjectName={handleSaveProjectName}
+        isSavingName={isSavingName}
+        currentProjectId={currentProject?.id}
+        isSaving={isSaving}
+        lastSaved={lastSaved}
+        saveError={error}
+        onRunDetection={handleRunDetection}
+        isGenerating={isGenerating}
+        onExport={() => setShowExport(true)}
+        onChatToggle={() =>
+          setActiveSidebar(activeSidebar === "chat" ? null : "chat")
+        }
+        onHistoryToggle={() =>
+          setActiveSidebar(activeSidebar === "history" ? null : "history")
+        }
+        isChatActive={activeSidebar === "chat"}
+        isHistoryActive={activeSidebar === "history"}
+      />
 
       {/* Main Workspace */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Tool Rail */}
-        <aside className="flex w-16 flex-col items-center gap-2 border-r border-[#2E2E2E] bg-[#1A1A1A] py-4 shadow-sm">
+        <aside className="flex w-12 sm:w-14 md:w-16 flex-col items-center gap-1 sm:gap-2 border-r border-[#2E2E2E] bg-[#1A1A1A] py-2 sm:py-4 shadow-sm">
           {[
             {
               tool: "pen" as Tool,
@@ -876,14 +612,14 @@ export default function CanvasPage() {
               key={tool}
               onClick={() => setCurrentTool(tool)}
               title={label}
-              className={`group relative flex h-12 w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) ${
+              className={`group relative flex h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12 items-center justify-center rounded-lg transition-all duration-(--duration-fast) ${
                 currentTool === tool
                   ? "bg-white text-[#0A0A0A] shadow-md"
                   : "text-[#A0A0A0] hover:bg-[#2E2E2E] hover:text-white"
               }`}
             >
               <svg
-                className="h-5 w-5"
+                className="h-4 w-4 sm:h-5 sm:w-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -989,7 +725,7 @@ export default function CanvasPage() {
 
         {/* Center: Canvas Area */}
         <main className="relative flex-1 overflow-hidden bg-[#0A0A0A]">
-          <div className="flex h-full items-center justify-center p-8">
+          <div className="flex h-full items-center justify-center p-2 sm:p-4 md:p-8">
             <SketchCanvas
               ref={canvasRef}
               tool={currentTool}
@@ -1009,7 +745,7 @@ export default function CanvasPage() {
 
         {/* Right: Inspector Panel */}
         {activeSidebar === "inspector" && (
-          <aside className="w-80 overflow-y-auto border-l border-[#2E2E2E] bg-[#1A1A1A] p-4 shadow-sm">
+          <aside className="w-64 sm:w-72 md:w-80 overflow-y-auto border-l border-[#2E2E2E] bg-[#1A1A1A] p-3 sm:p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-bold uppercase tracking-wide text-white">
                 Layers
@@ -1158,7 +894,7 @@ export default function CanvasPage() {
 
         {/* Phase 1: Version History Sidebar */}
         {activeSidebar === "history" && (
-          <aside className="w-80 overflow-y-auto border-l border-[#2E2E2E] bg-[#1A1A1A] z-20 shadow-[-5px_0_15px_rgba(0,0,0,0.5)]">
+          <aside className="w-64 sm:w-72 md:w-80 overflow-y-auto border-l border-[#2E2E2E] bg-[#1A1A1A] z-20 shadow-[-5px_0_15px_rgba(0,0,0,0.5)]">
             <VersionHistory
               projectId={currentProject?.id || ""}
               versions={versionHistory.versions}
@@ -1172,7 +908,7 @@ export default function CanvasPage() {
 
         {/* Phase 2: Chat Sidebar */}
         {activeSidebar === "chat" && (
-          <aside className="w-80 overflow-y-auto border-l border-[#2E2E2E] bg-[#1A1A1A] z-20 shadow-[-5px_0_15px_rgba(0,0,0,0.5)]">
+          <aside className="w-full sm:w-80 md:w-96 overflow-y-auto border-l border-[#2E2E2E] bg-[#1A1A1A] z-20 shadow-[-5px_0_15px_rgba(0,0,0,0.5)]">
             <ChatInterface
               onSendMessage={handleChatMessage}
               isProcessing={isGenerating}

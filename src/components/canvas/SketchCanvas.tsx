@@ -15,6 +15,10 @@ import {
   Circle,
   Text as KonvaText,
   Group,
+  Transformer,
+  Arrow,
+  Ellipse,
+  RegularPolygon,
 } from "react-konva";
 import type Konva from "konva";
 
@@ -35,20 +39,28 @@ interface LineData {
   points: number[];
   color?: string;
   width?: number;
+  id?: string;
 }
 
 interface ShapeData {
   id: string;
-  type: "rectangle" | "circle" | "text" | "image";
+  type: "rectangle" | "circle" | "text" | "image" | "ellipse" | "triangle" | "arrow";
   x: number;
   y: number;
   width?: number;
   height?: number;
   radius?: number;
+  radiusX?: number;
+  radiusY?: number;
   text?: string;
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  rotation?: number;
+  scaleX?: number;
+  scaleY?: number;
+  draggable?: boolean;
+  selected?: boolean;
 }
 
 export interface SketchCanvasRef {
@@ -60,6 +72,8 @@ export interface SketchCanvasRef {
   };
   clearCanvas: () => void;
   insertTemplate: (data: any) => void;
+  exportAsPNG: () => string;
+  exportAsDataURL: (mimeType?: string, quality?: number) => string;
 }
 
 const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
@@ -85,6 +99,12 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const [isPanning, setIsPanning] = useState(false);
     const [spacePressed, setSpacePressed] = useState(false);
     const stageRef = useRef<Konva.Stage>(null);
+    
+    // Selection state
+    const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+    const [isTransforming, setIsTransforming] = useState(false);
+    const transformerRef = useRef<Konva.Transformer>(null);
+    const selectedShapeRef = useRef<Konva.Shape | Konva.Group | null>(null);
 
     // Text input modal state
     const [showTextInput, setShowTextInput] = useState(false);
@@ -107,9 +127,16 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       clearCanvas: () => {
         setLines([]);
         setShapes([]);
+        setSelectedShapeId(null);
       },
       insertTemplate: (data: any) => {
-        if (data.lines) setLines((prev) => [...prev, ...data.lines]);
+        if (data.lines) {
+          const newLines = data.lines.map((line: any) => ({
+            ...line,
+            id: line.id || `line-${Date.now()}-${Math.random()}`,
+          }));
+          setLines((prev) => [...prev, ...newLines]);
+        }
         if (data.shapes) {
           const newShapes = data.shapes.map((s: any) => ({
             ...s,
@@ -117,9 +144,25 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             stroke: s.stroke || strokeColor,
             strokeWidth: s.strokeWidth || 2,
             fill: s.fill || "transparent",
+            draggable: true,
           }));
           setShapes((prev) => [...prev, ...newShapes]);
         }
+      },
+      exportAsPNG: () => {
+        if (!stageRef.current) return '';
+        // Export immediately without selection - transformer won't be included in export
+        const dataURL = stageRef.current.toDataURL({ pixelRatio: 2 });
+        return dataURL;
+      },
+      exportAsDataURL: (mimeType = 'image/png', quality = 1) => {
+        if (!stageRef.current) return '';
+        const dataURL = stageRef.current.toDataURL({ 
+          mimeType, 
+          quality,
+          pixelRatio: 2 
+        });
+        return dataURL;
       },
     }));
     // Responsive canvas sizing
@@ -157,14 +200,29 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       }
     }, [importedDesign]);
 
-    // Spacebar pan controls
+    // Spacebar pan controls and keyboard shortcuts
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.code === "Space" && !spacePressed) {
+        if (e.code === "Space" && !spacePressed && document.activeElement?.tagName !== "INPUT") {
           e.preventDefault();
           setSpacePressed(true);
           if (stageRef.current) {
             stageRef.current.container().style.cursor = "grab";
+          }
+        }
+        
+        // Delete selected shape with Delete or Backspace
+        if ((e.key === "Delete" || e.key === "Backspace") && selectedShapeId && document.activeElement?.tagName !== "INPUT") {
+          e.preventDefault();
+          setShapes(shapes => shapes.filter(shape => shape.id !== selectedShapeId));
+          setSelectedShapeId(null);
+        }
+        
+        // Escape to deselect
+        if (e.key === "Escape") {
+          setSelectedShapeId(null);
+          if (showTextInput) {
+            handleTextCancel();
           }
         }
       };
@@ -187,7 +245,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         window.removeEventListener("keydown", handleKeyDown);
         window.removeEventListener("keyup", handleKeyUp);
       };
-    }, [spacePressed]);
+    }, [spacePressed, selectedShapeId, showTextInput]);
 
     // Helper function to get mouse position adjusted for zoom and pan
     const getTransformedPointerPosition = (stage: Konva.Stage | null) => {
@@ -198,10 +256,19 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       const scale = zoom / 100;
       const stagePos = stage.position();
 
-      return {
+      const transformed = {
         x: (pos.x - stagePos.x) / scale,
         y: (pos.y - stagePos.y) / scale,
       };
+
+      // Apply snap to grid if enabled
+      if (snapEnabled && gridEnabled) {
+        const gridSize = 20;
+        transformed.x = Math.round(transformed.x / gridSize) * gridSize;
+        transformed.y = Math.round(transformed.y / gridSize) * gridSize;
+      }
+
+      return transformed;
     };
 
     // Focus text input when shown
@@ -210,6 +277,17 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         textInputRef.current.focus();
       }
     }, [showTextInput]);
+
+    // Attach transformer to selected shape
+    useEffect(() => {
+      if (tool === "select" && selectedShapeId && transformerRef.current && selectedShapeRef.current) {
+        transformerRef.current.nodes([selectedShapeRef.current]);
+        transformerRef.current.getLayer()?.batchDraw();
+      } else if (transformerRef.current) {
+        transformerRef.current.nodes([]);
+        transformerRef.current.getLayer()?.batchDraw();
+      }
+    }, [selectedShapeId, tool]);
 
     // Handle text submission
     const handleTextSubmit = () => {
@@ -249,6 +327,62 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       );
     };
 
+    // Handle shape drag
+    const handleShapeDragEnd = (id: string, e: Konva.KonvaEventObject<DragEvent>) => {
+      setShapes(shapes =>
+        shapes.map(shape =>
+          shape.id === id
+            ? { ...shape, x: e.target.x(), y: e.target.y() }
+            : shape
+        )
+      );
+    };
+
+    // Handle shape transform
+    const handleShapeTransformEnd = (id: string, node: Konva.Node) => {
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
+      
+      // Reset scale and apply it to width/height
+      node.scaleX(1);
+      node.scaleY(1);
+      
+      setShapes(shapes =>
+        shapes.map(shape => {
+          if (shape.id === id) {
+            if (shape.type === "rectangle" || shape.type === "triangle" || shape.type === "arrow") {
+              return {
+                ...shape,
+                x: node.x(),
+                y: node.y(),
+                width: Math.max(5, (shape.width || 0) * scaleX),
+                height: Math.max(5, (shape.height || 0) * scaleY),
+                rotation: node.rotation(),
+              };
+            } else if (shape.type === "circle") {
+              return {
+                ...shape,
+                x: node.x(),
+                y: node.y(),
+                radius: Math.max(5, (shape.radius || 0) * Math.max(scaleX, scaleY)),
+                rotation: node.rotation(),
+              };
+            } else if (shape.type === "ellipse") {
+              return {
+                ...shape,
+                x: node.x(),
+                y: node.y(),
+                radiusX: Math.max(5, (shape.radiusX || 0) * scaleX),
+                radiusY: Math.max(5, (shape.radiusY || 0) * scaleY),
+                rotation: node.rotation(),
+              };
+            }
+          }
+          return shape;
+        })
+      );
+    };
+
     const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
       // Pan mode with spacebar
       if (spacePressed) {
@@ -266,7 +400,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         // Check for hit on shapes first (reverse for topmost first)
         for (let i = shapes.length - 1; i >= 0; i--) {
           const shape = shapes[i];
-          if (shape.type === "rectangle") {
+          if (shape.type === "rectangle" || shape.type === "triangle" || shape.type === "arrow") {
             const x1 = shape.x;
             const y1 = shape.y;
             const x2 = shape.x + (shape.width || 0);
@@ -280,6 +414,15 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             const dy = pos.y - shape.y;
             const r = shape.radius || 0;
             if (dx * dx + dy * dy <= r * r) {
+              setShapes(shapes => shapes.filter((_, idx) => idx !== i));
+              return;
+            }
+          } else if (shape.type === "ellipse") {
+            const dx = pos.x - shape.x;
+            const dy = pos.y - shape.y;
+            const rx = shape.radiusX || 0;
+            const ry = shape.radiusY || 0;
+            if (rx > 0 && ry > 0 && ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry)) <= 1) {
               setShapes(shapes => shapes.filter((_, idx) => idx !== i));
               return;
             }
@@ -332,15 +475,25 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             points: [pos.x, pos.y],
             color: strokeColor,
             width: strokeWidth,
+            id: `line-${Date.now()}-${Math.random()}`,
           },
         ]);
       } else if (
         tool === "shape" ||
         tool === "rectangle" ||
-        tool === "circle"
+        tool === "circle" ||
+        tool === "ellipse" ||
+        tool === "triangle" ||
+        tool === "arrow"
       ) {
-        // Handle Shape Tools (assuming 'shape' maps to rectangle for now if specific tool logic used)
-        const shapeType = tool === "circle" ? "circle" : "rectangle";
+        // Handle Shape Tools
+        let shapeType: ShapeData["type"] = "rectangle";
+        if (tool === "circle") shapeType = "circle";
+        else if (tool === "ellipse") shapeType = "ellipse";
+        else if (tool === "triangle") shapeType = "triangle";
+        else if (tool === "arrow") shapeType = "arrow";
+        else if (tool === "shape") shapeType = "rectangle";
+        
         setIsDrawing(true);
         const newShape: ShapeData = {
           id: `shape-${Date.now()}`,
@@ -350,6 +503,8 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           width: 0,
           height: 0,
           radius: 0,
+          radiusX: 0,
+          radiusY: 0,
           stroke: strokeColor,
           strokeWidth: strokeWidth,
           fill: fillColor,
@@ -372,7 +527,75 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           setTextInputValue("");
           setShowTextInput(true);
         }
+      } else if (tool === "erase") {
+        // Eraser tool - similar to bin but continuous during drag
+        setIsDrawing(true);
+        // Erase at current position
+        eraseAtPosition(pos);
+      } else if (tool === "select") {
+        // Check if clicking on a shape
+        let clickedShapeId: string | null = null;
+        for (let i = shapes.length - 1; i >= 0; i--) {
+          const shape = shapes[i];
+          if (shape.type === "rectangle" || shape.type === "triangle" || shape.type === "arrow") {
+            const x1 = shape.x;
+            const y1 = shape.y;
+            const x2 = shape.x + (shape.width || 0);
+            const y2 = shape.y + (shape.height || 0);
+            if (pos.x >= Math.min(x1, x2) && pos.x <= Math.max(x1, x2) && 
+                pos.y >= Math.min(y1, y2) && pos.y <= Math.max(y1, y2)) {
+              clickedShapeId = shape.id;
+              break;
+            }
+          } else if (shape.type === "circle") {
+            const dx = pos.x - shape.x;
+            const dy = pos.y - shape.y;
+            const r = shape.radius || 0;
+            if (dx * dx + dy * dy <= r * r) {
+              clickedShapeId = shape.id;
+              break;
+            }
+          } else if (shape.type === "ellipse") {
+            const dx = pos.x - shape.x;
+            const dy = pos.y - shape.y;
+            const rx = shape.radiusX || 0;
+            const ry = shape.radiusY || 0;
+            if (rx > 0 && ry > 0 && ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry)) <= 1) {
+              clickedShapeId = shape.id;
+              break;
+            }
+          }
+        }
+        setSelectedShapeId(clickedShapeId);
       }
+    };
+
+    // Helper function to erase at a position
+    const eraseAtPosition = (pos: { x: number; y: number }) => {
+      const eraseRadius = strokeWidth * 2; // Eraser size based on stroke width
+      
+      // Check for hit on lines
+      const newLines = lines.filter((line) => {
+        const points = line.points;
+        for (let j = 0; j < points.length - 2; j += 2) {
+          const x1 = points[j];
+          const y1 = points[j + 1];
+          const x2 = points[j + 2];
+          const y2 = points[j + 3];
+          const lineLen = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+          if (lineLen === 0) continue;
+          const t = Math.max(0, Math.min(1, ((pos.x - x1) * (x2 - x1) + (pos.y - y1) * (y2 - y1)) / (lineLen ** 2)));
+          const projX = x1 + t * (x2 - x1);
+          const projY = y1 + t * (y2 - y1);
+          const dist = Math.sqrt((pos.x - projX) ** 2 + (pos.y - projY) ** 2);
+          if (dist <= eraseRadius) {
+            return false; // Remove this line
+          }
+        }
+        return true; // Keep this line
+      });
+      
+      setLines(newLines);
     };
 
     const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -388,6 +611,9 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           points: lastLine.points.concat([point.x, point.y]),
         };
         setLines([...lines.slice(0, -1), updatedLine]);
+      } else if (tool === "erase") {
+        // Continue erasing while dragging
+        eraseAtPosition(point);
       } else if (
         currentShape &&
         (tool === "shape" || tool === "rectangle" || tool === "circle")
@@ -412,6 +638,22 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             ...currentShape,
             radius,
           });
+        } else if (currentShape.type === "ellipse") {
+          const radiusX = Math.abs(point.x - startX);
+          const radiusY = Math.abs(point.y - startY);
+          setCurrentShape({
+            ...currentShape,
+            radiusX,
+            radiusY,
+          });
+        } else if (currentShape.type === "triangle" || currentShape.type === "arrow") {
+          const width = point.x - startX;
+          const height = point.y - startY;
+          setCurrentShape({
+            ...currentShape,
+            width,
+            height,
+          });
         }
       }
     };
@@ -422,7 +664,10 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         // Prevent adding 0-size shapes
         if (
           (currentShape.type === "rectangle" && currentShape.width !== 0) ||
-          (currentShape.type === "circle" && currentShape.radius !== 0)
+          (currentShape.type === "circle" && currentShape.radius !== 0) ||
+          (currentShape.type === "ellipse" && currentShape.radiusX !== 0) ||
+          (currentShape.type === "triangle" && currentShape.width !== 0) ||
+          (currentShape.type === "arrow" && currentShape.width !== 0)
         ) {
           setShapes([...shapes, currentShape]);
         }
@@ -448,6 +693,12 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           ref={stageRef}
           className="rounded-xl"
           draggable={spacePressed}
+          onClick={(e) => {
+            // Deselect when clicking on empty canvas
+            if (e.target === e.target.getStage()) {
+              setSelectedShapeId(null);
+            }
+          }}
         >
           {/* Background Layer - Grid doesn't scale with zoom */}
           <Layer>
@@ -485,22 +736,31 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             {/* Drawn Lines */}
             {lines.map((line, i) => (
               <Line
-                key={`line-${i}`}
+                key={line.id || `line-${i}`}
                 points={line.points}
                 stroke={line.color || "#000000"}
                 strokeWidth={line.width || 2.5}
                 tension={0.5}
                 lineCap="round"
                 lineJoin="round"
+                globalCompositeOperation={
+                  line.tool === "erase" ? "destination-out" : "source-over"
+                }
               />
             ))}
 
             {/* Drawn Shapes */}
             {shapes.map((shape, i) => {
+              const isSelected = shape.id === selectedShapeId && tool === "select";
               if (shape.type === "rectangle") {
                 return (
                   <Rect
                     key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
                     x={shape.x}
                     y={shape.y}
                     width={shape.width}
@@ -509,18 +769,130 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                     strokeWidth={shape.strokeWidth || 2}
                     fill={shape.fill || "transparent"}
                     cornerRadius={5}
+                    draggable={tool === "select"}
+                    rotation={shape.rotation || 0}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
+                    onDragEnd={(e) => handleShapeDragEnd(shape.id, e)}
+                    onTransformEnd={(e) => handleShapeTransformEnd(shape.id, e.target)}
                   />
                 );
               } else if (shape.type === "circle") {
                 return (
                   <Circle
                     key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
                     x={shape.x}
                     y={shape.y}
                     radius={shape.radius}
                     stroke={shape.stroke || "#000000"}
                     strokeWidth={shape.strokeWidth || 2}
                     fill={shape.fill || "transparent"}
+                    draggable={tool === "select"}
+                    rotation={shape.rotation || 0}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
+                    onDragEnd={(e) => handleShapeDragEnd(shape.id, e)}
+                    onTransformEnd={(e) => handleShapeTransformEnd(shape.id, e.target)}
+                  />
+                );
+              } else if (shape.type === "ellipse") {
+                return (
+                  <Ellipse
+                    key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
+                    x={shape.x}
+                    y={shape.y}
+                    radiusX={shape.radiusX || 0}
+                    radiusY={shape.radiusY || 0}
+                    stroke={shape.stroke || "#000000"}
+                    strokeWidth={shape.strokeWidth || 2}
+                    fill={shape.fill || "transparent"}
+                    draggable={tool === "select"}
+                    rotation={shape.rotation || 0}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
+                    onDragEnd={(e) => handleShapeDragEnd(shape.id, e)}
+                    onTransformEnd={(e) => handleShapeTransformEnd(shape.id, e.target)}
+                  />
+                );
+              } else if (shape.type === "triangle") {
+                // Draw triangle using Line
+                const points = [
+                  shape.x + (shape.width || 0) / 2, shape.y,  // Top point
+                  shape.x, shape.y + (shape.height || 0),      // Bottom left
+                  shape.x + (shape.width || 0), shape.y + (shape.height || 0), // Bottom right
+                ];
+                return (
+                  <Line
+                    key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
+                    points={points}
+                    stroke={shape.stroke || "#000000"}
+                    strokeWidth={shape.strokeWidth || 2}
+                    fill={shape.fill || "transparent"}
+                    closed={true}
+                    draggable={tool === "select"}
+                    rotation={shape.rotation || 0}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
+                    onDragEnd={(e) => handleShapeDragEnd(shape.id, e)}
+                    onTransformEnd={(e) => handleShapeTransformEnd(shape.id, e.target)}
+                  />
+                );
+              } else if (shape.type === "arrow") {
+                return (
+                  <Arrow
+                    key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
+                    points={[
+                      shape.x, 
+                      shape.y, 
+                      shape.x + (shape.width || 0), 
+                      shape.y + (shape.height || 0)
+                    ]}
+                    stroke={shape.stroke || "#000000"}
+                    strokeWidth={shape.strokeWidth || 2}
+                    fill={shape.stroke || "#000000"}
+                    pointerLength={10}
+                    pointerWidth={10}
+                    draggable={tool === "select"}
+                    rotation={shape.rotation || 0}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
+                    onDragEnd={(e) => handleShapeDragEnd(shape.id, e)}
+                    onTransformEnd={(e) => handleShapeTransformEnd(shape.id, e.target)}
                   />
                 );
               } else if (shape.type === "text") {
@@ -582,6 +954,31 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
               return null;
             })}
 
+            {/* Transformer for selected shapes */}
+            {tool === "select" && selectedShapeId && (
+              <Transformer
+                ref={transformerRef}
+                rotateEnabled={true}
+                enabledAnchors={[
+                  'top-left',
+                  'top-right',
+                  'bottom-left',
+                  'bottom-right',
+                  'top-center',
+                  'middle-right',
+                  'middle-left',
+                  'bottom-center'
+                ]}
+                boundBoxFunc={(oldBox, newBox) => {
+                  // Limit minimum size
+                  if (newBox.width < 5 || newBox.height < 5) {
+                    return oldBox;
+                  }
+                  return newBox;
+                }}
+              />
+            )}
+
             {/* Current Shape (Being Drawn) */}
             {currentShape &&
               (currentShape.type === "rectangle" ? (
@@ -603,6 +1000,42 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                   stroke={currentShape.stroke || "#000000"}
                   strokeWidth={currentShape.strokeWidth || 2}
                   fill={currentShape.fill || "transparent"}
+                />
+              ) : currentShape.type === "ellipse" ? (
+                <Ellipse
+                  x={currentShape.x}
+                  y={currentShape.y}
+                  radiusX={currentShape.radiusX || 0}
+                  radiusY={currentShape.radiusY || 0}
+                  stroke={currentShape.stroke || "#000000"}
+                  strokeWidth={currentShape.strokeWidth || 2}
+                  fill={currentShape.fill || "transparent"}
+                />
+              ) : currentShape.type === "triangle" ? (
+                <Line
+                  points={[
+                    currentShape.x + (currentShape.width || 0) / 2, currentShape.y,
+                    currentShape.x, currentShape.y + (currentShape.height || 0),
+                    currentShape.x + (currentShape.width || 0), currentShape.y + (currentShape.height || 0),
+                  ]}
+                  stroke={currentShape.stroke || "#000000"}
+                  strokeWidth={currentShape.strokeWidth || 2}
+                  fill={currentShape.fill || "transparent"}
+                  closed={true}
+                />
+              ) : currentShape.type === "arrow" ? (
+                <Arrow
+                  points={[
+                    currentShape.x, 
+                    currentShape.y, 
+                    currentShape.x + (currentShape.width || 0), 
+                    currentShape.y + (currentShape.height || 0)
+                  ]}
+                  stroke={currentShape.stroke || "#000000"}
+                  strokeWidth={currentShape.strokeWidth || 2}
+                  fill={currentShape.stroke || "#000000"}
+                  pointerLength={10}
+                  pointerWidth={10}
                 />
               ) : null)}
 
@@ -675,13 +1108,39 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                 ? "Selection"
                 : tool === "bin"
                   ? "Delete"
-                  : tool.charAt(0).toUpperCase() + tool.slice(1)}{" "}
+                  : tool === "erase"
+                    ? "Eraser"
+                    : tool === "ellipse"
+                      ? "Ellipse"
+                      : tool === "triangle"
+                        ? "Triangle"
+                        : tool === "arrow"
+                          ? "Arrow"
+                          : tool.charAt(0).toUpperCase() + tool.slice(1)}{" "}
             Mode
           </span>
           {gridEnabled && (
             <>
               <span>•</span>
               <span className="text-accent">Grid On</span>
+            </>
+          )}
+          {snapEnabled && gridEnabled && (
+            <>
+              <span>•</span>
+              <span className="text-accent">Snap On</span>
+            </>
+          )}
+          {zoom !== 100 && (
+            <>
+              <span>•</span>
+              <span>Zoom: {zoom}%</span>
+            </>
+          )}
+          {selectedShapeId && (
+            <>
+              <span>•</span>
+              <span className="text-[#FF6B00]">Shape Selected</span>
             </>
           )}
         </div>

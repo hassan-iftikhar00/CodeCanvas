@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import Pricing from "@/components/Pricing";
 import Testimonials from "@/components/Testimonials";
+import Footer from "@/components/Footer";
 
 const GridScan = dynamic(() => import("@/components/GridScan"), {
   ssr: false,
@@ -120,26 +121,28 @@ export default function Home() {
     <div className="min-h-screen bg-[#0A0A0A]">
       {/* Navigation Header */}
       <nav className="relative z-20 border-b border-[#2E2E2E]">
-        <div className="mx-auto max-w-7xl px-6 py-4 lg:px-8">
+        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
               <img
                 src="/logo.png"
                 alt="CodeCanvas Logo"
-                className="w-10 h-10"
+                className="h-8 w-8 sm:h-10 sm:w-10"
               />
-              <span className="text-xl font-bold text-white">CodeCanvas</span>
+              <span className="text-lg font-bold text-white sm:text-xl">
+                CodeCanvas
+              </span>
             </Link>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Link
                 href="/auth/login"
-                className="rounded-lg px-4 py-2 text-sm font-medium text-[#A0A0A0] transition-colors hover:text-white"
+                className="rounded-lg px-3 py-2 text-xs font-medium text-[#A0A0A0] transition-colors hover:text-white sm:px-4 sm:text-sm"
               >
                 Log in
               </Link>
               <Link
                 href="/canvas"
-                className="rounded-lg bg-[#FF6B00] px-4 py-2 text-sm font-bold text-white transition-all hover:bg-[#E66000] hover:shadow-[0_0_20px_rgba(255,107,0,0.3)]"
+                className="rounded-lg bg-[#FF6B00] px-3 py-2 text-xs font-bold text-white transition-all hover:bg-[#E66000] hover:shadow-[0_0_20px_rgba(255,107,0,0.3)] sm:px-4 sm:text-sm"
               >
                 Get Started
               </Link>
@@ -166,29 +169,29 @@ export default function Home() {
           />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-7xl px-6 py-16 sm:py-24 lg:px-8 pointer-events-none">
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
+        <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-24 pointer-events-none">
+          <div className="grid gap-8 sm:gap-12 lg:grid-cols-2 lg:gap-16 items-center">
             {/* Left: Hero Copy */}
-            <div className="space-y-8 pointer-events-auto">
+            <div className="space-y-6 sm:space-y-8 pointer-events-auto">
               <div className="inline-flex items-center rounded-full bg-[#2E2E2E] px-4 py-1.5 text-sm font-medium text-[#A0A0A0]">
                 ✨ Sketch-to-code in seconds
               </div>
 
               <div className="space-y-0">
                 <h1
-                  className="text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl animate-slide-in-up"
+                  className="text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl animate-slide-in-up"
                   style={{ animationDelay: "0.1s" }}
                 >
                   Draw.
                 </h1>
                 <h1
-                  className="text-5xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl animate-slide-in-up"
+                  className="text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl animate-slide-in-up"
                   style={{ animationDelay: "0.2s" }}
                 >
                   Describe.
                 </h1>
                 <h1
-                  className="text-5xl font-bold tracking-tight text-[#FF6B00] sm:text-6xl lg:text-7xl animate-slide-in-up animate-glow-pulse"
+                  className="text-4xl font-bold tracking-tight text-[#FF6B00] sm:text-5xl md:text-6xl lg:text-7xl animate-slide-in-up animate-glow-pulse"
                   style={{ animationDelay: "0.3s" }}
                 >
                   Ship.
@@ -196,7 +199,7 @@ export default function Home() {
               </div>
 
               <p
-                className="text-xl leading-relaxed text-[#A0A0A0] max-w-lg animate-fade-in"
+                className="text-base leading-relaxed text-[#A0A0A0] max-w-lg sm:text-lg md:text-xl animate-fade-in"
                 style={{
                   animationDelay: "0.5s",
                   opacity: 0,
@@ -208,7 +211,7 @@ export default function Home() {
               </p>
 
               <div
-                className="flex flex-col gap-4 sm:flex-row animate-slide-in-up"
+                className="flex flex-col gap-3 sm:flex-row sm:gap-4 animate-slide-in-up"
                 style={{
                   animationDelay: "0.6s",
                   opacity: 0,
@@ -217,11 +220,11 @@ export default function Home() {
               >
                 <Link
                   href="/canvas"
-                  className="btn-base ripple group inline-flex items-center justify-center rounded-xl glass-orange px-8 py-4 text-base font-semibold text-white glow-orange-hover focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-offset-2 focus:ring-offset-[#0A0A0A]"
+                  className="btn-base ripple group inline-flex items-center justify-center rounded-xl glass-orange px-6 py-3 text-sm font-semibold text-white glow-orange-hover focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-offset-2 focus:ring-offset-[#0A0A0A] sm:px-8 sm:py-4 sm:text-base"
                 >
                   Open Canvas
                   <svg
-                    className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1"
+                    className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1 sm:h-5 sm:w-5"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -235,7 +238,7 @@ export default function Home() {
                   </svg>
                 </Link>
 
-                <button className="btn-base glass-light inline-flex items-center justify-center rounded-xl px-8 py-4 text-base font-semibold text-white transition-all duration-[var(--duration-base)] hover:glass focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-offset-2 focus:ring-offset-[#0A0A0A]">
+                <button className="btn-base glass-light inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold text-white transition-all duration-[var(--duration-base)] hover:glass focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-offset-2 focus:ring-offset-[#0A0A0A] sm:px-8 sm:py-4 sm:text-base">
                   Watch Demo
                 </button>
               </div>
@@ -338,6 +341,41 @@ export default function Home() {
       {/* Features Section */}
       <section className="border-t border-[#2E2E2E] bg-[#0A0A0A] py-16 sm:py-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          {/* Video Demo Section */}
+          <div className="mb-24">
+            <div className="mb-8 text-center">
+              <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                See It In Action
+              </h2>
+              <p className="mt-4 text-lg text-[#A0A0A0]">
+                Watch how CodeCanvas transforms sketches into production-ready
+                code
+              </p>
+            </div>
+
+            <div className="relative mx-auto max-w-5xl">
+              <div className="relative rounded-2xl border border-[#2E2E2E] bg-[#1A1A1A] p-4 shadow-2xl ">
+                <video
+                  className="w-full rounded-lg"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                >
+                  <source
+                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/media/demo-video2.mp4`}
+                    type="video/mp4"
+                  />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+
+              {/* Decorative blur effects */}
+              <div className="absolute -left-10 top-1/2 h-40 w-40 rounded-full bg-[#FF6B00]/20 blur-3xl" />
+              <div className="absolute -right-10 top-1/4 h-40 w-40 rounded-full bg-white/5 blur-3xl" />
+            </div>
+          </div>
+
           <div className="mb-16 text-center">
             <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
               Why CodeCanvas?
@@ -428,6 +466,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 }
