@@ -87,6 +87,18 @@ const SketchCanvasWithHistory = forwardRef<
           }, 100);
         }
       },
+      exportAsPNG: () => {
+        if (canvasRef.current) {
+          return canvasRef.current.exportAsPNG();
+        }
+        return '';
+      },
+      exportAsDataURL: (mimeType?: string, quality?: number) => {
+        if (canvasRef.current) {
+          return canvasRef.current.exportAsDataURL(mimeType, quality);
+        }
+        return '';
+      },
     }));
 
     // Track if we're applying history state to prevent circular updates
