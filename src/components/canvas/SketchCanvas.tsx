@@ -17,6 +17,8 @@ import {
   Group,
   Transformer,
   Arrow,
+  Ellipse,
+  RegularPolygon,
 } from "react-konva";
 import type Konva from "konva";
 
@@ -322,7 +324,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       setShapes(shapes =>
         shapes.map(shape => {
           if (shape.id === id) {
-            if (shape.type === "rectangle") {
+            if (shape.type === "rectangle" || shape.type === "triangle" || shape.type === "arrow") {
               return {
                 ...shape,
                 x: node.x(),
@@ -337,6 +339,15 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                 x: node.x(),
                 y: node.y(),
                 radius: Math.max(5, (shape.radius || 0) * Math.max(scaleX, scaleY)),
+                rotation: node.rotation(),
+              };
+            } else if (shape.type === "ellipse") {
+              return {
+                ...shape,
+                x: node.x(),
+                y: node.y(),
+                radiusX: Math.max(5, (shape.radiusX || 0) * scaleX),
+                radiusY: Math.max(5, (shape.radiusY || 0) * scaleY),
                 rotation: node.rotation(),
               };
             }
@@ -363,7 +374,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         // Check for hit on shapes first (reverse for topmost first)
         for (let i = shapes.length - 1; i >= 0; i--) {
           const shape = shapes[i];
-          if (shape.type === "rectangle") {
+          if (shape.type === "rectangle" || shape.type === "triangle" || shape.type === "arrow") {
             const x1 = shape.x;
             const y1 = shape.y;
             const x2 = shape.x + (shape.width || 0);
@@ -377,6 +388,15 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             const dy = pos.y - shape.y;
             const r = shape.radius || 0;
             if (dx * dx + dy * dy <= r * r) {
+              setShapes(shapes => shapes.filter((_, idx) => idx !== i));
+              return;
+            }
+          } else if (shape.type === "ellipse") {
+            const dx = pos.x - shape.x;
+            const dy = pos.y - shape.y;
+            const rx = shape.radiusX || 0;
+            const ry = shape.radiusY || 0;
+            if (rx > 0 && ry > 0 && ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry)) <= 1) {
               setShapes(shapes => shapes.filter((_, idx) => idx !== i));
               return;
             }
@@ -435,10 +455,19 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       } else if (
         tool === "shape" ||
         tool === "rectangle" ||
-        tool === "circle"
+        tool === "circle" ||
+        tool === "ellipse" ||
+        tool === "triangle" ||
+        tool === "arrow"
       ) {
-        // Handle Shape Tools (assuming 'shape' maps to rectangle for now if specific tool logic used)
-        const shapeType = tool === "circle" ? "circle" : "rectangle";
+        // Handle Shape Tools
+        let shapeType: ShapeData["type"] = "rectangle";
+        if (tool === "circle") shapeType = "circle";
+        else if (tool === "ellipse") shapeType = "ellipse";
+        else if (tool === "triangle") shapeType = "triangle";
+        else if (tool === "arrow") shapeType = "arrow";
+        else if (tool === "shape") shapeType = "rectangle";
+        
         setIsDrawing(true);
         const newShape: ShapeData = {
           id: `shape-${Date.now()}`,
@@ -448,6 +477,8 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           width: 0,
           height: 0,
           radius: 0,
+          radiusX: 0,
+          radiusY: 0,
           stroke: strokeColor,
           strokeWidth: strokeWidth,
           fill: fillColor,
@@ -480,7 +511,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         let clickedShapeId: string | null = null;
         for (let i = shapes.length - 1; i >= 0; i--) {
           const shape = shapes[i];
-          if (shape.type === "rectangle") {
+          if (shape.type === "rectangle" || shape.type === "triangle" || shape.type === "arrow") {
             const x1 = shape.x;
             const y1 = shape.y;
             const x2 = shape.x + (shape.width || 0);
@@ -495,6 +526,15 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             const dy = pos.y - shape.y;
             const r = shape.radius || 0;
             if (dx * dx + dy * dy <= r * r) {
+              clickedShapeId = shape.id;
+              break;
+            }
+          } else if (shape.type === "ellipse") {
+            const dx = pos.x - shape.x;
+            const dy = pos.y - shape.y;
+            const rx = shape.radiusX || 0;
+            const ry = shape.radiusY || 0;
+            if (rx > 0 && ry > 0 && ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry)) <= 1) {
               clickedShapeId = shape.id;
               break;
             }
@@ -572,6 +612,22 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             ...currentShape,
             radius,
           });
+        } else if (currentShape.type === "ellipse") {
+          const radiusX = Math.abs(point.x - startX);
+          const radiusY = Math.abs(point.y - startY);
+          setCurrentShape({
+            ...currentShape,
+            radiusX,
+            radiusY,
+          });
+        } else if (currentShape.type === "triangle" || currentShape.type === "arrow") {
+          const width = point.x - startX;
+          const height = point.y - startY;
+          setCurrentShape({
+            ...currentShape,
+            width,
+            height,
+          });
         }
       }
     };
@@ -582,7 +638,10 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         // Prevent adding 0-size shapes
         if (
           (currentShape.type === "rectangle" && currentShape.width !== 0) ||
-          (currentShape.type === "circle" && currentShape.radius !== 0)
+          (currentShape.type === "circle" && currentShape.radius !== 0) ||
+          (currentShape.type === "ellipse" && currentShape.radiusX !== 0) ||
+          (currentShape.type === "triangle" && currentShape.width !== 0) ||
+          (currentShape.type === "arrow" && currentShape.width !== 0)
         ) {
           setShapes([...shapes, currentShape]);
         }
@@ -721,6 +780,95 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                     onTransformEnd={(e) => handleShapeTransformEnd(shape.id, e.target)}
                   />
                 );
+              } else if (shape.type === "ellipse") {
+                return (
+                  <Ellipse
+                    key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
+                    x={shape.x}
+                    y={shape.y}
+                    radiusX={shape.radiusX || 0}
+                    radiusY={shape.radiusY || 0}
+                    stroke={shape.stroke || "#000000"}
+                    strokeWidth={shape.strokeWidth || 2}
+                    fill={shape.fill || "transparent"}
+                    draggable={tool === "select"}
+                    rotation={shape.rotation || 0}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
+                    onDragEnd={(e) => handleShapeDragEnd(shape.id, e)}
+                    onTransformEnd={(e) => handleShapeTransformEnd(shape.id, e.target)}
+                  />
+                );
+              } else if (shape.type === "triangle") {
+                // Draw triangle using Line
+                const points = [
+                  shape.x + (shape.width || 0) / 2, shape.y,  // Top point
+                  shape.x, shape.y + (shape.height || 0),      // Bottom left
+                  shape.x + (shape.width || 0), shape.y + (shape.height || 0), // Bottom right
+                ];
+                return (
+                  <Line
+                    key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
+                    points={points}
+                    stroke={shape.stroke || "#000000"}
+                    strokeWidth={shape.strokeWidth || 2}
+                    fill={shape.fill || "transparent"}
+                    closed={true}
+                    draggable={tool === "select"}
+                    rotation={shape.rotation || 0}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
+                    onDragEnd={(e) => handleShapeDragEnd(shape.id, e)}
+                    onTransformEnd={(e) => handleShapeTransformEnd(shape.id, e.target)}
+                  />
+                );
+              } else if (shape.type === "arrow") {
+                return (
+                  <Arrow
+                    key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
+                    points={[
+                      shape.x, 
+                      shape.y, 
+                      shape.x + (shape.width || 0), 
+                      shape.y + (shape.height || 0)
+                    ]}
+                    stroke={shape.stroke || "#000000"}
+                    strokeWidth={shape.strokeWidth || 2}
+                    fill={shape.stroke || "#000000"}
+                    pointerLength={10}
+                    pointerWidth={10}
+                    draggable={tool === "select"}
+                    rotation={shape.rotation || 0}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
+                    onDragEnd={(e) => handleShapeDragEnd(shape.id, e)}
+                    onTransformEnd={(e) => handleShapeTransformEnd(shape.id, e.target)}
+                  />
+                );
               } else if (shape.type === "text") {
                 const isHovered = hoveredTextId === shape.id;
                 return (
@@ -826,6 +974,42 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                   stroke={currentShape.stroke || "#000000"}
                   strokeWidth={currentShape.strokeWidth || 2}
                   fill={currentShape.fill || "transparent"}
+                />
+              ) : currentShape.type === "ellipse" ? (
+                <Ellipse
+                  x={currentShape.x}
+                  y={currentShape.y}
+                  radiusX={currentShape.radiusX || 0}
+                  radiusY={currentShape.radiusY || 0}
+                  stroke={currentShape.stroke || "#000000"}
+                  strokeWidth={currentShape.strokeWidth || 2}
+                  fill={currentShape.fill || "transparent"}
+                />
+              ) : currentShape.type === "triangle" ? (
+                <Line
+                  points={[
+                    currentShape.x + (currentShape.width || 0) / 2, currentShape.y,
+                    currentShape.x, currentShape.y + (currentShape.height || 0),
+                    currentShape.x + (currentShape.width || 0), currentShape.y + (currentShape.height || 0),
+                  ]}
+                  stroke={currentShape.stroke || "#000000"}
+                  strokeWidth={currentShape.strokeWidth || 2}
+                  fill={currentShape.fill || "transparent"}
+                  closed={true}
+                />
+              ) : currentShape.type === "arrow" ? (
+                <Arrow
+                  points={[
+                    currentShape.x, 
+                    currentShape.y, 
+                    currentShape.x + (currentShape.width || 0), 
+                    currentShape.y + (currentShape.height || 0)
+                  ]}
+                  stroke={currentShape.stroke || "#000000"}
+                  strokeWidth={currentShape.strokeWidth || 2}
+                  fill={currentShape.stroke || "#000000"}
+                  pointerLength={10}
+                  pointerWidth={10}
                 />
               ) : null)}
 
