@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useCallback, useEffect, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 interface Project {
   id: string;
@@ -12,8 +12,16 @@ interface Project {
 }
 
 interface UseProjectSaveReturn {
-  saveProject: (name: string, canvasData: any, thumbnail?: string) => Promise<string | null>;
-  updateProject: (projectId: string, canvasData: any, thumbnail?: string) => Promise<boolean>;
+  saveProject: (
+    name: string,
+    canvasData: any,
+    thumbnail?: string
+  ) => Promise<string | null>;
+  updateProject: (
+    projectId: string,
+    canvasData: any,
+    thumbnail?: string
+  ) => Promise<boolean>;
   updateProjectName: (projectId: string, name: string) => Promise<boolean>;
   loadProject: (projectId: string) => Promise<Project | null>;
   deleteProject: (projectId: string) => Promise<boolean>;
@@ -28,146 +36,165 @@ export function useProjectSave(): UseProjectSaveReturn {
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
 
-  const saveProject = useCallback(async (
-    name: string,
-    canvasData: any,
-    thumbnail?: string
-  ): Promise<string | null> => {
-    setIsSaving(true);
-    setError(null);
+  const saveProject = useCallback(
+    async (
+      name: string,
+      canvasData: any,
+      thumbnail?: string
+    ): Promise<string | null> => {
+      setIsSaving(true);
+      setError(null);
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('User not authenticated');
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          throw new Error("User not authenticated");
+        }
+
+        const { data, error: saveError } = await supabase
+          .from("projects")
+          .insert({
+            user_id: user.id,
+            name,
+            canvas_data: canvasData,
+            thumbnail,
+          })
+          .select()
+          .single();
+
+        if (saveError) throw saveError;
+
+        setLastSaved(new Date());
+        return data.id;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to save project";
+        setError(errorMessage);
+        console.error("Save project error:", err);
+        return null;
+      } finally {
+        setIsSaving(false);
       }
+    },
+    [supabase]
+  );
 
-      const { data, error: saveError } = await supabase
-        .from('projects')
-        .insert({
-          user_id: user.id,
-          name,
+  const updateProject = useCallback(
+    async (
+      projectId: string,
+      canvasData: any,
+      thumbnail?: string
+    ): Promise<boolean> => {
+      setIsSaving(true);
+      setError(null);
+
+      try {
+        const updateData: any = {
           canvas_data: canvasData,
-          thumbnail,
-        })
-        .select()
-        .single();
+          updated_at: new Date().toISOString(),
+        };
 
-      if (saveError) throw saveError;
+        if (thumbnail) {
+          updateData.thumbnail = thumbnail;
+        }
 
-      setLastSaved(new Date());
-      return data.id;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save project';
-      setError(errorMessage);
-      console.error('Save project error:', err);
-      return null;
-    } finally {
-      setIsSaving(false);
-    }
-  }, [supabase]);
+        const { error: updateError } = await supabase
+          .from("projects")
+          .update(updateData)
+          .eq("id", projectId);
 
-  const updateProject = useCallback(async (
-    projectId: string,
-    canvasData: any,
-    thumbnail?: string
-  ): Promise<boolean> => {
-    setIsSaving(true);
-    setError(null);
+        if (updateError) throw updateError;
 
-    try {
-      const updateData: any = {
-        canvas_data: canvasData,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (thumbnail) {
-        updateData.thumbnail = thumbnail;
+        setLastSaved(new Date());
+        return true;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to update project";
+        setError(errorMessage);
+        console.error("Update project error:", err);
+        return false;
+      } finally {
+        setIsSaving(false);
       }
+    },
+    [supabase]
+  );
 
-      const { error: updateError } = await supabase
-        .from('projects')
-        .update(updateData)
-        .eq('id', projectId);
+  const loadProject = useCallback(
+    async (projectId: string): Promise<Project | null> => {
+      try {
+        const { data, error: loadError } = await supabase
+          .from("projects")
+          .select("*")
+          .eq("id", projectId)
+          .single();
 
-      if (updateError) throw updateError;
+        if (loadError) throw loadError;
 
-      setLastSaved(new Date());
-      return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update project';
-      setError(errorMessage);
-      console.error('Update project error:', err);
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  }, [supabase]);
+        return data;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to load project";
+        setError(errorMessage);
+        console.error("Load project error:", err);
+        return null;
+      }
+    },
+    [supabase]
+  );
 
-  const loadProject = useCallback(async (projectId: string): Promise<Project | null> => {
-    try {
-      const { data, error: loadError } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', projectId)
-        .single();
+  const deleteProject = useCallback(
+    async (projectId: string): Promise<boolean> => {
+      try {
+        const { error: deleteError } = await supabase
+          .from("projects")
+          .delete()
+          .eq("id", projectId);
 
-      if (loadError) throw loadError;
+        if (deleteError) throw deleteError;
 
-      return data;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load project';
-      setError(errorMessage);
-      console.error('Load project error:', err);
-      return null;
-    }
-  }, [supabase]);
+        return true;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to delete project";
+        setError(errorMessage);
+        console.error("Delete project error:", err);
+        return false;
+      }
+    },
+    [supabase]
+  );
 
-  const deleteProject = useCallback(async (projectId: string): Promise<boolean> => {
-    try {
-      const { error: deleteError } = await supabase
-        .from('projects')
-        .delete()
-        .eq('id', projectId);
+  const updateProjectName = useCallback(
+    async (projectId: string, name: string): Promise<boolean> => {
+      setIsSaving(true);
+      setError(null);
 
-      if (deleteError) throw deleteError;
+      try {
+        const { error: updateError } = await supabase
+          .from("projects")
+          .update({ name, updated_at: new Date().toISOString() })
+          .eq("id", projectId);
 
-      return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
-      setError(errorMessage);
-      console.error('Delete project error:', err);
-      return false;
-    }
-  }, [supabase]);
+        if (updateError) throw updateError;
 
-  const updateProjectName = useCallback(async (
-    projectId: string,
-    name: string
-  ): Promise<boolean> => {
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      const { error: updateError } = await supabase
-        .from('projects')
-        .update({ name, updated_at: new Date().toISOString() })
-        .eq('id', projectId);
-
-      if (updateError) throw updateError;
-
-      setLastSaved(new Date());
-      return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update project name';
-      setError(errorMessage);
-      console.error('Update project name error:', err);
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  }, [supabase]);
+        setLastSaved(new Date());
+        return true;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to update project name";
+        setError(errorMessage);
+        console.error("Update project name error:", err);
+        return false;
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [supabase]
+  );
 
   return {
     saveProject,
