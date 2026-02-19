@@ -212,10 +212,10 @@ export function useProjectSave(): UseProjectSaveReturn {
 export function useAutoSave(
   projectId: string | null,
   canvasData: any,
-  delay: number = 3000
+  delay: number = 1000
 ) {
   const { updateProject, isSaving } = useProjectSave();
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout>(undefined);
 
   useEffect(() => {
     if (!projectId || !canvasData) return;

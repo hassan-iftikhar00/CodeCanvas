@@ -363,7 +363,7 @@ export default function Home() {
                   playsInline
                 >
                   <source
-                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/media/demo-video2.mp4`}
+                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/media/demo-video.mp4`}
                     type="video/mp4"
                   />
                   Your browser does not support the video tag.
