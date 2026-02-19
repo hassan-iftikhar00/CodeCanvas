@@ -20,6 +20,9 @@ interface NavbarProps {
   lastSaved?: Date | null;
   saveError?: string | null;
 
+  // Save action
+  onSave?: () => void;
+
   // Action buttons (optional - for canvas page)
   onRunDetection?: () => void;
   isGenerating?: boolean;
@@ -54,6 +57,7 @@ export default function Navbar({
   onHistoryToggle,
   isChatActive,
   isHistoryActive,
+  onSave,
   showBackButton = true,
   backButtonHref = "/dashboard",
   showLogo = true,
@@ -211,6 +215,33 @@ export default function Navbar({
         {/* Canvas-specific action buttons */}
         {onRunDetection && (
           <>
+            {/* Save Button */}
+            {onSave && (
+              <button
+                onClick={onSave}
+                disabled={isSaving}
+                className="flex items-center gap-1 rounded-lg bg-[#2E2E2E] px-2 py-1.5 text-xs font-semibold text-white transition-all hover:bg-white hover:text-[#0A0A0A] disabled:opacity-50"
+                title="Save Project (Ctrl+S)"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+                  <path d="M17 21v-8H7v8" />
+                  <path d="M7 3v5h8" />
+                </svg>
+                <span className="hidden lg:inline">
+                  {isSaving ? "Saving..." : "Save"}
+                </span>
+              </button>
+            )}
+
             {/* Run Detection Button */}
             <button
               onClick={onRunDetection}
@@ -343,8 +374,8 @@ export default function Navbar({
           <div className="hidden 2xl:block w-28 shrink-0">
             <SaveIndicator
               isSaving={isSaving}
-              lastSaved={lastSaved}
-              error={saveError}
+              lastSaved={lastSaved ?? null}
+              error={saveError ?? null}
             />
           </div>
         )}

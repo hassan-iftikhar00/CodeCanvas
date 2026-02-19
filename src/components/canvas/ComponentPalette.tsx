@@ -25,6 +25,7 @@ const COMPONENTS: Component[] = [
   {
     id: "button",
     name: "Button",
+    icon: "🔘",
     description: "Interactive button",
     canvasData: {
       shapes: [
