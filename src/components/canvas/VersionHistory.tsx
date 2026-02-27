@@ -2,6 +2,7 @@
 
 import React from "react";
 import { formatDistanceToNow } from "date-fns";
+import { Check, Clock } from "lucide-react";
 
 interface ProjectVersion {
   id: string;
@@ -58,19 +59,7 @@ export default function VersionHistory({
           onClick={onCreateCheckpoint}
           className="w-full rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-[#FF6B00]/30 hover:border-[#FF6B00]"
         >
-          <svg
-            className="mr-2 inline-block h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
+          <Check className="mr-2 inline-block h-4 w-4" />
           Create Checkpoint
         </button>
       </div>
@@ -87,19 +76,7 @@ export default function VersionHistory({
         ) : versions.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
             <div className="text-center">
-              <svg
-                className="mx-auto mb-3 h-12 w-12 text-[#4A4A4A]"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+              <Clock className="mx-auto mb-3 h-12 w-12 text-[#4A4A4A]" />
               <p className="text-sm text-[#A0A0A0]">No version history yet</p>
               <p className="mt-1 text-xs text-[#666666]">
                 Versions are created automatically when you save

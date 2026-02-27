@@ -62,6 +62,7 @@ const SketchCanvasWithHistory = forwardRef<
         return {
           lines: canvasState?.lines || [],
           shapes: canvasState?.shapes || [],
+          componentGroups: [],
           width: 1000,
           height: 600,
         };
@@ -72,9 +73,9 @@ const SketchCanvasWithHistory = forwardRef<
         }
         onStateChange({ lines: [], shapes: [] });
       },
-      insertTemplate: (data: any) => {
+      insertTemplate: (data: any, templateName?: string) => {
         if (canvasRef.current) {
-          canvasRef.current.insertTemplate(data);
+          canvasRef.current.insertTemplate(data, templateName);
           // After inserting template, get updated state
           setTimeout(() => {
             const updatedData = canvasRef.current?.getCanvasData();

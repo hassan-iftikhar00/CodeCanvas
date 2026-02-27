@@ -1,6 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { 
+  Pencil, 
+  Square, 
+  Type, 
+  Image, 
+  Eye, 
+  EyeOff, 
+  Lock, 
+  Unlock, 
+  GripVertical,
+  MoreVertical,
+  Layers
+} from "lucide-react";
 
 export interface Layer {
   id: string;
@@ -47,41 +60,13 @@ export default function LayerPanel({
   const getLayerIcon = (type: Layer["type"]) => {
     switch (type) {
       case "pen":
-        return (
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-          />
-        );
+        return <Pencil className="h-4 w-4" />;
       case "shape":
-        return (
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5z"
-          />
-        );
+        return <Square className="h-4 w-4" />;
       case "text":
-        return (
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-          />
-        );
+        return <Type className="h-4 w-4" />;
       case "image":
-        return (
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        );
+        return <Image className="h-4 w-4" />;
     }
   };
 
@@ -100,16 +85,12 @@ export default function LayerPanel({
           >
             {/* Drag Handle */}
             <div className="cursor-grab text-[var(--text-muted)] opacity-0 transition-opacity group-hover:opacity-100">
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" />
-              </svg>
+              <GripVertical className="h-4 w-4" />
             </div>
 
             {/* Layer Icon */}
             <div className="text-white">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                {getLayerIcon(layer.type)}
-              </svg>
+              {getLayerIcon(layer.type)}
             </div>
 
             {/* Layer Name */}
@@ -155,29 +136,9 @@ export default function LayerPanel({
                 title={layer.visible ? "Hide layer" : "Show layer"}
               >
                 {layer.visible ? (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  </svg>
+                  <Eye className="h-4 w-4" />
                 ) : (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                    />
-                  </svg>
+                  <EyeOff className="h-4 w-4" />
                 )}
               </button>
 
@@ -191,23 +152,9 @@ export default function LayerPanel({
                 title={layer.locked ? "Unlock layer" : "Lock layer"}
               >
                 {layer.locked ? (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
+                  <Lock className="h-4 w-4" />
                 ) : (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
-                    />
-                  </svg>
+                  <Unlock className="h-4 w-4" />
                 )}
               </button>
 
@@ -219,9 +166,7 @@ export default function LayerPanel({
                 }}
                 className="rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--grey-700)] hover:text-white"
               >
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
+                <MoreVertical className="h-4 w-4" />
               </button>
             </div>
 
@@ -267,19 +212,7 @@ export default function LayerPanel({
 
         {layers.length === 0 && (
           <div className="py-8 text-center text-[var(--text-muted)]">
-            <svg
-              className="mx-auto mb-3 h-12 w-12 opacity-50"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-              />
-            </svg>
+            <Layers className="mx-auto mb-3 h-12 w-12 opacity-50" />
             <p className="text-sm">No layers yet</p>
             <p className="mt-1 text-xs">Start drawing to create layers</p>
           </div>
