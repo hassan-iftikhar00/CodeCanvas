@@ -1,6 +1,6 @@
 "use client";
 
-import {
+import React, {
   useRef,
   useState,
   useEffect,
@@ -68,17 +68,31 @@ interface ShapeData {
   scaleY?: number;
   draggable?: boolean;
   selected?: boolean;
+  cornerRadius?: number;
+  fontSize?: number;
+  fontFamily?: string;
+}
+
+// Component group interface for templates/components that should move together
+interface ComponentGroup {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  shapes: ShapeData[]; // Shapes with positions relative to group
+  selected?: boolean;
 }
 
 export interface SketchCanvasRef {
   getCanvasData: () => {
     lines: LineData[];
     shapes: ShapeData[];
+    componentGroups: ComponentGroup[];
     width: number;
     height: number;
   };
   clearCanvas: () => void;
-  insertTemplate: (data: any) => void;
+  insertTemplate: (data: any, templateName?: string) => void;
   exportAsPNG: () => string;
   exportAsDataURL: (mimeType?: string, quality?: number) => string;
 }
@@ -99,6 +113,11 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
   ) => {
     const [lines, setLines] = useState<LineData[]>([]);
     const [shapes, setShapes] = useState<ShapeData[]>([]);
+    const [componentGroups, setComponentGroups] = useState<ComponentGroup[]>([]);
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    // Edit mode for groups - allows moving/deleting individual shapes within a group
+    const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+    const [selectedGroupShapeId, setSelectedGroupShapeId] = useState<string | null>(null);
     const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
     const [containerSize, setContainerSize] = useState({
       width: 800,
@@ -116,6 +135,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const isDrawingRef = useRef(false);
     const toolRef = useRef(tool);
     const currentShapeRef = useRef<ShapeData | null>(null);
+    const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
     const strokeColorRef = useRef(strokeColor);
     const strokeWidthRef = useRef(strokeWidth);
     const fillColorRef = useRef(fillColor);
@@ -158,6 +178,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
 
     // Selection state
     const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+    const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(null);
     const [isTransforming, setIsTransforming] = useState(false);
     const transformerRef = useRef<Konva.Transformer>(null);
     const selectedShapeRef = useRef<Konva.Shape | Konva.Group | null>(null);
@@ -180,32 +201,67 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       getCanvasData: () => ({
         lines,
         shapes,
+        componentGroups,
         width: canvasSize.width,
         height: canvasSize.height,
       }),
       clearCanvas: () => {
         setLines([]);
         setShapes([]);
+        setComponentGroups([]);
         setSelectedShapeId(null);
+        setSelectedGroupId(null);
       },
-      insertTemplate: (data: any) => {
+      insertTemplate: (data: any, templateName?: string) => {
+        // Check if we should create a component group
+        if (data.shapes && data.shapes.length > 0) {
+          // Calculate the bounding box of all shapes
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          
+          data.shapes.forEach((s: any) => {
+            const x = s.x || 0;
+            const y = s.y || 0;
+            const width = s.width || 100;
+            const height = s.height || 40;
+            
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x + width);
+            maxY = Math.max(maxY, y + height);
+          });
+          
+          // Create shapes with positions relative to the group origin
+          const groupShapes: ShapeData[] = data.shapes.map((s: any) => ({
+            ...s,
+            id: s.id || `shape-${Date.now()}-${Math.random()}`,
+            x: (s.x || 0) - minX,
+            y: (s.y || 0) - minY,
+            stroke: s.stroke || strokeColor,
+            strokeWidth: s.strokeWidth || 2,
+            fill: s.fill || "transparent",
+            draggable: false, // Individual shapes in group are not draggable
+          }));
+          
+          // Create the component group
+          const newGroup: ComponentGroup = {
+            id: `group-${Date.now()}-${Math.random()}`,
+            name: templateName || 'Component',
+            x: minX,
+            y: minY,
+            shapes: groupShapes,
+            selected: false,
+          };
+          
+          setComponentGroups((prev) => [...prev, newGroup]);
+        }
+        
+        // Handle any lines if present
         if (data.lines) {
           const newLines = data.lines.map((line: any) => ({
             ...line,
             id: line.id || `line-${Date.now()}-${Math.random()}`,
           }));
           setLines((prev) => [...prev, ...newLines]);
-        }
-        if (data.shapes) {
-          const newShapes = data.shapes.map((s: any) => ({
-            ...s,
-            id: s.id || `shape-${Date.now()}-${Math.random()}`,
-            stroke: s.stroke || strokeColor,
-            strokeWidth: s.strokeWidth || 2,
-            fill: s.fill || "transparent",
-            draggable: true,
-          }));
-          setShapes((prev) => [...prev, ...newShapes]);
         }
       },
       exportAsPNG: () => {
@@ -294,22 +350,59 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           }
         }
 
-        // Delete selected shape with Delete or Backspace
+        // Delete selected shape or line with Delete or Backspace
         if (
           (e.key === "Delete" || e.key === "Backspace") &&
-          selectedShapeId &&
+          (selectedShapeId || selectedLineIndex !== null || selectedGroupId || selectedGroupShapeId) &&
           document.activeElement?.tagName !== "INPUT"
         ) {
           e.preventDefault();
-          setShapes((shapes) =>
-            shapes.filter((shape) => shape.id !== selectedShapeId)
-          );
-          setSelectedShapeId(null);
+          if (selectedShapeId) {
+            setShapes((shapes) =>
+              shapes.filter((shape) => shape.id !== selectedShapeId)
+            );
+            setSelectedShapeId(null);
+          }
+          if (selectedLineIndex !== null) {
+            setLines((lines) => lines.filter((_, idx) => idx !== selectedLineIndex));
+            setSelectedLineIndex(null);
+          }
+          // Delete individual shape within a group when in edit mode
+          if (selectedGroupShapeId && editingGroupId) {
+            setComponentGroups((groups) =>
+              groups.map((group) => {
+                if (group.id === editingGroupId) {
+                  const newShapes = group.shapes.filter((s) => s.id !== selectedGroupShapeId);
+                  // If no shapes left, remove the entire group
+                  if (newShapes.length === 0) {
+                    return null;
+                  }
+                  return { ...group, shapes: newShapes };
+                }
+                return group;
+              }).filter(Boolean) as ComponentGroup[]
+            );
+            setSelectedGroupShapeId(null);
+          } else if (selectedGroupId && !editingGroupId) {
+            // Delete entire group when not in edit mode
+            setComponentGroups((groups) =>
+              groups.filter((group) => group.id !== selectedGroupId)
+            );
+            setSelectedGroupId(null);
+          }
         }
 
-        // Escape to deselect
+        // Escape to deselect or exit edit mode
         if (e.key === "Escape") {
-          setSelectedShapeId(null);
+          if (editingGroupId) {
+            // Exit edit mode first
+            setEditingGroupId(null);
+            setSelectedGroupShapeId(null);
+          } else {
+            setSelectedShapeId(null);
+            setSelectedLineIndex(null);
+            setSelectedGroupId(null);
+          }
           if (showTextInput) {
             handleTextCancel();
           }
@@ -368,7 +461,11 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     // Focus text input when shown
     useEffect(() => {
       if (showTextInput && textInputRef.current) {
-        textInputRef.current.focus();
+        // Use setTimeout to ensure DOM is ready
+        setTimeout(() => {
+          textInputRef.current?.focus();
+          textInputRef.current?.select();
+        }, 10);
       }
     }, [showTextInput]);
 
@@ -634,6 +731,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
 
         isDrawingRef.current = true;
         setIsDrawing(true);
+        shapeStartRef.current = { x: pos.x, y: pos.y };
         const newShape: ShapeData = {
           id: `shape-${Date.now()}`,
           type: shapeType,
@@ -674,8 +772,11 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         // Erase at current position
         eraseAtPosition(pos);
       } else if (toolRef.current === "select") {
-        // Check if clicking on a shape
+        // Check if clicking on a shape first
         let clickedShapeId: string | null = null;
+        let clickedLineIdx: number | null = null;
+        
+        // Check shapes (reverse order for topmost first)
         for (let i = shapes.length - 1; i >= 0; i--) {
           const shape = shapes[i];
           if (
@@ -719,13 +820,48 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             }
           }
         }
+        
+        // If no shape was clicked, check for lines (pen drawings)
+        if (!clickedShapeId) {
+          const hitThreshold = 10;
+          for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i];
+            const points = line.points;
+            for (let j = 0; j < points.length - 2; j += 2) {
+              const x1 = points[j];
+              const y1 = points[j + 1];
+              const x2 = points[j + 2];
+              const y2 = points[j + 3];
+              const lineLen = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+              if (lineLen === 0) continue;
+              const t = Math.max(
+                0,
+                Math.min(
+                  1,
+                  ((pos.x - x1) * (x2 - x1) + (pos.y - y1) * (y2 - y1)) /
+                    lineLen ** 2
+                )
+              );
+              const projX = x1 + t * (x2 - x1);
+              const projY = y1 + t * (y2 - y1);
+              const dist = Math.sqrt((pos.x - projX) ** 2 + (pos.y - projY) ** 2);
+              if (dist <= hitThreshold + (line.width || 5) / 2) {
+                clickedLineIdx = i;
+                break;
+              }
+            }
+            if (clickedLineIdx !== null) break;
+          }
+        }
+        
         setSelectedShapeId(clickedShapeId);
+        setSelectedLineIndex(clickedLineIdx);
       }
     };
 
     // Helper function to erase at a position
     const eraseAtPosition = (pos: { x: number; y: number }) => {
-      const eraseRadius = strokeWidth * 2; // Eraser size based on stroke width
+      const eraseRadius = strokeWidthRef.current * 2; // Eraser size based on stroke width
 
       // Check for hit on lines
       const newLines = lines.filter((line) => {
@@ -785,36 +921,52 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           toolRef.current === "triangle" ||
           toolRef.current === "arrow")
       ) {
-        // Update current shape using ref so we never lose startX/startY
-        const startX = currentShapeRef.current.x;
-        const startY = currentShapeRef.current.y;
+        // Use shapeStartRef for the original click position (never changes during drag)
+        const start = shapeStartRef.current;
+        if (!start) return;
+        
         let updated: ShapeData;
 
         if (currentShapeRef.current.type === "rectangle") {
           updated = {
             ...currentShapeRef.current,
-            width: point.x - startX,
-            height: point.y - startY,
+            x: start.x,
+            y: start.y,
+            width: point.x - start.x,
+            height: point.y - start.y,
           };
         } else if (currentShapeRef.current.type === "circle") {
-          const dx = point.x - startX;
-          const dy = point.y - startY;
+          // Calculate circle that fits in the bounding box from start to current point
+          const dx = point.x - start.x;
+          const dy = point.y - start.y;
+          const radius = Math.max(Math.abs(dx), Math.abs(dy)) / 2;
           updated = {
             ...currentShapeRef.current,
-            radius: Math.sqrt(dx * dx + dy * dy),
+            // Center the circle in the bounding box
+            x: start.x + dx / 2,
+            y: start.y + dy / 2,
+            radius: radius,
           };
         } else if (currentShapeRef.current.type === "ellipse") {
+          // Calculate ellipse that fits in the bounding box from start to current point
+          const dx = point.x - start.x;
+          const dy = point.y - start.y;
           updated = {
             ...currentShapeRef.current,
-            radiusX: Math.abs(point.x - startX),
-            radiusY: Math.abs(point.y - startY),
+            // Center the ellipse in the bounding box
+            x: start.x + dx / 2,
+            y: start.y + dy / 2,
+            radiusX: Math.abs(dx) / 2,
+            radiusY: Math.abs(dy) / 2,
           };
         } else {
           // triangle / arrow
           updated = {
             ...currentShapeRef.current,
-            width: point.x - startX,
-            height: point.y - startY,
+            x: start.x,
+            y: start.y,
+            width: point.x - start.x,
+            height: point.y - start.y,
           };
         }
         currentShapeRef.current = updated;
@@ -851,6 +1003,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           setShapes((prev) => [...prev, shape]);
         }
         currentShapeRef.current = null;
+        shapeStartRef.current = null;
         setCurrentShape(null);
       }
     };
@@ -890,6 +1043,10 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             // Deselect when clicking on empty canvas
             if (e.target === e.target.getStage()) {
               setSelectedShapeId(null);
+              setSelectedLineIndex(null);
+              setSelectedGroupId(null);
+              setEditingGroupId(null);
+              setSelectedGroupShapeId(null);
             }
           }}
         >
@@ -927,22 +1084,31 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           {/* Content Layer - Scales with zoom */}
           <Layer scaleX={scale} scaleY={scale}>
             {/* Drawn Lines */}
-            {lines.map((line, i) => (
-              <Line
-                key={line.id || `line-${i}`}
-                points={line.points}
-                stroke={line.color || "#000000"}
-                strokeWidth={line.width || 2.5}
-                tension={0.5}
-                lineCap="round"
-                lineJoin="round"
-                perfectDrawEnabled={false}
-                listening={false}
-                globalCompositeOperation={
-                  line.tool === "erase" ? "destination-out" : "source-over"
-                }
-              />
-            ))}
+            {lines.map((line, i) => {
+              const isSelected = selectedLineIndex === i && tool === "select";
+              return (
+                <Line
+                  key={line.id || `line-${i}`}
+                  points={line.points}
+                  stroke={isSelected ? "#FF6B00" : (line.color || "#000000")}
+                  strokeWidth={(line.width || 2.5) + (isSelected ? 2 : 0)}
+                  tension={0.5}
+                  lineCap="round"
+                  lineJoin="round"
+                  perfectDrawEnabled={false}
+                  listening={tool === "select"}
+                  onClick={() => {
+                    if (tool === "select") {
+                      setSelectedLineIndex(i);
+                      setSelectedShapeId(null);
+                    }
+                  }}
+                  globalCompositeOperation={
+                    line.tool === "erase" ? "destination-out" : "source-over"
+                  }
+                />
+              );
+            })}
 
             {/* Active drawing line — updated via Konva API, not React state */}
             {isActivelyDrawing && (
@@ -1052,14 +1218,17 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                   />
                 );
               } else if (shape.type === "triangle") {
-                // Draw triangle using Line
+                // Draw triangle using Line - handle negative dimensions
+                const w = shape.width || 0;
+                const h = shape.height || 0;
+                const minX = w >= 0 ? shape.x : shape.x + w;
+                const maxX = w >= 0 ? shape.x + w : shape.x;
+                const minY = h >= 0 ? shape.y : shape.y + h;
+                const maxY = h >= 0 ? shape.y + h : shape.y;
                 const points = [
-                  shape.x + (shape.width || 0) / 2,
-                  shape.y, // Top point
-                  shape.x,
-                  shape.y + (shape.height || 0), // Bottom left
-                  shape.x + (shape.width || 0),
-                  shape.y + (shape.height || 0), // Bottom right
+                  (minX + maxX) / 2, minY, // Top center
+                  minX, maxY, // Bottom left
+                  maxX, maxY, // Bottom right
                 ];
                 return (
                   <Line
@@ -1179,6 +1348,242 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
               return null;
             })}
 
+            {/* Component Groups (Templates/Components) */}
+            {componentGroups.map((group) => {
+              const isGroupSelected = selectedGroupId === group.id && tool === "select";
+              const isInEditMode = editingGroupId === group.id && tool === "select";
+              
+              // Helper to handle individual shape drag within group
+              const handleGroupShapeDrag = (shapeId: string, newX: number, newY: number) => {
+                setComponentGroups((prev) =>
+                  prev.map((g) => {
+                    if (g.id === group.id) {
+                      return {
+                        ...g,
+                        shapes: g.shapes.map((s) =>
+                          s.id === shapeId ? { ...s, x: newX, y: newY } : s
+                        ),
+                      };
+                    }
+                    return g;
+                  })
+                );
+              };
+              
+              return (
+                <Group
+                  key={group.id}
+                  x={group.x}
+                  y={group.y}
+                  draggable={tool === "select" && !isInEditMode}
+                  onClick={(e) => {
+                    if (tool === "select" && !isInEditMode) {
+                      e.cancelBubble = true;
+                      setSelectedGroupId(group.id);
+                      setSelectedShapeId(null);
+                      setSelectedLineIndex(null);
+                    }
+                  }}
+                  onDblClick={(e) => {
+                    if (tool === "select") {
+                      e.cancelBubble = true;
+                      // Enter edit mode on double-click
+                      setEditingGroupId(group.id);
+                      setSelectedGroupId(group.id);
+                      setSelectedGroupShapeId(null);
+                    }
+                  }}
+                  onDragEnd={(e) => {
+                    if (!isInEditMode) {
+                      const newX = e.target.x();
+                      const newY = e.target.y();
+                      setComponentGroups((prev) =>
+                        prev.map((g) =>
+                          g.id === group.id ? { ...g, x: newX, y: newY } : g
+                        )
+                      );
+                    }
+                  }}
+                >
+                  {/* Selection highlight border */}
+                  {isGroupSelected && (() => {
+                    // Calculate group bounds
+                    let maxWidth = 0, maxHeight = 0;
+                    group.shapes.forEach((s) => {
+                      const right = (s.x || 0) + (s.width || 100);
+                      const bottom = (s.y || 0) + (s.height || 40);
+                      maxWidth = Math.max(maxWidth, right);
+                      maxHeight = Math.max(maxHeight, bottom);
+                    });
+                    return (
+                      <Rect
+                        x={-4}
+                        y={-4}
+                        width={maxWidth + 8}
+                        height={maxHeight + 8}
+                        stroke={isInEditMode ? "#10B981" : "#3B82F6"}
+                        strokeWidth={2}
+                        dash={isInEditMode ? undefined : [5, 5]}
+                        fill="transparent"
+                        listening={false}
+                      />
+                    );
+                  })()}
+                  
+                  {/* Edit mode indicator */}
+                  {isInEditMode && (
+                    <KonvaText
+                      x={0}
+                      y={-24}
+                      text="Edit Mode (Esc to exit)"
+                      fontSize={12}
+                      fontFamily="Inter, sans-serif"
+                      fill="#10B981"
+                      listening={false}
+                    />
+                  )}
+                  
+                  {/* Render shapes within the group */}
+                  {group.shapes.map((shape, shapeIndex) => {
+                    const isShapeSelected = selectedGroupShapeId === shape.id && isInEditMode;
+                    
+                    // Common props for draggable shapes in edit mode
+                    const editModeProps = isInEditMode ? {
+                      draggable: true,
+                      onClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
+                        e.cancelBubble = true;
+                        setSelectedGroupShapeId(shape.id);
+                      },
+                      onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
+                        const node = e.target;
+                        handleGroupShapeDrag(shape.id, node.x(), node.y());
+                      },
+                    } : {};
+                    
+                    // Selection highlight for individual shape
+                    const shapeHighlight = isShapeSelected ? (
+                      <Rect
+                        key={`highlight-${shape.id}`}
+                        x={(shape.x || 0) - 3}
+                        y={(shape.y || 0) - 3}
+                        width={(shape.width || 100) + 6}
+                        height={(shape.height || 40) + 6}
+                        stroke="#F59E0B"
+                        strokeWidth={2}
+                        fill="transparent"
+                        listening={false}
+                      />
+                    ) : null;
+                    
+                    if (shape.type === "rectangle") {
+                      return (
+                        <React.Fragment key={shape.id || shapeIndex}>
+                          {shapeHighlight}
+                          <Rect
+                            x={shape.x}
+                            y={shape.y}
+                            width={shape.width}
+                            height={shape.height}
+                            stroke={shape.stroke || "#000000"}
+                            strokeWidth={shape.strokeWidth || 2}
+                            fill={shape.fill || "transparent"}
+                            cornerRadius={shape.cornerRadius || 5}
+                            {...editModeProps}
+                          />
+                        </React.Fragment>
+                      );
+                    } else if (shape.type === "text") {
+                      const textHighlight = isShapeSelected ? (
+                        <Rect
+                          key={`highlight-${shape.id}`}
+                          x={(shape.x || 0) - 3}
+                          y={(shape.y || 0) - 3}
+                          width={100}
+                          height={(shape.fontSize || 16) + 6}
+                          stroke="#F59E0B"
+                          strokeWidth={2}
+                          fill="transparent"
+                          listening={false}
+                        />
+                      ) : null;
+                      return (
+                        <React.Fragment key={shape.id || shapeIndex}>
+                          {textHighlight}
+                          <KonvaText
+                            x={shape.x}
+                            y={shape.y}
+                            text={shape.text || "Text"}
+                            fontSize={shape.fontSize || 16}
+                            fontFamily={shape.fontFamily || "Inter, sans-serif"}
+                            fill={shape.stroke || shape.fill || "#000000"}
+                            {...editModeProps}
+                          />
+                        </React.Fragment>
+                      );
+                    } else if (shape.type === "circle") {
+                      const circleHighlight = isShapeSelected ? (
+                        <Rect
+                          key={`highlight-${shape.id}`}
+                          x={(shape.x || 0) - (shape.radius || 0) - 3}
+                          y={(shape.y || 0) - (shape.radius || 0) - 3}
+                          width={((shape.radius || 0) * 2) + 6}
+                          height={((shape.radius || 0) * 2) + 6}
+                          stroke="#F59E0B"
+                          strokeWidth={2}
+                          fill="transparent"
+                          listening={false}
+                        />
+                      ) : null;
+                      return (
+                        <React.Fragment key={shape.id || shapeIndex}>
+                          {circleHighlight}
+                          <Circle
+                            x={shape.x}
+                            y={shape.y}
+                            radius={shape.radius}
+                            stroke={shape.stroke || "#000000"}
+                            strokeWidth={shape.strokeWidth || 2}
+                            fill={shape.fill || "transparent"}
+                            {...editModeProps}
+                          />
+                        </React.Fragment>
+                      );
+                    } else if (shape.type === "ellipse") {
+                      const ellipseHighlight = isShapeSelected ? (
+                        <Rect
+                          key={`highlight-${shape.id}`}
+                          x={(shape.x || 0) - (shape.radiusX || 0) - 3}
+                          y={(shape.y || 0) - (shape.radiusY || 0) - 3}
+                          width={((shape.radiusX || 0) * 2) + 6}
+                          height={((shape.radiusY || 0) * 2) + 6}
+                          stroke="#F59E0B"
+                          strokeWidth={2}
+                          fill="transparent"
+                          listening={false}
+                        />
+                      ) : null;
+                      return (
+                        <React.Fragment key={shape.id || shapeIndex}>
+                          {ellipseHighlight}
+                          <Ellipse
+                            x={shape.x}
+                            y={shape.y}
+                            radiusX={shape.radiusX || 0}
+                            radiusY={shape.radiusY || 0}
+                            stroke={shape.stroke || "#000000"}
+                            strokeWidth={shape.strokeWidth || 2}
+                            fill={shape.fill || "transparent"}
+                            {...editModeProps}
+                          />
+                        </React.Fragment>
+                      );
+                    }
+                    return null;
+                  })}
+                </Group>
+              );
+            })}
+
             {/* Transformer for selected shapes */}
             {tool === "select" && selectedShapeId && (
               <Transformer
@@ -1237,20 +1642,27 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                   fill={currentShape.fill || "transparent"}
                 />
               ) : currentShape.type === "triangle" ? (
-                <Line
-                  points={[
-                    currentShape.x + (currentShape.width || 0) / 2,
-                    currentShape.y,
-                    currentShape.x,
-                    currentShape.y + (currentShape.height || 0),
-                    currentShape.x + (currentShape.width || 0),
-                    currentShape.y + (currentShape.height || 0),
-                  ]}
-                  stroke={currentShape.stroke || "#000000"}
-                  strokeWidth={currentShape.strokeWidth || 2}
-                  fill={currentShape.fill || "transparent"}
-                  closed={true}
-                />
+                (() => {
+                  const w = currentShape.width || 0;
+                  const h = currentShape.height || 0;
+                  const minX = w >= 0 ? currentShape.x : currentShape.x + w;
+                  const maxX = w >= 0 ? currentShape.x + w : currentShape.x;
+                  const minY = h >= 0 ? currentShape.y : currentShape.y + h;
+                  const maxY = h >= 0 ? currentShape.y + h : currentShape.y;
+                  return (
+                    <Line
+                      points={[
+                        (minX + maxX) / 2, minY,
+                        minX, maxY,
+                        maxX, maxY,
+                      ]}
+                      stroke={currentShape.stroke || "#000000"}
+                      strokeWidth={currentShape.strokeWidth || 2}
+                      fill={currentShape.fill || "transparent"}
+                      closed={true}
+                    />
+                  );
+                })()
               ) : currentShape.type === "arrow" ? (
                 <Arrow
                   points={[
@@ -1294,6 +1706,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             <input
               ref={textInputRef}
               type="text"
+              autoFocus
               value={textInputValue}
               onChange={(e) => setTextInputValue(e.target.value)}
               onKeyDown={(e) => {
@@ -1369,6 +1782,12 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             <>
               <span>•</span>
               <span className="text-[#FF6B00]">Shape Selected</span>
+            </>
+          )}
+          {selectedLineIndex !== null && (
+            <>
+              <span>•</span>
+              <span className="text-[#FF6B00]">Drawing Selected</span>
             </>
           )}
         </div>

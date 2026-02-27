@@ -212,13 +212,26 @@ export function useProjectSave(): UseProjectSaveReturn {
 export function useAutoSave(
   projectId: string | null,
   canvasData: any,
-  delay: number = 1000
+  delay: number = 3000
 ) {
   const { updateProject, isSaving } = useProjectSave();
   const timeoutRef = useRef<NodeJS.Timeout>(undefined);
+  const lastSavedDataRef = useRef<string>("");
 
   useEffect(() => {
-    if (!projectId || !canvasData) return;
+    // Don't auto-save temp projects or if no data
+    if (!projectId || projectId.startsWith("temp-") || !canvasData) return;
+    
+    // Serialize current state
+    const currentDataStr = JSON.stringify(canvasData);
+    
+    // Skip if data hasn't changed
+    if (currentDataStr === lastSavedDataRef.current) return;
+    
+    // Skip if canvas is empty
+    const hasContent = (canvasData.lines && canvasData.lines.length > 0) || 
+                       (canvasData.shapes && canvasData.shapes.length > 0);
+    if (!hasContent) return;
 
     // Clear existing timeout
     if (timeoutRef.current) {
@@ -226,8 +239,11 @@ export function useAutoSave(
     }
 
     // Set new timeout for auto-save
-    timeoutRef.current = setTimeout(() => {
-      updateProject(projectId, canvasData);
+    timeoutRef.current = setTimeout(async () => {
+      const success = await updateProject(projectId, canvasData);
+      if (success) {
+        lastSavedDataRef.current = currentDataStr;
+      }
     }, delay);
 
     return () => {

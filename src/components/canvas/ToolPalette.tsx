@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { X } from "lucide-react";
 
 interface ToolPaletteProps {
   isOpen: boolean;
@@ -45,19 +45,7 @@ export default function ToolPalette({
             onClick={onClose}
             className="rounded-lg p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--grey-700)] hover:text-white"
           >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <X className="h-5 w-5" />
           </button>
         </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { RotateCw, ExternalLink } from "lucide-react";
 
 interface LivePreviewProps {
   code: string;
@@ -156,14 +157,7 @@ ${code}
               className="ml-2 rounded-lg bg-[#2E2E2E] p-2 text-white transition-all hover:bg-white/10"
               title="Toggle Orientation"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
+              <RotateCw className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -181,14 +175,7 @@ ${code}
             className="rounded-lg bg-[#2E2E2E] p-2 text-white transition-all hover:bg-white/10"
             title="Refresh Preview"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <RotateCw className="h-4 w-4" />
           </button>
 
           <button
@@ -196,14 +183,7 @@ ${code}
             className="rounded-lg bg-[#2E2E2E] p-2 text-white transition-all hover:bg-white/10"
             title="Open in New Window"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-              />
-            </svg>
+            <ExternalLink className="h-4 w-4" />
           </button>
 
           <span className="text-xs text-[#666666]">

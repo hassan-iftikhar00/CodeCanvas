@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Minus, Plus } from "lucide-react";
 
 interface ZoomControlsProps {
   zoom: number;
@@ -8,7 +9,7 @@ interface ZoomControlsProps {
   onFitToScreen: () => void;
 }
 
-const ZOOM_PRESETS = [25, 50, 75, 100, 125, 150, 200, 300];
+const ZOOM_PRESETS = [100, 125, 150, 175, 200, 250, 300];
 
 export default function ZoomControls({
   zoom,
@@ -21,21 +22,12 @@ export default function ZoomControls({
     <div className="absolute bottom-4 left-4 z-20 flex items-center gap-px rounded-lg border border-[#2E2E2E] bg-[#1A1A1A] shadow-lg overflow-hidden">
       {/* Zoom Out */}
       <button
-        onClick={() => onZoomChange(Math.max(zoom - 10, 25))}
-        disabled={zoom <= 25}
+        onClick={() => onZoomChange(Math.max(zoom - 10, 100))}
+        disabled={zoom <= 100}
         className="flex h-8 w-8 items-center justify-center text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
         title="Zoom Out (Ctrl+-)"
       >
-        <svg
-          className="h-3.5 w-3.5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          strokeLinecap="round"
-        >
-          <path d="M5 12h14" />
-        </svg>
+        <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
       </button>
 
       {/* Zoom Level / Preset dropdown */}
@@ -92,16 +84,7 @@ export default function ZoomControls({
         className="flex h-8 w-8 items-center justify-center text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
         title="Zoom In (Ctrl+=)"
       >
-        <svg
-          className="h-3.5 w-3.5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          strokeLinecap="round"
-        >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
+        <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
       </button>
 
       {/* Reset */}
