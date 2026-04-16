@@ -16,9 +16,6 @@ const REMEMBER_ME_KEY = "codecanvas_remember_me";
 const SAVED_EMAIL_KEY = "codecanvas_saved_email";
 const MIN_PASSWORD_LENGTH = 6;
 
-// Password strength levels
-type PasswordStrength = "none" | "weak" | "medium" | "strong";
-
 interface ValidationState {
   email: {
     touched: boolean;
@@ -89,42 +86,6 @@ function LoginPageInner() {
     }
     return null;
   }, []);
-
-  // Calculate password strength
-  const passwordStrength = useMemo((): PasswordStrength => {
-    if (!password) return "none";
-
-    let score = 0;
-
-    // Length checks
-    if (password.length >= MIN_PASSWORD_LENGTH) score++;
-    if (password.length >= 8) score++;
-    if (password.length >= 12) score++;
-
-    // Character variety checks
-    if (/[a-z]/.test(password)) score++;
-    if (/[A-Z]/.test(password)) score++;
-    if (/[0-9]/.test(password)) score++;
-    if (/[^a-zA-Z0-9]/.test(password)) score++;
-
-    if (score <= 2) return "weak";
-    if (score <= 4) return "medium";
-    return "strong";
-  }, [password]);
-
-  // Get strength indicator properties
-  const strengthConfig = useMemo(() => {
-    switch (passwordStrength) {
-      case "weak":
-        return { label: "Weak", color: "#EF4444", width: "33%" };
-      case "medium":
-        return { label: "Medium", color: "#F59E0B", width: "66%" };
-      case "strong":
-        return { label: "Strong", color: "#22C55E", width: "100%" };
-      default:
-        return { label: "", color: "transparent", width: "0%" };
-    }
-  }, [passwordStrength]);
 
   // Check if form is valid for submission
   const isFormValid = useMemo(() => {
@@ -641,32 +602,6 @@ function LoginPageInner() {
                       </svg>
                       {validation.password.error}
                     </p>
-                  )}
-
-                  {/* Password strength indicator */}
-                  {password && !validation.password.error && (
-                    <div className="space-y-1.5 mt-2 animate-fade-in">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-[#666666]">
-                          Password strength
-                        </span>
-                        <span
-                          className="text-xs font-medium transition-colors"
-                          style={{ color: strengthConfig.color }}
-                        >
-                          {strengthConfig.label}
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-[#2E2E2E] rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-300 ease-out"
-                          style={{
-                            width: strengthConfig.width,
-                            backgroundColor: strengthConfig.color,
-                          }}
-                        />
-                      </div>
-                    </div>
                   )}
                 </div>
 
