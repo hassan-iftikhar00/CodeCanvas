@@ -623,7 +623,13 @@ function CanvasPageInner() {
     }
   };
 
-  const handleChatMessage = async (message: string) => {
+  const handleChatMessage = async (message: string): Promise<string> => {
+    // Sketch-first workflow: block chat if no code exists
+    const currentCode = editedCode || generatedCode;
+    if (!currentCode) {
+      return "Please draw a sketch and generate code first. I can only refine existing code.";
+    }
+
     setIsGenerating(true);
     try {
       const response = await fetch("/api/generate-code", {
@@ -632,7 +638,7 @@ function CanvasPageInner() {
         body: JSON.stringify({
           mode: "chat",
           messages: [{ role: "user", content: message }],
-          currentCode: editedCode || generatedCode,
+          currentCode,
           projectId: currentProject?.id,
           framework: "html",
           styling: "tailwind",
@@ -642,6 +648,12 @@ function CanvasPageInner() {
       const result = await response.json();
       setGeneratedCode(result.code);
       setEditedCode(result.code);
+      // Ensure code panel is visible so user sees the update
+      setShowCodePanel(true);
+      return (
+        result.message ||
+        "Done! I've updated the code. Check the code panel below."
+      );
     } catch (err) {
       console.error(err);
       throw err;
@@ -1563,11 +1575,12 @@ function CanvasPageInner() {
               </div>
             )}
 
-            {/* Chat panel */}
+            {/* Chat panel — sketch-first workflow: hasCode gates chat input */}
             {rightPanel === "chat" && (
               <ChatInterface
                 onSendMessage={handleChatMessage}
                 isProcessing={isGenerating}
+                hasCode={!!(editedCode || generatedCode)}
               />
             )}
           </aside>

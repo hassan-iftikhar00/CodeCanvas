@@ -1,6 +1,121 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+/* ─── OpenRouter (free) – code-refinement via chat ─── */
+const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+// Ordered list of free models to try (fallback on rate-limit / error)
+const FREE_MODELS = [
+  "openai/gpt-oss-120b:free",
+  "deepseek/deepseek-r1-0528:free",
+  "openai/gpt-oss-20b:free",
+];
+
+async function callOpenRouter(
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userContent: string
+): Promise<Response> {
+  return fetch(OPENROUTER_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer":
+        process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+      "X-Title": "CodeCanvas",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.3,
+      max_tokens: 4096,
+    }),
+  });
+}
+
+async function refineChatWithOpenRouter(
+  userMessage: string,
+  currentCode: string
+): Promise<{ code: string; message: string }> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY is not set");
+  }
+
+  const systemPrompt = `You are CodeCanvas AI — a code-refinement assistant.
+You receive the user's CURRENT CODE and an INSTRUCTION describing what to change.
+Return ONLY the complete, updated code — no explanations, no markdown fences, no commentary.
+Rules:
+• Preserve the overall structure unless the instruction says otherwise.
+• Use Tailwind CSS classes for styling changes.
+• Keep the code valid HTML / JSX.
+• If the instruction is unclear, make a reasonable best-effort change.`;
+
+  const userContent = `CURRENT CODE:\n\`\`\`\n${currentCode}\n\`\`\`\n\nINSTRUCTION: ${userMessage}`;
+
+  let lastError = "";
+
+  for (const model of FREE_MODELS) {
+    // Try each model, with one retry on 429
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await callOpenRouter(
+          apiKey,
+          model,
+          systemPrompt,
+          userContent
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          let refined =
+            data.choices?.[0]?.message?.content?.trim() ?? currentCode;
+
+          // Strip markdown code fences if model wraps them anyway
+          refined = refined
+            .replace(/^```[\w]*\n?/, "")
+            .replace(/\n?```$/, "")
+            .trim();
+
+          const usedModel =
+            model.split("/").pop()?.replace(":free", "") ?? model;
+          return {
+            code: refined,
+            message: `Code updated (via ${usedModel}).`,
+          };
+        }
+
+        const errBody = await res.text();
+        lastError = `${model}: ${res.status} ${errBody}`;
+        console.warn(
+          `OpenRouter [${model}] attempt ${attempt + 1}:`,
+          res.status
+        );
+
+        // On 429 rate-limit, wait briefly then retry once
+        if (res.status === 429 && attempt === 0) {
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+
+        // Any other error (404, 500, etc.) → skip to next model
+        break;
+      } catch (fetchErr) {
+        lastError = `${model}: ${fetchErr}`;
+        break;
+      }
+    }
+  }
+
+  // All models exhausted
+  throw new Error(`All free models failed. Last: ${lastError}`);
+}
+
 // Fallback code generation when FastAPI is unavailable
 function generateCodeFallback(
   canvasData: any,
@@ -174,6 +289,34 @@ export async function POST(request: Request) {
       );
     }
 
+    /* ─── Chat mode → OpenRouter (no FastAPI needed) ─── */
+    if (mode === "chat") {
+      const lastMessage = messages[messages.length - 1].content;
+      try {
+        const result = await refineChatWithOpenRouter(lastMessage, currentCode);
+        return NextResponse.json({
+          code: result.code,
+          message: result.message,
+          detectedElements: [],
+          framework,
+          styling,
+        });
+      } catch (err) {
+        console.error("OpenRouter chat error:", err);
+        // Fallback: append comment so user isn't stuck
+        return NextResponse.json({
+          code: currentCode + `\n\n<!-- Refinement: ${lastMessage} -->`,
+          message:
+            "AI service temporarily unavailable – added your request as a comment.",
+          detectedElements: [],
+          framework,
+          styling,
+          usedFallback: true,
+        });
+      }
+    }
+
+    /* ─── Generate mode → FastAPI sketch detection ─── */
     // Try FastAPI backend first
     const fastApiUrl =
       process.env.FASTAPI_URL || "http://localhost:8000/api/predict";
@@ -209,21 +352,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fallback logic
+    // Fallback logic for sketch → code generation
     let code = "";
     let detectedElements: any[] = [];
 
-    if (mode === "chat") {
-      // Mock chat refinement for fallback
-      const lastMessage = messages[messages.length - 1].content;
-      code = currentCode + `\n\n{/* Refinement: ${lastMessage} */}`;
-      // In a real app we'd need an LLM here
-    } else {
-      // Fallback to client-side code generation for canvas
-      const result = generateCodeFallback(canvasData, framework, styling);
-      code = result.code;
-      detectedElements = result.detectedElements;
-    }
+    const result = generateCodeFallback(canvasData, framework, styling);
+    code = result.code;
+    detectedElements = result.detectedElements;
 
     return NextResponse.json({
       code,
