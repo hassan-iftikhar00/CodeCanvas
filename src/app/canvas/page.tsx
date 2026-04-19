@@ -14,7 +14,11 @@ import TemplatesPanel from "@/components/canvas/TemplatesPanel";
 import SaveIndicator from "@/components/SaveIndicator";
 import ZoomControls from "@/components/canvas/ZoomControls";
 import Navbar from "@/components/Navbar";
-import { useProjectSave, useAutoSave } from "@/hooks/useProjectSave";
+import {
+  useProjectSave,
+  useAutoSave,
+  type CanvasData,
+} from "@/hooks/useProjectSave";
 import type { Template } from "@/data/templates";
 
 import MonacoCodeEditor from "@/components/canvas/MonacoCodeEditor";
@@ -360,7 +364,7 @@ function CanvasPageInner() {
   const {
     saveProject,
     updateProject,
-    updateProjectName,
+    updateProjectTitle,
     loadProject,
     isSaving: isManualSaving,
     lastSaved,
@@ -392,7 +396,7 @@ function CanvasPageInner() {
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ History & versions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const history = useHistory({
-    initialState: { lines: [] as unknown[], shapes: [] as unknown[] },
+    initialState: { lines: [], shapes: [] } as CanvasData,
     maxHistory: 50,
   });
   const { isSaving: isAutoSaving } = useAutoSave(
@@ -462,14 +466,18 @@ function CanvasPageInner() {
       const load = async () => {
         const project = await loadProject(id);
         if (project) {
-          setCurrentProject({ id: project.id, name: project.name });
-          setProjectName(project.name);
-          setOriginalProjectName(project.name);
+          setCurrentProject({ id: project.id, name: project.title });
+          setProjectName(project.title);
+          setOriginalProjectName(project.title);
           if (project.canvas_data) {
             setTimeout(() => {
               if (canvasRef.current && project.canvas_data.lines) {
                 canvasRef.current.clearCanvas();
-                canvasRef.current.insertTemplate(project.canvas_data);
+                canvasRef.current.insertTemplate(
+                  project.canvas_data as Parameters<
+                    SketchCanvasRef["insertTemplate"]
+                  >[0]
+                );
               }
             }, 500);
           }
@@ -610,7 +618,7 @@ function CanvasPageInner() {
     if (!currentProject?.id || !projectName.trim()) return;
     setIsSavingName(true);
     try {
-      const success = await updateProjectName(
+      const success = await updateProjectTitle(
         currentProject.id,
         projectName.trim()
       );
@@ -743,8 +751,13 @@ function CanvasPageInner() {
       canvasRef.current.insertTemplate(template.canvasData);
   };
   const handleInsertComponent = (component: { canvasData: unknown }) => {
-    if (canvasRef.current)
-      canvasRef.current.insertTemplate(component.canvasData);
+    if (canvasRef.current) {
+      canvasRef.current.insertTemplate(
+        component.canvasData as Parameters<
+          SketchCanvasRef["insertTemplate"]
+        >[0]
+      );
+    }
   };
 
   const handleFitToScreen = () => setZoom(100);
