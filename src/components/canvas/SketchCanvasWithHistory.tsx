@@ -1,12 +1,43 @@
 "use client";
 
 import React, {
-  useState,
   useEffect,
   forwardRef,
   useImperativeHandle,
+  useRef,
 } from "react";
 import SketchCanvas, { type SketchCanvasRef } from "./SketchCanvas";
+
+interface CanvasShapeData {
+  id?: string;
+  type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow";
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  radius?: number;
+  radiusX?: number;
+  radiusY?: number;
+  text?: string;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  cornerRadius?: number;
+  draggable?: boolean;
+}
+
+interface CanvasLineData {
+  tool?: string;
+  points?: number[];
+  color?: string;
+  width?: number;
+  id?: string;
+}
+
+interface CanvasTemplateData {
+  lines?: CanvasLineData[];
+  shapes?: CanvasShapeData[];
+}
 
 interface SketchCanvasWithHistoryProps {
   tool: string;
@@ -18,8 +49,8 @@ interface SketchCanvasWithHistoryProps {
   fillColor?: string;
   strokeWidth?: number;
   zoom?: number;
-  canvasState: { lines: any[]; shapes: any[] };
-  onStateChange: (newState: { lines: any[]; shapes: any[] }) => void;
+  canvasState: CanvasTemplateData;
+  onStateChange: (newState: CanvasTemplateData) => void;
 }
 
 export interface SketchCanvasWithHistoryRef extends SketchCanvasRef {
@@ -51,7 +82,7 @@ const SketchCanvasWithHistory = forwardRef<
     },
     ref
   ) => {
-    const canvasRef = React.useRef<SketchCanvasRef>(null);
+    const canvasRef = useRef<SketchCanvasRef>(null);
 
     // Expose methods to parent
     useImperativeHandle(ref, () => ({
@@ -62,9 +93,10 @@ const SketchCanvasWithHistory = forwardRef<
         return {
           lines: canvasState?.lines || [],
           shapes: canvasState?.shapes || [],
+          componentGroups: [],
           width: 1000,
           height: 600,
-        };
+        } as ReturnType<SketchCanvasRef["getCanvasData"]>;
       },
       clearCanvas: () => {
         if (canvasRef.current) {
@@ -72,9 +104,9 @@ const SketchCanvasWithHistory = forwardRef<
         }
         onStateChange({ lines: [], shapes: [] });
       },
-      insertTemplate: (data: any) => {
+      insertTemplate: (data: CanvasTemplateData, templateName?: string) => {
         if (canvasRef.current) {
-          canvasRef.current.insertTemplate(data);
+          canvasRef.current.insertTemplate(data, templateName);
           // After inserting template, get updated state
           setTimeout(() => {
             const updatedData = canvasRef.current?.getCanvasData();
@@ -91,22 +123,22 @@ const SketchCanvasWithHistory = forwardRef<
         if (canvasRef.current) {
           return canvasRef.current.exportAsPNG();
         }
-        return '';
+        return "";
       },
       exportAsDataURL: (mimeType?: string, quality?: number) => {
         if (canvasRef.current) {
           return canvasRef.current.exportAsDataURL(mimeType, quality);
         }
-        return '';
+        return "";
       },
     }));
 
     // Track if we're applying history state to prevent circular updates
-    const [isApplyingHistory, setIsApplyingHistory] = useState(false);
+    const isApplyingHistoryRef = useRef(false);
 
     // Apply history state to canvas (for undo/redo)
     useEffect(() => {
-      if (!canvasState || !canvasRef.current || isApplyingHistory) return;
+      if (!canvasState || !canvasRef.current || isApplyingHistoryRef.current) return;
 
       const currentData = canvasRef.current.getCanvasData();
       const currentCanvasState = {
@@ -116,24 +148,29 @@ const SketchCanvasWithHistory = forwardRef<
 
       // Only update canvas if history state is different from canvas state
       if (JSON.stringify(currentCanvasState) !== JSON.stringify(canvasState)) {
-        setIsApplyingHistory(true);
+        isApplyingHistoryRef.current = true;
         // Clear and restore canvas from history
         canvasRef.current.clearCanvas();
-        if (canvasState.lines?.length > 0 || canvasState.shapes?.length > 0) {
+        if (
+          (canvasState.lines?.length ?? 0) > 0 ||
+          (canvasState.shapes?.length ?? 0) > 0
+        ) {
           canvasRef.current.insertTemplate(canvasState);
         }
         // Reset flag after a brief delay
-        setTimeout(() => setIsApplyingHistory(false), 100);
+        setTimeout(() => {
+          isApplyingHistoryRef.current = false;
+        }, 100);
       }
-    }, [canvasState, isApplyingHistory]);
+    }, [canvasState]);
 
     // Sync canvas state changes with parent (for capturing new changes)
     useEffect(() => {
-      if (!canvasState || isApplyingHistory) return; // Don't capture changes while applying history
+      if (!canvasState || isApplyingHistoryRef.current) return; // Don't capture changes while applying history
 
       // Poll for canvas changes every 500ms
       const interval = setInterval(() => {
-        if (canvasRef.current && !isApplyingHistory) {
+        if (canvasRef.current && !isApplyingHistoryRef.current) {
           const currentData = canvasRef.current.getCanvasData();
           const currentState = {
             lines: currentData.lines,
@@ -148,7 +185,7 @@ const SketchCanvasWithHistory = forwardRef<
       }, 500);
 
       return () => clearInterval(interval);
-    }, [canvasState, onStateChange, isApplyingHistory]);
+    }, [canvasState, onStateChange]);
 
     return (
       <SketchCanvas

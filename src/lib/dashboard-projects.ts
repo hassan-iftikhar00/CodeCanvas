@@ -113,6 +113,14 @@ export function readRecentProjectActivity(): RecentProjectActivity[] {
   }
 }
 
+export function writeRecentProjectActivity(activity: RecentProjectActivity[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(RECENT_ACTIVITY_KEY, JSON.stringify(activity));
+}
+
 export function recordProjectActivity(
   projectId: string,
   type: RecentProjectActivity["type"]
