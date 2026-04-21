@@ -1,28 +1,61 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+export interface CanvasData {
+  lines?: Array<{
+    tool?: string;
+    points?: number[];
+    color?: string;
+    width?: number;
+    id?: string;
+  }>;
+  shapes?: Array<{
+    id?: string;
+    type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow";
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    radius?: number;
+    radiusX?: number;
+    radiusY?: number;
+    text?: string;
+    fill?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    cornerRadius?: number;
+    draggable?: boolean;
+    selected?: boolean;
+    fontSize?: number;
+    fontFamily?: string;
+    scaleX?: number;
+    scaleY?: number;
+    rotation?: number;
+  }>;
+}
+
 interface Project {
   id: string;
-  name: string;
+  title: string;
   description?: string;
-  canvas_data: any;
-  thumbnail?: string;
+  canvas_data: CanvasData;
+  thumbnail_url?: string;
   created_at: string;
   updated_at: string;
 }
 
 interface UseProjectSaveReturn {
   saveProject: (
-    name: string,
-    canvasData: any,
-    thumbnail?: string
+    title: string,
+    canvasData: CanvasData,
+    thumbnail_url?: string
   ) => Promise<string | null>;
   updateProject: (
     projectId: string,
-    canvasData: any,
-    thumbnail?: string
+    canvasData: CanvasData,
+    thumbnail_url?: string
   ) => Promise<boolean>;
-  updateProjectName: (projectId: string, name: string) => Promise<boolean>;
+  updateProjectTitle: (projectId: string, title: string) => Promise<boolean>;
   loadProject: (projectId: string) => Promise<Project | null>;
   deleteProject: (projectId: string) => Promise<boolean>;
   isSaving: boolean;
@@ -38,9 +71,9 @@ export function useProjectSave(): UseProjectSaveReturn {
 
   const saveProject = useCallback(
     async (
-      name: string,
-      canvasData: any,
-      thumbnail?: string
+      title: string,
+      canvasData: CanvasData,
+      thumbnail_url?: string
     ): Promise<string | null> => {
       setIsSaving(true);
       setError(null);
@@ -58,9 +91,9 @@ export function useProjectSave(): UseProjectSaveReturn {
           .from("projects")
           .insert({
             user_id: user.id,
-            name,
+            title,
             canvas_data: canvasData,
-            thumbnail,
+            thumbnail_url,
           })
           .select()
           .single();
@@ -85,20 +118,24 @@ export function useProjectSave(): UseProjectSaveReturn {
   const updateProject = useCallback(
     async (
       projectId: string,
-      canvasData: any,
-      thumbnail?: string
+      canvasData: CanvasData,
+      thumbnail_url?: string
     ): Promise<boolean> => {
       setIsSaving(true);
       setError(null);
 
       try {
-        const updateData: any = {
+        const updateData: {
+          canvas_data: CanvasData;
+          updated_at: string;
+          thumbnail_url?: string;
+        } = {
           canvas_data: canvasData,
           updated_at: new Date().toISOString(),
         };
 
-        if (thumbnail) {
-          updateData.thumbnail = thumbnail;
+        if (thumbnail_url) {
+          updateData.thumbnail_url = thumbnail_url;
         }
 
         const { error: updateError } = await supabase
@@ -168,15 +205,15 @@ export function useProjectSave(): UseProjectSaveReturn {
     [supabase]
   );
 
-  const updateProjectName = useCallback(
-    async (projectId: string, name: string): Promise<boolean> => {
+  const updateProjectTitle = useCallback(
+    async (projectId: string, title: string): Promise<boolean> => {
       setIsSaving(true);
       setError(null);
 
       try {
         const { error: updateError } = await supabase
           .from("projects")
-          .update({ name, updated_at: new Date().toISOString() })
+          .update({ title, updated_at: new Date().toISOString() })
           .eq("id", projectId);
 
         if (updateError) throw updateError;
@@ -185,9 +222,9 @@ export function useProjectSave(): UseProjectSaveReturn {
         return true;
       } catch (err) {
         const errorMessage =
-          err instanceof Error ? err.message : "Failed to update project name";
+          err instanceof Error ? err.message : "Failed to update project title";
         setError(errorMessage);
-        console.error("Update project name error:", err);
+        console.error("Update project title error:", err);
         return false;
       } finally {
         setIsSaving(false);
@@ -199,7 +236,7 @@ export function useProjectSave(): UseProjectSaveReturn {
   return {
     saveProject,
     updateProject,
-    updateProjectName,
+    updateProjectTitle,
     loadProject,
     deleteProject,
     isSaving,
@@ -211,14 +248,28 @@ export function useProjectSave(): UseProjectSaveReturn {
 // Auto-save hook with debouncing
 export function useAutoSave(
   projectId: string | null,
-  canvasData: any,
-  delay: number = 1000
+  canvasData: CanvasData,
+  delay: number = 3000
 ) {
   const { updateProject, isSaving } = useProjectSave();
   const timeoutRef = useRef<NodeJS.Timeout>(undefined);
+  const lastSavedDataRef = useRef<string>("");
 
   useEffect(() => {
-    if (!projectId || !canvasData) return;
+    // Don't auto-save temp projects or if no data
+    if (!projectId || projectId.startsWith("temp-") || !canvasData) return;
+
+    // Serialize current state
+    const currentDataStr = JSON.stringify(canvasData);
+
+    // Skip if data hasn't changed
+    if (currentDataStr === lastSavedDataRef.current) return;
+
+    // Skip if canvas is empty
+    const hasContent =
+      (canvasData.lines && canvasData.lines.length > 0) ||
+      (canvasData.shapes && canvasData.shapes.length > 0);
+    if (!hasContent) return;
 
     // Clear existing timeout
     if (timeoutRef.current) {
@@ -226,8 +277,11 @@ export function useAutoSave(
     }
 
     // Set new timeout for auto-save
-    timeoutRef.current = setTimeout(() => {
-      updateProject(projectId, canvasData);
+    timeoutRef.current = setTimeout(async () => {
+      const success = await updateProject(projectId, canvasData);
+      if (success) {
+        lastSavedDataRef.current = currentDataStr;
+      }
     }, delay);
 
     return () => {

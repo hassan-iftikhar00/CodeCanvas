@@ -13,17 +13,19 @@ interface Project {
 
 interface ProjectCardProps {
   project: Project;
-  onDelete: (id: string) => void;
+  onRequestDelete: (project: Project, triggerButton: HTMLButtonElement) => void;
   onRename: (id: string, newName: string) => void;
   onToggleStar: (id: string) => void;
   isStarred: boolean;
+  deleteDisabled?: boolean;
 }
 
 export default function ProjectCard({
   project,
-  onDelete,
+  onRequestDelete,
   onToggleStar,
   isStarred,
+  deleteDisabled = false,
 }: ProjectCardProps) {
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-xl border border-[#2E2E2E] bg-[#1A1A1A] transition-all hover:border-[#FF6B00] hover:shadow-lg">
@@ -91,6 +93,10 @@ export default function ProjectCard({
 
           <div className="relative flex items-center gap-1">
             <button
+              type="button"
+              aria-label={
+                isStarred ? "Remove star from project" : "Star project"
+              }
               className={`rounded p-1 transition-colors ${
                 isStarred
                   ? "text-[#FFB97A] hover:bg-[#2E2E2E]"
@@ -118,13 +124,14 @@ export default function ProjectCard({
               </svg>
             </button>
             <button
+              type="button"
+              aria-label={`Delete ${project.title}`}
+              disabled={deleteDisabled}
               className="rounded p-1 text-[#666666] hover:bg-[#2E2E2E] hover:text-white"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (confirm("Are you sure you want to delete this project?")) {
-                  onDelete(project.id);
-                }
+                onRequestDelete(project, e.currentTarget);
               }}
             >
               <svg

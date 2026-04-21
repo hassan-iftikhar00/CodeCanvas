@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +18,8 @@ import {
   readRecentProjectActivity,
   readStarredProjectIds,
   recordProjectActivity,
+  writeRecentProjectActivity,
+  writeStarredProjectIds,
   toggleStarredProject,
   type DashboardProject,
   type RecentProjectActivity,
@@ -18,6 +27,22 @@ import {
 
 type SortOption = "recent" | "oldest" | "alphabetical";
 type DateFilter = "all" | "7d" | "30d";
+
+interface DeleteSnapshot {
+  project: DashboardProject;
+  index: number;
+  wasStarred: boolean;
+  recentEntries: RecentProjectActivity[];
+}
+
+type ProjectCardProject = {
+  id: string;
+  title: string;
+  description?: string | null;
+  framework: string;
+  thumbnailUrl?: string | null;
+  updated_at: string;
+};
 
 export default function DashboardPage() {
   const [projects, setProjects] = useState<DashboardProject[]>([]);
@@ -30,8 +55,30 @@ export default function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState<RecentProjectActivity[]>(
     []
   );
+  const [deleteDialogProject, setDeleteDialogProject] =
+    useState<DashboardProject | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(
+    null
+  );
   const supabase = createClient();
   const router = useRouter();
+  const deleteDialogRef = useRef<HTMLDivElement | null>(null);
+  const deleteCancelRef = useRef<HTMLButtonElement | null>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const newProjectButtonRef = useRef<HTMLButtonElement | null>(null);
+  const deleteSnapshotRef = useRef<DeleteSnapshot | null>(null);
+
+  const restoreDeleteFocus = useCallback(() => {
+    window.setTimeout(() => {
+      if (deleteTriggerRef.current?.isConnected) {
+        deleteTriggerRef.current.focus();
+        return;
+      }
+
+      newProjectButtonRef.current?.focus();
+    }, 0);
+  }, []);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -121,25 +168,197 @@ export default function DashboardPage() {
     }
   };
 
-  const handleDeleteProject = async (id: string) => {
+  const closeDeleteDialog = useCallback(() => {
+    setDeleteDialogProject(null);
+    setDeleteError(null);
+    deleteSnapshotRef.current = null;
+    restoreDeleteFocus();
+  }, [restoreDeleteFocus]);
+
+  const handleRequestDelete = useCallback(
+    (project: ProjectCardProject, triggerButton: HTMLButtonElement) => {
+      if (deleteDialogProject || deletingProjectId) {
+        return;
+      }
+
+      const projectToDelete = projects.find((item) => item.id === project.id);
+      if (!projectToDelete) {
+        return;
+      }
+
+      deleteTriggerRef.current = triggerButton;
+      deleteSnapshotRef.current = {
+        project: projectToDelete,
+        index: projects.findIndex((item) => item.id === projectToDelete.id),
+        wasStarred: starredProjectIds.includes(projectToDelete.id),
+        recentEntries: recentActivity.filter(
+          (entry) => entry.projectId === projectToDelete.id
+        ),
+      };
+
+      setDeleteError(null);
+      setDeleteDialogProject(projectToDelete);
+    },
+    [
+      deleteDialogProject,
+      deletingProjectId,
+      projects,
+      recentActivity,
+      starredProjectIds,
+    ]
+  );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteDialogProject || deletingProjectId) {
+      return;
+    }
+
+    const snapshot = deleteSnapshotRef.current;
+    if (!snapshot) {
+      return;
+    }
+
+    const projectId = deleteDialogProject.id;
+    setDeletingProjectId(projectId);
+
+    setProjects((current) =>
+      current.filter((project) => project.id !== projectId)
+    );
+    setStarredProjectIds((current) =>
+      current.filter((projectIdToKeep) => projectIdToKeep !== projectId)
+    );
+    setRecentActivity((current) =>
+      current.filter((entry) => entry.projectId !== projectId)
+    );
+
     try {
-      const { error } = await supabase.from("projects").delete().eq("id", id);
+      const { error } = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", projectId);
 
       if (error) {
         throw error;
       }
 
-      setProjects((current) => current.filter((project) => project.id !== id));
-      setStarredProjectIds((current) =>
-        current.filter((projectId) => projectId !== id)
-      );
-      setRecentActivity((current) =>
-        current.filter((entry) => entry.projectId !== id)
-      );
+      setStarredProjectIds((current) => {
+        const next = current.filter(
+          (projectIdToKeep) => projectIdToKeep !== projectId
+        );
+        writeStarredProjectIds(next);
+        return next;
+      });
+
+      setRecentActivity((current) => {
+        const next = current.filter((entry) => entry.projectId !== projectId);
+        writeRecentProjectActivity(next);
+        return next;
+      });
     } catch (error) {
       console.error("Error deleting project:", error);
+      setDeleteError("Could not delete the project. Please try again.");
+
+      setProjects((current) => {
+        if (current.some((project) => project.id === snapshot.project.id)) {
+          return current;
+        }
+
+        const insertIndex = Math.min(snapshot.index, current.length);
+        return [
+          ...current.slice(0, insertIndex),
+          snapshot.project,
+          ...current.slice(insertIndex),
+        ];
+      });
+
+      setStarredProjectIds((current) => {
+        if (snapshot.wasStarred && !current.includes(snapshot.project.id)) {
+          return [snapshot.project.id, ...current];
+        }
+
+        return current;
+      });
+
+      setRecentActivity((current) => {
+        const withoutDeletedProject = current.filter(
+          (entry) => entry.projectId !== snapshot.project.id
+        );
+        const restoredEntries = snapshot.recentEntries.filter(
+          (entry) =>
+            !withoutDeletedProject.some(
+              (currentEntry) =>
+                currentEntry.projectId === entry.projectId &&
+                currentEntry.type === entry.type &&
+                currentEntry.timestamp === entry.timestamp
+            )
+        );
+
+        return [...restoredEntries, ...withoutDeletedProject];
+      });
+    } finally {
+      setDeletingProjectId(null);
+      deleteSnapshotRef.current = null;
+      setDeleteDialogProject(null);
+      restoreDeleteFocus();
     }
-  };
+  }, [deleteDialogProject, deletingProjectId, restoreDeleteFocus, supabase]);
+
+  const handleDeleteDialogKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === "Escape") {
+        if (deletingProjectId) {
+          return;
+        }
+
+        event.preventDefault();
+        closeDeleteDialog();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements =
+        deleteDialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+
+      if (!focusableElements || focusableElements.length === 0) {
+        return;
+      }
+
+      const firstFocusable = focusableElements[0];
+      const lastFocusable = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey) {
+        if (
+          activeElement === firstFocusable ||
+          !activeElement ||
+          !deleteDialogRef.current?.contains(activeElement)
+        ) {
+          event.preventDefault();
+          lastFocusable.focus();
+        }
+        return;
+      }
+
+      if (activeElement === lastFocusable) {
+        event.preventDefault();
+        firstFocusable.focus();
+      }
+    },
+    [closeDeleteDialog, deletingProjectId]
+  );
+
+  useEffect(() => {
+    if (!deleteDialogProject) {
+      return;
+    }
+
+    deleteCancelRef.current?.focus();
+  }, [deleteDialogProject]);
 
   const handleRenameProject = async (id: string, newName: string) => {
     setProjects((current) =>
@@ -259,6 +478,7 @@ export default function DashboardPage() {
             <StatPill label="Total" value={String(projects.length)} />
             <StatPill label="Starred" value={String(starredCount)} />
             <button
+              ref={newProjectButtonRef}
               onClick={handleCreateProject}
               className="flex items-center gap-2 rounded-xl bg-[#FF6B00] px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-[#E66000] hover:shadow-[0_0_20px_rgba(255,107,0,0.3)]"
             >
@@ -394,6 +614,16 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        {deleteError && (
+          <div
+            role="alert"
+            aria-live="polite"
+            className="rounded-2xl border border-[#5A2B1A] bg-[#24150F] px-4 py-3 text-sm text-[#FFB59A]"
+          >
+            {deleteError}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex h-64 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2E2E2E] border-t-[#FF6B00]" />
@@ -454,12 +684,101 @@ export default function DashboardPage() {
                   thumbnailUrl: project.thumbnailUrl,
                   updated_at: project.updatedAt,
                 }}
-                onDelete={handleDeleteProject}
+                onRequestDelete={handleRequestDelete}
                 onRename={handleRenameProject}
                 onToggleStar={handleToggleStar}
                 isStarred={starredProjectIds.includes(project.id)}
+                deleteDisabled={Boolean(
+                  deleteDialogProject || deletingProjectId
+                )}
               />
             ))}
+          </div>
+        )}
+
+        {deleteDialogProject && (
+          <div
+            className="fixed inset-0 z-(--z-modal) flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm"
+            onClick={() => {
+              if (!deletingProjectId) {
+                closeDeleteDialog();
+              }
+            }}
+          >
+            <div
+              ref={deleteDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-project-title"
+              aria-describedby="delete-project-description"
+              tabIndex={-1}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={handleDeleteDialogKeyDown}
+              className="w-full max-w-md rounded-3xl border border-[#2E2E2E] bg-[#151515] p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-4">
+                <div className="rounded-2xl bg-[#2A1A13] p-3 text-[#FF8A4C]">
+                  <svg
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
+                    />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2
+                    id="delete-project-title"
+                    className="text-xl font-semibold text-white"
+                  >
+                    Delete project?
+                  </h2>
+                  <p
+                    id="delete-project-description"
+                    className="mt-2 text-sm text-[#B8B8B8]"
+                  >
+                    Are you sure you want to delete this project?
+                  </p>
+                  <p className="mt-2 truncate text-sm text-[#8A8A8A]">
+                    {deleteDialogProject.title}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  ref={deleteCancelRef}
+                  type="button"
+                  onClick={closeDeleteDialog}
+                  disabled={Boolean(deletingProjectId)}
+                  className="rounded-xl border border-[#2E2E2E] bg-[#1A1A1A] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#2A2A2A] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={Boolean(deletingProjectId)}
+                  aria-busy={Boolean(deletingProjectId)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#D94A34] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#C53F2B] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {deletingProjectId ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Deleting...
+                    </>
+                  ) : (
+                    "Confirm Delete"
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

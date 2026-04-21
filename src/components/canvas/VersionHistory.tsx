@@ -2,18 +2,18 @@
 
 import React from "react";
 import { formatDistanceToNow } from "date-fns";
+import { Check, Clock } from "lucide-react";
 
 interface ProjectVersion {
   id: string;
   project_id: string;
   version_number: number;
-  canvas_data: any;
+  canvas_data: Record<string, unknown>;
   created_at: string;
   description?: string;
 }
 
 interface VersionHistoryProps {
-  projectId: string;
   versions: ProjectVersion[];
   loading: boolean;
   onRestore: (versionId: string) => void;
@@ -26,7 +26,6 @@ interface VersionHistoryProps {
  * Displays timeline of project versions with restore/delete capabilities
  */
 export default function VersionHistory({
-  projectId,
   versions,
   loading,
   onRestore,
@@ -58,19 +57,7 @@ export default function VersionHistory({
           onClick={onCreateCheckpoint}
           className="w-full rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-[#FF6B00]/30 hover:border-[#FF6B00]"
         >
-          <svg
-            className="mr-2 inline-block h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
+          <Check className="mr-2 inline-block h-4 w-4" />
           Create Checkpoint
         </button>
       </div>
@@ -81,25 +68,15 @@ export default function VersionHistory({
           <div className="flex h-32 items-center justify-center">
             <div className="flex flex-col items-center gap-2">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2E2E2E] border-t-[#FF6B00]" />
-              <span className="text-xs text-[#A0A0A0]">Loading versions...</span>
+              <span className="text-xs text-[#A0A0A0]">
+                Loading versions...
+              </span>
             </div>
           </div>
         ) : versions.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
             <div className="text-center">
-              <svg
-                className="mx-auto mb-3 h-12 w-12 text-[#4A4A4A]"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+              <Clock className="mx-auto mb-3 h-12 w-12 text-[#4A4A4A]" />
               <p className="text-sm text-[#A0A0A0]">No version history yet</p>
               <p className="mt-1 text-xs text-[#666666]">
                 Versions are created automatically when you save
@@ -178,7 +155,7 @@ export default function VersionHistory({
                             </button>
                             <button
                               onClick={() => {
-                                if (confirm('Delete this version?')) {
+                                if (confirm("Delete this version?")) {
                                   onDelete(version.id);
                                 }
                               }}
