@@ -32,6 +32,8 @@ const SketchCanvas = dynamic(
   { ssr: false }
 );
 
+const GENERATE_CODE_ENDPOINT = "/api/generate-code";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -388,7 +390,7 @@ function CanvasPageInner() {
     "code" | "preview" | "split"
   >("code");
   const [codeLanguage] = useState<"html" | "css" | "javascript" | "typescript">(
-    "html"
+    "javascript"
   );
   const [detectedElements, setDetectedElements] = useState<
     Array<{ type: string; bounds: unknown }>
@@ -519,6 +521,25 @@ function CanvasPageInner() {
     }
   }, [currentProject, projectName, saveProject, updateProject]);
 
+  const ensureGenerationProject = useCallback(
+    async (canvasData: CanvasData): Promise<string | null> => {
+      if (currentProject?.id && !currentProject.id.startsWith("temp-")) {
+        return currentProject.id;
+      }
+
+      const title = projectName.trim() || "Untitled Project";
+      const projectId = await saveProject(title, canvasData);
+
+      if (projectId) {
+        setCurrentProject({ id: projectId, name: title });
+        window.history.replaceState({}, "", `/canvas?id=${projectId}`);
+      }
+
+      return projectId;
+    },
+    [currentProject?.id, projectName, saveProject]
+  );
+
   // Ã¢â€â‚¬Ã¢â€â‚¬ Keyboard shortcuts Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -640,7 +661,7 @@ function CanvasPageInner() {
 
     setIsGenerating(true);
     try {
-      const response = await fetch("/api/generate-code", {
+      const response = await fetch(GENERATE_CODE_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -648,11 +669,16 @@ function CanvasPageInner() {
           messages: [{ role: "user", content: message }],
           currentCode,
           projectId: currentProject?.id,
-          framework: "html",
+          framework: "react",
           styling: "tailwind",
         }),
       });
-      if (!response.ok) throw new Error("Failed to process request");
+      if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        throw new Error(
+          err?.error || err?.detail || "Failed to process request"
+        );
+      }
       const result = await response.json();
       setGeneratedCode(result.code);
       setEditedCode(result.code);
@@ -753,9 +779,7 @@ function CanvasPageInner() {
   const handleInsertComponent = (component: { canvasData: unknown }) => {
     if (canvasRef.current) {
       canvasRef.current.insertTemplate(
-        component.canvasData as Parameters<
-          SketchCanvasRef["insertTemplate"]
-        >[0]
+        component.canvasData as Parameters<SketchCanvasRef["insertTemplate"]>[0]
       );
     }
   };
@@ -770,24 +794,67 @@ function CanvasPageInner() {
     setDetectedElements([]);
     try {
       const canvasData = canvasRef.current.getCanvasData();
-      if (!canvasData || canvasData.lines.length === 0) {
-        alert("Please draw something on the canvas first!");
+      const hasContent =
+        !!canvasData &&
+        ((canvasData.lines?.length ?? 0) > 0 ||
+          (canvasData.shapes?.length ?? 0) > 0 ||
+          (canvasData.componentGroups?.length ?? 0) > 0);
+      if (!hasContent) {
+        alert("Please draw or add something to the canvas first!");
         return;
       }
-      let projectId = currentProject?.id;
+      const projectId = await ensureGenerationProject(canvasData);
       if (!projectId) {
-        projectId = `temp-${Date.now()}`;
-        setCurrentProject({ id: projectId, name: "Untitled Project" });
+        throw new Error("Failed to create a project before generation");
       }
-      const response = await fetch("/api/generate-code", {
+      const sketchImage = canvasRef.current.exportAsPNG?.() || undefined;
+
+      // Collect text the user wrote on the canvas so the backend can map each
+      // string to whichever detected component (navbar/section/card/footer)
+      // contains it. Uses absolute canvas coordinates for shapes inside groups.
+      type TextAnnotation = {
+        text: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      };
+      const textAnnotations: TextAnnotation[] = [];
+      const pushIfText = (
+        s: { type?: string; text?: string; x?: number; y?: number; width?: number; height?: number },
+        offsetX = 0,
+        offsetY = 0
+      ) => {
+        const value = (s.text || "").trim();
+        if (!value) return;
+        if (s.type !== "text" && !s.text) return;
+        textAnnotations.push({
+          text: value,
+          x: (s.x ?? 0) + offsetX,
+          y: (s.y ?? 0) + offsetY,
+          width: s.width ?? 0,
+          height: s.height ?? 0,
+        });
+      };
+      for (const shape of canvasData.shapes ?? []) pushIfText(shape);
+      for (const group of canvasData.componentGroups ?? []) {
+        for (const shape of group.shapes ?? []) {
+          pushIfText(shape, group.x ?? 0, group.y ?? 0);
+        }
+      }
+
+      const response = await fetch(GENERATE_CODE_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          mode: "generate",
           canvasData,
-          framework: "html",
+          framework: "react",
           styling: "tailwind",
           description: "",
           projectId,
+          sketchImage,
+          textAnnotations,
         }),
       });
       if (!response.ok) {
@@ -797,7 +864,7 @@ function CanvasPageInner() {
       const result = await response.json();
       setGeneratedCode(result.code);
       setEditedCode(result.code);
-      setDetectedElements(result.detectedElements || []);
+      setDetectedElements(result.detectedElements ?? result.elements ?? []);
       setCurrentMode("preview");
       setShowCodePanel(true);
     } catch (err) {
@@ -1384,7 +1451,7 @@ function CanvasPageInner() {
                       {codeViewMode === "preview" && (
                         <LivePreview
                           code={editedCode || generatedCode}
-                          language="html"
+                          language="react"
                         />
                       )}
                       {codeViewMode === "split" && (
