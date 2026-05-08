@@ -10,6 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 
 const REMEMBER_ME_KEY = "codecanvas_remember_me";
@@ -34,7 +35,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-screen items-center justify-center bg-[#0A0A0A]">
+        <div className="flex h-screen items-center justify-center bg-[var(--cc-bg-canvas)]">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
         </div>
       }
@@ -219,7 +220,12 @@ function LoginPageInner() {
       } else {
         // Clear password from memory for security
         setPassword("");
-        router.push("/canvas");
+        const redirectParam = searchParams.get("redirectTo");
+        const target =
+          redirectParam && redirectParam.startsWith("/")
+            ? redirectParam
+            : "/dashboard";
+        router.push(target);
         router.refresh();
       }
     } catch (err) {
@@ -239,10 +245,15 @@ function LoginPageInner() {
     setError(null);
 
     try {
+      const redirectParam = searchParams.get("redirectTo");
+      const callbackUrl =
+        redirectParam && redirectParam.startsWith("/")
+          ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectParam)}`
+          : `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
       });
 
@@ -266,10 +277,15 @@ function LoginPageInner() {
     setError(null);
 
     try {
+      const redirectParam = searchParams.get("redirectTo");
+      const callbackUrl =
+        redirectParam && redirectParam.startsWith("/")
+          ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectParam)}`
+          : `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
       });
 
@@ -287,24 +303,19 @@ function LoginPageInner() {
   const isAnyLoading = loading || isGoogleLoading || isGitHubLoading;
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-[#0A0A0A]">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-[#FF6B00]/20 to-transparent rounded-full blur-3xl animate-pulse" />
-        <div
-          className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-[#FF6B00]/10 to-transparent rounded-full blur-3xl animate-pulse"
-          style={{ animationDelay: "1s" }}
-        />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#FF6B00]/5 rounded-full blur-3xl" />
+    <div className="relative flex min-h-screen overflow-hidden bg-[var(--cc-bg-canvas)]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-[var(--cc-accent-glow)] blur-[100px]" />
+        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-[var(--cc-accent-glow)] blur-[100px]" />
       </div>
 
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative items-center justify-center p-12 bg-gradient-to-br from-[#0A0A0A] via-[#1A1A1A] to-[#0A0A0A]">
         <div className="relative z-10 max-w-lg text-center">
           {/* Logo Icon */}
-          <div className="mb-8 inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF6B00] to-[#CC5800] shadow-[0_0_60px_rgba(255,107,0,0.4)]">
+          <div className="mb-7 inline-flex h-16 w-16 items-center justify-center rounded-[12px] bg-[var(--cc-accent)] shadow-[0_0_40px_var(--cc-accent-glow-strong)]">
             <svg
-              className="w-10 h-10 text-white"
+              className="h-8 w-8 text-white"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -318,13 +329,13 @@ function LoginPageInner() {
             </svg>
           </div>
 
-          <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
-            Code<span className="text-[#FF6B00]">Canvas</span>
+          <h1 className="mb-3 text-[32px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
+            Code<span className="text-[var(--cc-accent)]">Canvas</span>
           </h1>
 
-          <p className="text-xl text-[#A0A0A0] mb-12 leading-relaxed">
+          <p className="mb-10 text-[15px] leading-relaxed text-[var(--cc-text-secondary)]">
             Transform your sketches into production-ready code with the power of
-            AI
+            AI.
           </p>
 
           {/* Feature Pills */}
@@ -335,30 +346,36 @@ function LoginPageInner() {
               "Export to Code",
               "Components Library",
             ].map((feature, i) => (
-              <span
+              <motion.span
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.3,
+                  delay: 0.1 + i * 0.06,
+                  ease: [0.22, 0.9, 0.28, 1],
+                }}
                 key={feature}
-                className="px-4 py-2 rounded-full text-sm font-medium bg-[#1A1A1A] border border-[#2E2E2E] text-[#A0A0A0] animate-fade-in"
-                style={{ animationDelay: `${i * 100}ms` }}
+                className="rounded-full border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-3 py-1.5 text-[12px] font-medium text-[var(--cc-text-secondary)]"
               >
                 {feature}
-              </span>
+              </motion.span>
             ))}
           </div>
 
           {/* Canvas Preview Mockup */}
           <div className="mt-12 relative">
             <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10" />
-            <div className="rounded-xl border border-[#2E2E2E] bg-[#1A1A1A] p-4 shadow-2xl">
+            <div className="rounded-xl border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] p-4 shadow-2xl">
               <div className="flex gap-2 mb-3">
                 <div className="w-3 h-3 rounded-full bg-[#FF5F57]" />
                 <div className="w-3 h-3 rounded-full bg-[#FEBC2E]" />
                 <div className="w-3 h-3 rounded-full bg-[#28C840]" />
               </div>
-              <div className="h-32 rounded-lg bg-[#0A0A0A] border border-[#2E2E2E] flex items-center justify-center">
+              <div className="flex h-32 items-center justify-center rounded-[8px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] cc-dot-grid">
                 <div className="flex gap-4">
                   <div className="w-16 h-16 rounded-lg border-2 border-dashed border-[#FF6B00]/50 flex items-center justify-center">
                     <svg
-                      className="w-6 h-6 text-[#FF6B00]/50"
+                      className="h-5 w-5 text-[var(--cc-accent)]/60"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -382,12 +399,17 @@ function LoginPageInner() {
 
       {/* Right Panel - Login Form */}
       <div className="flex flex-1 items-center justify-center p-4 sm:p-6 md:p-8">
-        <div className="w-full max-w-sm animate-slide-in-up">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24, ease: [0.22, 0.9, 0.28, 1] }}
+          className="w-full max-w-sm"
+        >
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-6">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-xl sm:text-2xl font-bold text-white hover:text-[#FF6B00] transition-colors"
+              className="inline-flex items-center gap-2 text-xl sm:text-2xl font-bold text-[var(--cc-text-primary)] hover:text-[var(--cc-accent)] transition-colors"
             >
               <img
                 src="/logo.png"
@@ -400,22 +422,19 @@ function LoginPageInner() {
 
           {/* Form Card */}
           <div className="relative">
-            {/* Glow effect behind card */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#FF6B00]/20 via-[#FF6B00]/10 to-[#FF6B00]/20 rounded-3xl blur-xl opacity-50" />
-
-            <div className="relative rounded-xl border border-[#2E2E2E] bg-[#1A1A1A]/80 backdrop-blur-xl p-5 sm:p-6 shadow-2xl">
+            <div className="relative rounded-[12px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-5 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.7)] sm:p-6">
               <div className="text-center mb-5 sm:mb-6">
-                <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
+                <h2 className="text-lg sm:text-xl font-bold text-[var(--cc-text-primary)] mb-1">
                   Welcome back
                 </h2>
-                <p className="text-xs sm:text-sm text-[#A0A0A0]">
+                <p className="text-xs sm:text-sm text-[var(--cc-text-secondary)]">
                   Sign in to continue to your canvas
                 </p>
               </div>
 
               <form onSubmit={handleLogin} className="space-y-4">
                 {error && (
-                  <div className="flex items-center gap-3 rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-sm text-red-400 animate-shake">
+                  <div className="flex items-center gap-3 rounded-xl bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.35)] p-4 text-sm text-[var(--cc-error)] animate-shake">
                     <svg
                       className="w-5 h-5 flex-shrink-0"
                       fill="none"
@@ -436,14 +455,14 @@ function LoginPageInner() {
                 <div className="space-y-2">
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-[#A0A0A0]"
+                    className="block text-sm font-medium text-[var(--cc-text-secondary)]"
                   >
                     Email address
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <svg
-                        className={`h-4 w-4 transition-colors ${validation.email.touched && validation.email.error ? "text-red-400" : "text-[#666666]"}`}
+                        className={`h-4 w-4 transition-colors ${validation.email.touched && validation.email.error ? "text-[var(--cc-error)]" : "text-[var(--cc-text-muted)]"}`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -465,17 +484,17 @@ function LoginPageInner() {
                       value={email}
                       onChange={(e) => handleEmailChange(e.target.value)}
                       onBlur={handleEmailBlur}
-                      className={`block w-full rounded-lg border bg-[#0A0A0A]/50 pl-10 pr-3 py-2.5 text-sm text-white placeholder-[#666666] transition-all focus:outline-none focus:ring-2 focus:bg-[#0A0A0A] disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`block w-full rounded-lg border bg-[var(--cc-bg-canvas)]/50 pl-10 pr-3 py-2.5 text-sm text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] transition-all focus:outline-none focus:ring-2 focus:bg-[var(--cc-bg-canvas)] disabled:opacity-50 disabled:cursor-not-allowed ${
                         validation.email.touched && validation.email.error
-                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-[#2E2E2E] focus:border-[#FF6B00] focus:ring-[#FF6B00]/20"
+                          ? "border-[var(--cc-error)] focus:border-[var(--cc-error)] focus:ring-[rgba(239,68,68,0.2)]"
+                          : "border-[var(--cc-border-subtle)] focus:border-[var(--cc-accent)] focus:ring-[var(--cc-accent-glow)]"
                       }`}
                       placeholder="you@example.com"
                     />
                   </div>
                   {/* Email validation message */}
                   {validation.email.touched && validation.email.error && (
-                    <p className="flex items-center gap-1.5 text-xs text-red-400 mt-1.5 animate-fade-in">
+                    <p className="flex items-center gap-1.5 text-xs text-[var(--cc-error)] mt-1.5 animate-fade-in">
                       <svg
                         className="w-3.5 h-3.5"
                         fill="none"
@@ -498,13 +517,13 @@ function LoginPageInner() {
                   <div className="flex items-center justify-between">
                     <label
                       htmlFor="password"
-                      className="block text-sm font-medium text-[#A0A0A0]"
+                      className="block text-sm font-medium text-[var(--cc-text-secondary)]"
                     >
                       Password
                     </label>
                     <Link
                       href="/auth/forgot-password"
-                      className="text-sm font-medium text-[#FF6B00] hover:text-[#FF8533] transition-colors"
+                      className="text-sm font-medium text-[var(--cc-accent)] hover:text-[#ff8533] transition-colors"
                     >
                       Forgot password?
                     </Link>
@@ -512,7 +531,7 @@ function LoginPageInner() {
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <svg
-                        className={`h-4 w-4 transition-colors ${validation.password.touched && validation.password.error ? "text-red-400" : "text-[#666666]"}`}
+                        className={`h-4 w-4 transition-colors ${validation.password.touched && validation.password.error ? "text-[var(--cc-error)]" : "text-[var(--cc-text-muted)]"}`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -534,17 +553,17 @@ function LoginPageInner() {
                       value={password}
                       onChange={(e) => handlePasswordChange(e.target.value)}
                       onBlur={handlePasswordBlur}
-                      className={`block w-full rounded-lg border bg-[#0A0A0A]/50 pl-10 pr-10 py-2.5 text-sm text-white placeholder-[#666666] transition-all focus:outline-none focus:ring-2 focus:bg-[#0A0A0A] disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`block w-full rounded-lg border bg-[var(--cc-bg-canvas)]/50 pl-10 pr-10 py-2.5 text-sm text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] transition-all focus:outline-none focus:ring-2 focus:bg-[var(--cc-bg-canvas)] disabled:opacity-50 disabled:cursor-not-allowed ${
                         validation.password.touched && validation.password.error
-                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-[#2E2E2E] focus:border-[#FF6B00] focus:ring-[#FF6B00]/20"
+                          ? "border-[var(--cc-error)] focus:border-[var(--cc-error)] focus:ring-[rgba(239,68,68,0.2)]"
+                          : "border-[var(--cc-border-subtle)] focus:border-[var(--cc-accent)] focus:ring-[var(--cc-accent-glow)]"
                       }`}
                       placeholder="••••••••"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#666666] hover:text-[#A0A0A0] transition-colors"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-[var(--cc-text-muted)] hover:text-[var(--cc-text-secondary)] transition-colors"
                     >
                       {showPassword ? (
                         <svg
@@ -586,7 +605,7 @@ function LoginPageInner() {
 
                   {/* Password validation message */}
                   {validation.password.touched && validation.password.error && (
-                    <p className="flex items-center gap-1.5 text-xs text-red-400 mt-1.5 animate-fade-in">
+                    <p className="flex items-center gap-1.5 text-xs text-[var(--cc-error)] mt-1.5 animate-fade-in">
                       <svg
                         className="w-3.5 h-3.5"
                         fill="none"
@@ -616,9 +635,9 @@ function LoginPageInner() {
                         disabled={isAnyLoading}
                         className="sr-only peer"
                       />
-                      <div className="w-5 h-5 rounded border-2 border-[#2E2E2E] bg-[#0A0A0A]/50 transition-all peer-checked:bg-[#FF6B00] peer-checked:border-[#FF6B00] peer-disabled:opacity-50 peer-disabled:cursor-not-allowed group-hover:border-[#3E3E3E] peer-checked:group-hover:border-[#FF8533]">
+                      <div className="w-5 h-5 rounded border-2 border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)]/50 transition-all peer-checked:bg-[var(--cc-accent)] peer-checked:border-[var(--cc-accent)] peer-disabled:opacity-50 peer-disabled:cursor-not-allowed group-hover:border-[var(--cc-border-emphasis)] peer-checked:group-hover:border-[#ff8533]">
                         <svg
-                          className="w-full h-full text-white opacity-0 peer-checked:opacity-100 transition-opacity p-0.5"
+                          className="w-full h-full text-[var(--cc-text-primary)] opacity-0 peer-checked:opacity-100 transition-opacity p-0.5"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
@@ -632,7 +651,7 @@ function LoginPageInner() {
                         </svg>
                       </div>
                       <svg
-                        className={`absolute top-0.5 left-0.5 w-4 h-4 text-white transition-opacity ${rememberMe ? "opacity-100" : "opacity-0"}`}
+                        className={`absolute top-0.5 left-0.5 w-4 h-4 text-[var(--cc-text-primary)] transition-opacity ${rememberMe ? "opacity-100" : "opacity-0"}`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -645,24 +664,21 @@ function LoginPageInner() {
                         />
                       </svg>
                     </div>
-                    <span className="ml-3 text-sm text-[#A0A0A0] group-hover:text-white transition-colors">
+                    <span className="ml-3 text-sm text-[var(--cc-text-secondary)] group-hover:text-[var(--cc-text-primary)] transition-colors">
                       Remember me
                     </span>
                   </label>
                 </div>
 
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
                   type="submit"
                   disabled={
                     isAnyLoading ||
                     (!isFormValid &&
                       (validation.email.touched || validation.password.touched))
                   }
-                  className={`relative w-full overflow-hidden rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all group ${
-                    isFormValid
-                      ? "bg-gradient-to-r from-[#FF6B00] to-[#CC5800] shadow-[#FF6B00]/25 hover:shadow-[#FF6B00]/40 hover:shadow-xl"
-                      : "bg-gradient-to-r from-[#FF6B00]/70 to-[#CC5800]/70 shadow-[#FF6B00]/15"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className="group relative w-full overflow-hidden rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
                     {loading ? (
@@ -692,29 +708,29 @@ function LoginPageInner() {
                       <>
                         Sign in
                         <svg
-                          className="w-5 h-5 transition-transform group-hover:translate-x-1"
+                          className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
+                          strokeWidth={2}
                         >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeWidth={2}
                             d="M13 7l5 5m0 0l-5 5m5-5H6"
                           />
                         </svg>
                       </>
                     )}
                   </span>
-                </button>
+                </motion.button>
 
                 <div className="relative my-6">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-[#2E2E2E]" />
+                    <div className="w-full border-t border-[var(--cc-border-subtle)]" />
                   </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="bg-[#1A1A1A] px-4 text-[#666666]">
+                  <div className="relative flex justify-center text-[12px]">
+                    <span className="bg-[var(--cc-bg-surface)] px-3 text-[var(--cc-text-muted)]">
                       or continue with
                     </span>
                   </div>
@@ -724,7 +740,7 @@ function LoginPageInner() {
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={isAnyLoading}
-                  className="w-full rounded-lg border border-[#2E2E2E] bg-[#0A0A0A]/50 px-4 py-2.5 text-xs sm:text-sm font-medium text-white transition-all hover:bg-[#2E2E2E] hover:border-[#3E3E3E] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded-lg border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)]/50 px-4 py-2.5 text-xs sm:text-sm font-medium text-[var(--cc-text-primary)] transition-all hover:bg-[var(--cc-bg-elevated)] hover:border-[var(--cc-border-emphasis)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-center gap-2 sm:gap-3">
                     {isGoogleLoading ? (
@@ -781,7 +797,7 @@ function LoginPageInner() {
                   type="button"
                   onClick={handleGitHubLogin}
                   disabled={isAnyLoading}
-                  className="w-full rounded-lg border border-[#2E2E2E] bg-[#0A0A0A]/50 px-4 py-2.5 text-xs sm:text-sm font-medium text-white transition-all hover:bg-[#2E2E2E] hover:border-[#3E3E3E] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded-lg border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)]/50 px-4 py-2.5 text-xs sm:text-sm font-medium text-[var(--cc-text-primary)] transition-all hover:bg-[var(--cc-bg-elevated)] hover:border-[var(--cc-border-emphasis)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-center gap-2 sm:gap-3">
                     {isGitHubLoading ? (
@@ -824,11 +840,11 @@ function LoginPageInner() {
                 </button>
               </form>
 
-              <p className="mt-6 sm:mt-8 text-center text-xs sm:text-sm text-[#666666]">
+              <p className="mt-6 sm:mt-8 text-center text-xs sm:text-sm text-[var(--cc-text-muted)]">
                 Don't have an account?{" "}
                 <Link
                   href="/auth/signup"
-                  className="font-semibold text-[#FF6B00] hover:text-[#FF8533] transition-colors"
+                  className="font-semibold text-[var(--cc-accent)] hover:text-[#ff8533] transition-colors"
                 >
                   Create one free
                 </Link>
@@ -837,23 +853,23 @@ function LoginPageInner() {
           </div>
 
           {/* Footer */}
-          <p className="mt-6 sm:mt-8 text-center text-xs text-[#666666]">
+          <p className="mt-6 sm:mt-8 text-center text-xs text-[var(--cc-text-muted)]">
             By signing in, you agree to our{" "}
             <Link
               href="#"
-              className="text-[#A0A0A0] hover:text-white transition-colors"
+              className="text-[var(--cc-text-secondary)] hover:text-[var(--cc-text-primary)] transition-colors"
             >
               Terms of Service
             </Link>{" "}
             and{" "}
             <Link
               href="#"
-              className="text-[#A0A0A0] hover:text-white transition-colors"
+              className="text-[var(--cc-text-secondary)] hover:text-[var(--cc-text-primary)] transition-colors"
             >
               Privacy Policy
             </Link>
           </p>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

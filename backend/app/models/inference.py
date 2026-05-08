@@ -50,6 +50,36 @@ ROBOFLOW_DEFAULT_MODEL_ID = "object-detection-4affw/2"
 ROBOFLOW_DEFAULT_API_URL = "https://detect.roboflow.com"
 ROBOFLOW_DEFAULT_THRESHOLD = 0.4
 
+# Per-class confidence thresholds. Shahwaiz's 4-class object-detection-4affw model
+# has very different calibration per class:
+#   - navbar / footer / section are "container regions" (top bar / bottom bar /
+#     middle page body excluding header & footer). They're shape-shaped, easy
+#     to learn from ~311 training images, and come back at 0.2–0.9 confidence.
+#   - card is the catch-all "every other content unit" class — buttons, text,
+#     images, inputs, links all squashed into one label. High intra-class
+#     variance + small training set ⇒ model is structurally UNDER-confident on
+#     this class and returns 0.03–0.4 even for clear hits. A single global
+#     threshold cannot accommodate both calibrations, which is why a 0.25
+#     filter silently dropped every card the user drew.
+# Override any of these via env: ROBOFLOW_CONFIDENCE_THRESHOLD_<CLASS>=0.05
+_DEFAULT_PER_CLASS_THRESHOLDS = {
+    "card": 0.03,
+    "navbar": 0.20,
+    "footer": 0.20,
+    "section": 0.20,
+}
+
+# Class-aware NMS: when two same-class predictions overlap (IoU > this), keep
+# only the higher-confidence one. Collapses duplicate-section detections that
+# the old single-threshold filter was deduping by accident.
+_DEFAULT_NMS_IOU = 0.5
+
+# Sanity guard: a `card` whose bbox covers more than this fraction of the
+# image is almost certainly the model confusing itself with the surrounding
+# `section`. Drop these — real cards are always smaller than their parent
+# section.
+_MAX_CARD_AREA_RATIO = 0.85
+
 GEMINI_PRIMARY_MODEL = "gemini-2.5-pro"
 GEMINI_FALLBACK_MODEL = "gemini-2.5-flash"
 
@@ -224,6 +254,67 @@ def _decode_sketch_image(sketch_image: str) -> bytes:
     return base64.b64decode(payload)
 
 
+def _resolve_class_threshold(class_name: str, fallback: float) -> float:
+    """Per-class confidence threshold: env override > built-in default > fallback."""
+    env_key = f"ROBOFLOW_CONFIDENCE_THRESHOLD_{class_name.upper()}"
+    raw = os.getenv(env_key)
+    if raw is not None:
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+    return _DEFAULT_PER_CLASS_THRESHOLDS.get(class_name, fallback)
+
+
+def _iou(a: "ExternalModelElement", b: "ExternalModelElement") -> float:
+    """Intersection-over-union of two element bboxes."""
+    ab = a.bounds or {}
+    bb = b.bounds or {}
+    try:
+        ax = float(ab.get("x", 0)); ay = float(ab.get("y", 0))
+        aw = float(ab.get("width", 0)); ah = float(ab.get("height", 0))
+        bx = float(bb.get("x", 0)); by = float(bb.get("y", 0))
+        bw = float(bb.get("width", 0)); bh = float(bb.get("height", 0))
+    except (TypeError, ValueError):
+        return 0.0
+    if aw <= 0 or ah <= 0 or bw <= 0 or bh <= 0:
+        return 0.0
+    ix1 = max(ax, bx); iy1 = max(ay, by)
+    ix2 = min(ax + aw, bx + bw); iy2 = min(ay + ah, by + bh)
+    iw = ix2 - ix1; ih = iy2 - iy1
+    if iw <= 0 or ih <= 0:
+        return 0.0
+    inter = iw * ih
+    union = aw * ah + bw * bh - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _class_aware_nms(
+    elements: List["ExternalModelElement"],
+    iou_threshold: float,
+) -> List["ExternalModelElement"]:
+    """
+    Drop duplicate same-class detections via non-maximum suppression.
+    Cross-class overlaps are KEPT (a card inside a section is expected — that's
+    exactly Shahwaiz's intended hierarchy: section is the middle page body and
+    cards are the buttons/text/images sitting inside it).
+    """
+    by_class: Dict[str, List[ExternalModelElement]] = {}
+    for el in elements:
+        by_class.setdefault((el.type or "").lower(), []).append(el)
+
+    kept: List[ExternalModelElement] = []
+    for items in by_class.values():
+        items.sort(key=lambda e: e.confidence, reverse=True)
+        survivors: List[ExternalModelElement] = []
+        for cand in items:
+            if any(_iou(cand, s) > iou_threshold for s in survivors):
+                continue
+            survivors.append(cand)
+        kept.extend(survivors)
+    return kept
+
+
 def _roboflow_to_element(prediction: Dict[str, Any]) -> Optional[ExternalModelElement]:
     try:
         cx = float(prediction["x"])
@@ -292,13 +383,50 @@ def detect_with_roboflow(
         print(f"Pillow not installed: {error}")
         return None
 
+    # Composite RGBA → RGB onto a WHITE background.
+    # The Konva canvas exports PNGs with a transparent background. PIL's plain
+    # .convert("RGB") fills transparent pixels with BLACK, and Roboflow's
+    # preprocessor does the same thing on its end. Result: dark sketch lines
+    # rendered onto black → effectively invisible → model returns 0 predictions
+    # even on a sketch that looks fine when previewed in Windows / Mac (those
+    # OSes composite alpha over white before display, hiding the bug).
     try:
-        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        raw_image = Image.open(io.BytesIO(image_bytes))
+        has_alpha = raw_image.mode in ("RGBA", "LA") or (
+            raw_image.mode == "P" and "transparency" in raw_image.info
+        )
+        if has_alpha:
+            rgba = raw_image.convert("RGBA")
+            background = Image.new("RGB", rgba.size, (255, 255, 255))
+            background.paste(rgba, mask=rgba.split()[3])  # alpha channel as mask
+            pil_image = background
+        else:
+            pil_image = raw_image.convert("RGB")
     except Exception as error:
         print(f"Roboflow: could not open sketch image: {error}")
         return None
 
     debug = os.getenv("DEBUG_AI_PROMPT", "").lower() in ("1", "true", "yes", "on")
+
+    # In debug mode, dump the white-composited PNG that's about to be sent to
+    # Roboflow. Critically: we save the COMPOSITED version, not the raw bytes,
+    # so what you see locally is exactly what the model sees (no more "looks
+    # fine in my image viewer but the model can't detect anything" mismatch).
+    if debug:
+        try:
+            debug_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "..", "..", "debug"
+            )
+            os.makedirs(debug_dir, exist_ok=True)
+            debug_path = os.path.join(debug_dir, "last_sketch.png")
+            pil_image.save(debug_path, format="PNG")
+            print(
+                f"[debug] sketch PNG saved to {os.path.abspath(debug_path)} "
+                f"({pil_image.width}x{pil_image.height}, mode={pil_image.mode}, "
+                f"alpha={'composited' if has_alpha else 'n/a'})"
+            )
+        except Exception as dump_error:
+            print(f"[debug] could not save sketch PNG: {dump_error}")
 
     # Roboflow's hosted inference applies its OWN confidence floor (default 0.4)
     # before sending predictions back. Override it down to a small value so we
@@ -341,21 +469,69 @@ def detect_with_roboflow(
             print("[debug] Roboflow returned no predictions at all → returning None")
         return None
 
-    elements: List[ExternalModelElement] = []
-    rejected = 0
+    # Image dimensions (in pixel space Roboflow returns bounds in) — used by the
+    # oversized-card sanity guard.
+    image_meta = result.get("image") if isinstance(result, dict) else None
+    img_w = float(image_meta.get("width") or 0) if isinstance(image_meta, dict) else 0.0
+    img_h = float(image_meta.get("height") or 0) if isinstance(image_meta, dict) else 0.0
+    image_area = img_w * img_h
+
+    nms_iou = float(os.getenv("ROBOFLOW_NMS_IOU", _DEFAULT_NMS_IOU))
+
+    # Pass 1: convert + per-class threshold + oversize-card guard.
+    # Thresholds are per-class because card / navbar / footer / section have
+    # very different confidence calibrations (see _DEFAULT_PER_CLASS_THRESHOLDS).
+    pre_nms: List[ExternalModelElement] = []
+    rejected_low_conf = 0
+    rejected_oversize_card = 0
+    parse_errors = 0
+    if debug:
+        print("[debug] per-class thresholds:")
+        for cls in ("navbar", "footer", "section", "card"):
+            print(f"    {cls}: {_resolve_class_threshold(cls, threshold):.2f}")
     for prediction in predictions:
         element = _roboflow_to_element(prediction)
         if element is None:
-            rejected += 1
+            parse_errors += 1
             continue
-        if element.confidence >= threshold:
-            elements.append(element)
-        else:
-            rejected += 1
+        cls = (element.type or "").lower()
+        cls_threshold = _resolve_class_threshold(cls, threshold)
+        if element.confidence < cls_threshold:
+            rejected_low_conf += 1
+            if debug:
+                print(
+                    f"[debug] reject {cls} conf={element.confidence:.3f} "
+                    f"< per-class threshold {cls_threshold:.2f}"
+                )
+            continue
+        if cls == "card" and image_area > 0:
+            b = element.bounds or {}
+            cw = float(b.get("width", 0)); ch = float(b.get("height", 0))
+            ratio = (cw * ch) / image_area if image_area > 0 else 0.0
+            if ratio > _MAX_CARD_AREA_RATIO:
+                rejected_oversize_card += 1
+                if debug:
+                    print(
+                        f"[debug] reject oversized card: covers {ratio:.0%} of image "
+                        f"(model is confusing it with the section container)"
+                    )
+                continue
+        pre_nms.append(element)
+
+    # Pass 2: class-aware NMS to collapse duplicate same-class detections.
+    elements = _class_aware_nms(pre_nms, nms_iou)
 
     if debug:
+        nms_dropped = len(pre_nms) - len(elements)
         print(
-            f"[debug] After threshold {threshold}: kept={len(elements)} rejected={rejected}"
+            f"[debug] After per-class threshold: kept={len(pre_nms)} "
+            f"low-conf-rejected={rejected_low_conf} "
+            f"oversize-card-rejected={rejected_oversize_card} "
+            f"parse-errors={parse_errors}"
+        )
+        print(
+            f"[debug] After class-aware NMS (iou>{nms_iou}): kept={len(elements)} "
+            f"(dropped {nms_dropped} same-class duplicates)"
         )
 
     if not elements:
@@ -373,7 +549,6 @@ def detect_with_roboflow(
     }
     if canvas_size:
         metadata["canvas_width"], metadata["canvas_height"] = canvas_size
-    image_meta = result.get("image") if isinstance(result, dict) else None
     if isinstance(image_meta, dict):
         metadata["image_width"] = image_meta.get("width")
         metadata["image_height"] = image_meta.get("height")
@@ -396,15 +571,41 @@ def _build_gemini_prompt(
     element_lines = []
     for index, element in enumerate(elements, start=1):
         bounds = element.bounds or {}
-        label_text = (element.attributes or {}).get("label_text")
-        label_suffix = f' — contains text: "{label_text}"' if label_text else ""
-        element_lines.append(
+        attrs = element.attributes or {}
+        label_text = attrs.get("label_text")
+        positioned_texts = attrs.get("positioned_texts") or []
+        synthetic = attrs.get("synthetic") is True
+
+        suffix_parts: List[str] = []
+        if synthetic:
+            suffix_parts.append(
+                " [SYNTHESIZED — the detector missed this region; "
+                "we inferred it from text/card positions]"
+            )
+        if label_text:
+            suffix_parts.append(f' — contains text: "{label_text}"')
+
+        line = (
             f"{index}. {element.type} "
             f"(confidence={element.confidence:.2f}, "
             f"x={bounds.get('x', 0):.0f}, y={bounds.get('y', 0):.0f}, "
             f"w={bounds.get('width', 0):.0f}, h={bounds.get('height', 0):.0f})"
-            f"{label_suffix}"
+            f"{''.join(suffix_parts)}"
         )
+
+        if positioned_texts:
+            line += (
+                "\n   inner text labels (positions are inside this container — "
+                "use them to infer the layout / visual order):"
+            )
+            for pt in positioned_texts:
+                line += (
+                    f"\n     - \"{pt.get('text', '')}\" "
+                    f"at (x={float(pt.get('x', 0)):.0f}, y={float(pt.get('y', 0)):.0f}, "
+                    f"w={float(pt.get('width', 0)):.0f}, h={float(pt.get('height', 0)):.0f})"
+                )
+
+        element_lines.append(line)
     elements_block = "\n".join(element_lines) if element_lines else "(no elements detected)"
 
     extra_text_block = ""
@@ -432,23 +633,25 @@ def _build_gemini_prompt(
         "Detected components (ordered top to bottom):\n"
         f"{elements_block}\n"
         f"{extra_text_block}\n"
-        "About the detection model:\n"
-        "- The sketch detector only outputs 4 class labels: `navbar`, `footer`, `section`, `card`.\n"
-        "- `navbar` = top navigation bar. `footer` = bottom footer strip. `section` = a large horizontal page band (hero, feature row, etc.).\n"
-        "- `card` is a CATCH-ALL inner block — the user uses it for anything that isn't a navbar/footer/section. Depending on its size, position, aspect ratio, and any attached `contains text` annotation, a `card` may actually be:\n"
-        "    * a heading or paragraph of text (small height, wide, has text)\n"
-        "    * an image / media placeholder (squarish or landscape, no text)\n"
-        "    * a button (small, has short action-style text like \"Sign up\", \"Buy now\")\n"
-        "    * an input field (wide and short, may have placeholder-style text)\n"
-        "    * an actual content card (medium-sized, may have text)\n"
-        "  Infer the most likely role for each `card` from its dimensions, position relative to siblings, and text content. Render it as the appropriate semantic element (h1/h2/p, img, button, input, or div), NOT literally as a generic card every time.\n"
-        "- When a `section` contains multiple `card` children (by overlapping bounds), treat them as the section's inner content and arrange them in a sensible grid/flex layout.\n"
-        "- For empty `card`s with image-like aspect ratios, render an `<img>` with a placeholder source (e.g. `https://placehold.co/{w}x{h}`) sized to the bounds.\n\n"
+        "How the detector was trained (read this carefully — the labels are not what their names suggest):\n"
+        "- `navbar` = the top horizontal bar region. CONTAINER, not content.\n"
+        "- `footer` = the bottom horizontal bar region. CONTAINER, not content.\n"
+        "- `section` = the entire middle band of the page between navbar and footer. CONTAINER, not content.\n"
+        "- `card` = ANY single content element. The model was deliberately trained to label EVERY content unit as `card` — every button, text label, heading, paragraph, input field, image, icon, or link is a `card`. The detector does NOT distinguish between these subtypes; it only marks \"this is one piece of content\". Your job is to infer the real semantic role of each `card` from:\n"
+        "    * its position — `card` inside `navbar` bounds → it's a logo or nav link; inside `footer` → footer link/copyright; inside `section` → main content.\n"
+        "    * its size and aspect ratio — small wide rectangle → button; long thin horizontal rectangle → input field; squarish or landscape with no text → image / media placeholder; wide short with text → heading or paragraph.\n"
+        "    * its attached `contains text` annotation — short action-style text (\"Submit\", \"Sign up\", \"Buy now\", \"Login\") → button; trailing colon (\"Email:\", \"Password:\") → label for an adjacent input; longer phrase → heading or paragraph; single word like \"Home\"/\"Pricing\"/\"About\" inside a navbar → nav link.\n"
+        "  Render each `card` as the appropriate semantic element (h1/h2/p/a/button/input/img), NEVER literally as a generic <div className=\"card\">.\n"
+        "- A container (navbar/footer/section) MAY have no `card` children if the detector missed them. In that case, the container's `inner text labels` block lists the user's text annotations with their positions — use those positions to lay them out.\n"
+        "- An element marked `[SYNTHESIZED]` was NOT returned by the detector — the pipeline inferred it from clustered text/card positions. Treat it as a real container.\n\n"
         "Layout rules:\n"
-        "- Compose the listed components in the order given.\n"
-        "- When a component is annotated with `contains text: \"...\"`, that text is the COMPLETE intended copy for that component. Use it verbatim. Do NOT augment, prefix, or suffix it with extra boilerplate (no \"©\", \"All rights reserved\", \"Welcome\", filler taglines, slogans, or default headings). If the user wrote `\"This is the footer\"` for the footer, the footer's only visible text is `\"This is the footer\"`.\n"
-        "- For components WITHOUT a `contains text:` annotation, use minimal, sensible default content appropriate to the inferred role (e.g. an unlabelled button can say \"Submit\"; an unlabelled heading can say \"Welcome\"). Keep these defaults short and avoid inventing branding/copyright/tagline text.\n"
-        "- The \"Additional text the user wrote on the canvas\" section (if present) is unbound text the user added; place each item somewhere reasonable but again, use it verbatim and don't augment it with extra surrounding copy.\n"
+        "- Compose the components in the order given (which is top-to-bottom on the canvas). A `navbar` MUST render at the top of the page; a `footer` MUST render at the bottom; everything else goes between them in canvas-y order.\n"
+        "- Inside a navbar, multiple cards / text labels are nav items — arrange them horizontally, with the leftmost one (smallest x) typically being the brand/logo and the rightmost ones being the nav links.\n"
+        "- Inside a section with stacked cards / text labels (similar x, increasing y), arrange them vertically. Group an `Email:`-style label with the wide-thin card immediately below or beside it as a labelled input.\n"
+        "- A `card` whose attached text is an action verb is a `<button>`. A `card` immediately below a label-style text and shaped wide-thin is an `<input>`. A long text-only annotation in a section is a heading or paragraph.\n"
+        "- When a component is annotated with `contains text: \"...\"`, that text is the COMPLETE intended copy. Use it verbatim. Do NOT prefix, suffix, or augment it with boilerplate (no \"©\", \"All rights reserved\", \"Welcome to\", taglines, slogans, default headings). If the user wrote `\"This is the footer\"`, the footer's only visible text is `\"This is the footer\"`.\n"
+        "- For components WITHOUT a `contains text:` annotation, use minimal, sensible default content appropriate to the inferred role (an unlabelled button can say \"Submit\"; an unlabelled heading can say \"Welcome\"). Keep defaults short and avoid inventing branding/copyright text.\n"
+        "- The \"Additional text the user wrote on the canvas\" list (if present) is unbound text — place each item somewhere reasonable, verbatim, no augmentation.\n"
         "- The output should be visually polished and responsive.\n\n"
         f"Output rules:\n- {framework_rule}\n"
         "- Return ONLY the code. No prose, no markdown fences, no explanations."
@@ -494,6 +697,15 @@ def generate_with_gemini(
         except Exception as error:
             print(f"Gemini [{model_name}] failed: {error}")
 
+    # TODO(H5 follow-up): when both Gemini models fail (typically free-tier
+    # quota exhaustion: 429 GenerateRequestsPerDayPerProjectPerModel), fall
+    # through to OpenRouter as a *generation* fallback (separate from the
+    # OpenRouter chat-refinement path in main.py — different system prompt,
+    # different model pool). This breaks CLAUDE_CONTEXT decision #2 ("Gemini
+    # only for code generation") so it's a real architectural change and
+    # needs an explicit go-ahead. Until then, callers fall back to the
+    # template generator in CodeGenerator._template_based_generation, which
+    # produces a near-empty shell for the 4-class output.
     return None
 
 
@@ -623,46 +835,140 @@ class CodeGenerator:
             return self._generate_react(elements, description)
 
     def _generate_react(self, elements: List[Dict], description: str) -> str:
-        """Generate React component code"""
-        # Sort elements by Y position (top to bottom)
+        """
+        Generate a usable React + Tailwind component as the LAST-RESORT fallback when
+        Gemini is unavailable. Handles the 4 Roboflow classes (navbar/footer/section/
+        card) plus the legacy contour-fallback classes (button/input/text/container).
+        Cards are inferred to button / input / heading / paragraph / image based on
+        attached text + bbox aspect ratio.
+        """
         sorted_elements = sorted(elements, key=_sort_key)
 
-        code = "export default function GeneratedComponent() {\n"
-        code += "  return (\n"
-        code += "    <div className=\"flex flex-col gap-4 p-8 max-w-md mx-auto\">\n"
-
+        body_lines: List[str] = []
         if description:
-            code += "      {/* " + description + " */}\n"
-
+            body_lines.append(f"      {{/* {description} */}}")
         for elem in sorted_elements:
-            elem_type = elem.get('type', 'div')
-            label = elem.get('label', elem_type.capitalize())
+            body_lines.append(self._render_element_react(elem))
 
-            if elem_type == 'button':
-                code += f"      <button className=\"rounded-lg bg-blue-600 px-6 py-3 text-white font-semibold hover:bg-blue-700 transition-colors\">\n"
-                code += f"        {label}\n"
-                code += f"      </button>\n"
+        body = "\n".join(line for line in body_lines if line)
 
-            elif elem_type == 'input':
-                code += f"      <input\n"
-                code += f"        type=\"text\"\n"
-                code += f"        placeholder=\"{label}\"\n"
-                code += f"        className=\"rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:outline-none\"\n"
-                code += f"      />\n"
+        return (
+            "export default function GeneratedComponent() {\n"
+            "  return (\n"
+            "    <div className=\"min-h-screen flex flex-col bg-white text-gray-900\">\n"
+            f"{body}\n"
+            "    </div>\n"
+            "  );\n"
+            "}"
+        )
 
-            elif elem_type == 'text':
-                code += f"      <p className=\"text-gray-700\">{label}</p>\n"
+    def _render_element_react(self, elem: Dict) -> str:
+        elem_type = (elem.get('type') or '').lower()
+        attrs = elem.get('attributes') or {}
+        label_text = (attrs.get('label_text') or '').strip()
+        positioned = attrs.get('positioned_texts') or []
+        bounds = elem.get('bounds') or {}
+        try:
+            w = float(bounds.get('width', 0)); h = float(bounds.get('height', 0))
+        except (TypeError, ValueError):
+            w = h = 0.0
+        aspect = (w / h) if h > 0 else 1.0
 
-            elif elem_type == 'container':
-                code += f"      <div className=\"rounded-lg border border-gray-200 p-4\">\n"
-                code += "        {/* Container content */}\n"
-                code += f"      </div>\n"
+        if elem_type == 'navbar':
+            items = [pt.get('text', '') for pt in positioned] or (
+                [t.strip() for t in label_text.split('/')] if label_text else []
+            )
+            items = [t for t in items if t]
+            if items:
+                links = "".join(
+                    f'<a href="#" className="hover:text-blue-600">{t}</a>' for t in items[1:]
+                )
+                brand = items[0]
+                return (
+                    '      <header className="flex items-center justify-between px-6 py-4 border-b">\n'
+                    f'        <span className="font-bold text-lg">{brand}</span>\n'
+                    f'        <nav className="flex gap-6 text-sm">{links}</nav>\n'
+                    '      </header>'
+                )
+            return (
+                '      <header className="flex items-center justify-between px-6 py-4 border-b">\n'
+                '        <span className="font-bold text-lg">Brand</span>\n'
+                '        <nav className="flex gap-6 text-sm"><a href="#">Home</a></nav>\n'
+                '      </header>'
+            )
 
-        code += "    </div>\n"
-        code += "  );\n"
-        code += "}"
+        if elem_type == 'footer':
+            items = [pt.get('text', '') for pt in positioned] or (
+                [t.strip() for t in label_text.split('/')] if label_text else []
+            )
+            items = [t for t in items if t]
+            inner = " ".join(f'<span>{t}</span>' for t in items) if items else '<span>Footer</span>'
+            return (
+                '      <footer className="mt-auto flex items-center justify-center gap-4 px-6 py-4 border-t text-sm text-gray-600">\n'
+                f'        {inner}\n'
+                '      </footer>'
+            )
 
-        return code
+        if elem_type == 'section':
+            if positioned:
+                inner = "\n".join(
+                    f'        <p className="text-gray-700">{pt.get("text", "")}</p>'
+                    for pt in positioned
+                )
+            elif label_text:
+                inner = f'        <p className="text-gray-700">{label_text}</p>'
+            else:
+                inner = '        {/* section content */}'
+            return (
+                '      <section className="flex-1 px-6 py-10">\n'
+                f'{inner}\n'
+                '      </section>'
+            )
+
+        if elem_type == 'card':
+            text = label_text
+            text_lower = text.lower()
+            ACTION_HINTS = (
+                'submit', 'sign up', 'signup', 'log in', 'login', 'register',
+                'subscribe', 'continue', 'send', 'buy', 'add', 'save', 'go',
+            )
+            is_action = bool(text) and any(hint in text_lower for hint in ACTION_HINTS)
+            looks_like_input = (aspect > 3 and h > 0 and not text)
+            looks_like_image = (w * h > 30000 and not text and 0.6 <= aspect <= 1.8)
+
+            if is_action:
+                return (
+                    f'      <button className="rounded-md bg-blue-600 px-6 py-2 text-white font-medium hover:bg-blue-700 self-center my-2">{text}</button>'
+                )
+            if text and looks_like_input:
+                return (
+                    f'      <input type="text" placeholder="{text}" className="rounded-md border border-gray-300 px-3 py-2 mx-auto my-2 w-72" />'
+                )
+            if looks_like_input:
+                return (
+                    '      <input type="text" placeholder="Enter text" className="rounded-md border border-gray-300 px-3 py-2 mx-auto my-2 w-72" />'
+                )
+            if looks_like_image:
+                return (
+                    '      <div className="bg-gray-100 rounded-md mx-auto my-2 h-40 w-64 flex items-center justify-center text-gray-400">Image</div>'
+                )
+            if text:
+                if len(text) > 30:
+                    return f'      <p className="text-gray-700 text-center my-2">{text}</p>'
+                return f'      <h2 className="text-xl font-semibold text-center my-2">{text}</h2>'
+            return '      <div className="border border-gray-200 rounded-md p-4 mx-auto my-2 w-64 text-center text-gray-400">Item</div>'
+
+        # Legacy classes from the OpenCV contour fallback (no Roboflow involvement).
+        label = elem.get('label') or elem_type.capitalize()
+        if elem_type == 'button':
+            return f'      <button className="rounded-md bg-blue-600 px-6 py-2 text-white font-medium hover:bg-blue-700 self-center my-2">{label}</button>'
+        if elem_type == 'input':
+            return f'      <input type="text" placeholder="{label}" className="rounded-md border border-gray-300 px-3 py-2 mx-auto my-2 w-72" />'
+        if elem_type == 'text':
+            return f'      <p className="text-gray-700 my-2">{label}</p>'
+        if elem_type == 'container':
+            return '      <div className="rounded-md border border-gray-200 p-4 my-2">{/* container */}</div>'
+        return f'      <div className="border border-gray-200 rounded-md p-2 my-1 text-sm text-gray-500">{label}</div>'
 
     def _generate_html(self, elements: List[Dict], description: str) -> str:
         """Generate HTML code"""

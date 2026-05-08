@@ -7,10 +7,14 @@ interface LivePreviewProps {
   language?: "html" | "react";
 }
 
-type DeviceType = "desktop" | "laptop" | "tablet" | "mobile";
+type DeviceType = "fit" | "desktop" | "laptop" | "tablet" | "mobile";
 type Orientation = "portrait" | "landscape";
 
-const DEVICE_PRESETS = {
+const DEVICE_PRESETS: Record<
+  DeviceType,
+  { width: number; height: number; label: string }
+> = {
+  fit: { width: 0, height: 0, label: "Fit" },
   desktop: { width: 1920, height: 1080, label: "Desktop" },
   laptop: { width: 1440, height: 900, label: "Laptop" },
   tablet: { width: 768, height: 1024, label: "Tablet" },
@@ -135,15 +139,39 @@ ${rawCode}
 }
 
 export default function LivePreview({ code, language = "html" }: LivePreviewProps) {
-  const [device, setDevice] = useState<DeviceType>("desktop");
+  const [device, setDevice] = useState<DeviceType>("fit");
   const [orientation, setOrientation] = useState<Orientation>("portrait");
-  const [scale, setScale] = useState(1);
+  const [manualZoom, setManualZoom] = useState<number | null>(null);
+  const [containerSize, setContainerSize] = useState({
+    width: 800,
+    height: 600,
+  });
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
   const [showConsole, setShowConsole] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Track container size so "Fit" mode can size the iframe to fill available space.
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const update = () => {
+      setContainerSize({
+        width: Math.max(320, el.clientWidth - 48),
+        height: Math.max(240, el.clientHeight - 48),
+      });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const getDeviceDimensions = () => {
+    if (device === "fit") {
+      return { width: containerSize.width, height: containerSize.height };
+    }
     const preset = DEVICE_PRESETS[device];
     if (orientation === "landscape") {
       return { width: preset.height, height: preset.width };
@@ -153,25 +181,23 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
 
   const dimensions = getDeviceDimensions();
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  const autoScale = Math.min(
+    containerSize.width / dimensions.width,
+    containerSize.height / dimensions.height,
+    1
+  );
 
-    const updateScale = () => {
-      const container = containerRef.current!;
-      const containerWidth = container.clientWidth - 48; // padding
-      const containerHeight = container.clientHeight - 48;
+  const scale = manualZoom ?? autoScale;
 
-      const scaleX = containerWidth / dimensions.width;
-      const scaleY = containerHeight / dimensions.height;
-      const newScale = Math.min(scaleX, scaleY, 1);
+  const selectDevice = (next: DeviceType) => {
+    setDevice(next);
+    setManualZoom(null);
+  };
 
-      setScale(newScale);
-    };
-
-    updateScale();
-    window.addEventListener("resize", updateScale);
-    return () => window.removeEventListener("resize", updateScale);
-  }, [dimensions.width, dimensions.height]);
+  const toggleOrientation = () => {
+    setOrientation((prev) => (prev === "portrait" ? "landscape" : "portrait"));
+    setManualZoom(null);
+  };
 
   useEffect(() => {
     if (!iframeRef.current) return;
@@ -189,12 +215,15 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
     iframeDoc.open();
     iframeDoc.write(htmlContent);
     iframeDoc.close();
-  }, [code, language]);
+  }, [code, language, refreshTick]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data.type === "console" || event.data.type === "error") {
         setConsoleOutput((prev) => [...prev, event.data.data]);
+        if (event.data.type === "error") {
+          setShowConsole(true);
+        }
       }
     };
 
@@ -203,18 +232,18 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
   }, []);
 
   const handleRefresh = () => {
-    if (iframeRef.current) {
-      iframeRef.current.src = iframeRef.current.src;
-    }
     setConsoleOutput([]);
+    setRefreshTick((t) => t + 1);
   };
 
   const handleOpenInNewWindow = () => {
     const newWindow = window.open("", "_blank");
-    if (newWindow) {
-      newWindow.document.write(code);
-      newWindow.document.close();
-    }
+    if (!newWindow) return;
+    const htmlContent =
+      language === "react" ? buildReactDocument(code) : buildHtmlDocument(code);
+    newWindow.document.open();
+    newWindow.document.write(htmlContent);
+    newWindow.document.close();
   };
 
   return (
@@ -224,7 +253,7 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
           {Object.entries(DEVICE_PRESETS).map(([key, preset]) => (
             <button
               key={key}
-              onClick={() => setDevice(key as DeviceType)}
+              onClick={() => selectDevice(key as DeviceType)}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                 device === key
                   ? "bg-white text-[#0A0A0A]"
@@ -236,11 +265,9 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
             </button>
           ))}
 
-          {device !== "desktop" && (
+          {device !== "desktop" && device !== "fit" && (
             <button
-              onClick={() =>
-                setOrientation((prev) => (prev === "portrait" ? "landscape" : "portrait"))
-              }
+              onClick={toggleOrientation}
               className="ml-2 rounded-lg bg-[#2E2E2E] p-2 text-white transition-all hover:bg-white/10"
               title="Toggle Orientation"
             >
@@ -294,8 +321,44 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
             </svg>
           </button>
 
-          <span className="text-xs text-[#666666]">
-            {dimensions.width} × {dimensions.height} @ {Math.round(scale * 100)}%
+          <div className="flex items-center gap-1 rounded-lg bg-[#2E2E2E] px-1 py-0.5">
+            <button
+              onClick={() =>
+                setManualZoom((z) =>
+                  Math.max(0.1, +((z ?? autoScale) - 0.1).toFixed(2))
+                )
+              }
+              className="rounded px-1.5 py-0.5 text-xs text-white hover:bg-white/10"
+              title="Zoom out"
+            >
+              −
+            </button>
+            <span className="min-w-14 text-center text-xs tabular-nums text-[#A0A0A0]">
+              {Math.round(scale * 100)}%
+            </span>
+            <button
+              onClick={() =>
+                setManualZoom((z) =>
+                  Math.min(2, +((z ?? autoScale) + 0.1).toFixed(2))
+                )
+              }
+              className="rounded px-1.5 py-0.5 text-xs text-white hover:bg-white/10"
+              title="Zoom in"
+            >
+              +
+            </button>
+            {manualZoom !== null && (
+              <button
+                onClick={() => setManualZoom(null)}
+                className="rounded px-1.5 py-0.5 text-xs text-[#FF6B00] hover:bg-white/10"
+                title="Reset to auto-fit"
+              >
+                Auto
+              </button>
+            )}
+          </div>
+          <span className="text-xs text-[#666666] tabular-nums">
+            {Math.round(dimensions.width)} × {Math.round(dimensions.height)}
           </span>
         </div>
       </div>

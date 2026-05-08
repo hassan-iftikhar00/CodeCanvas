@@ -18,7 +18,11 @@ const shortcuts: Shortcut[] = [
 
   // Canvas
   { keys: ["G"], description: "Toggle grid", category: "Canvas" },
-  { keys: ["Shift", "S"], description: "Toggle snap to grid", category: "Canvas" },
+  {
+    keys: ["Shift", "S"],
+    description: "Toggle snap to grid",
+    category: "Canvas",
+  },
   { keys: ["0"], description: "Fit to screen", category: "Canvas" },
   { keys: ["1"], description: "Zoom 100%", category: "Canvas" },
   { keys: ["+"], description: "Zoom in", category: "Canvas" },
@@ -49,13 +53,11 @@ interface ShortcutsPanelProps {
   onClose: () => void;
 }
 
-export default function ShortcutsPanel({ isOpen, onClose }: ShortcutsPanelProps) {
+export default function ShortcutsPanel({
+  isOpen,
+  onClose,
+}: ShortcutsPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [isMac, setIsMac] = useState(false);
-
-  useEffect(() => {
-    setIsMac(navigator.platform.toUpperCase().indexOf("MAC") >= 0);
-  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -95,12 +97,9 @@ export default function ShortcutsPanel({ isOpen, onClose }: ShortcutsPanelProps)
   );
 
   const formatKey = (key: string) => {
-    if (isMac) {
-      return key
-        .replace("Ctrl", "⌘")
-        .replace("Shift", "⇧")
-        .replace("Alt", "⌥");
-    }
+    if (key === "Ctrl") return "Ctrl/⌘";
+    if (key === "Shift") return "Shift";
+    if (key === "Alt") return "Alt";
     return key;
   };
 
@@ -116,7 +115,9 @@ export default function ShortcutsPanel({ isOpen, onClose }: ShortcutsPanelProps)
         {/* Header */}
         <div className="border-b border-[var(--grey-700)] px-6 py-4">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white">Keyboard Shortcuts</h2>
+            <h2 className="text-2xl font-bold text-white">
+              Keyboard Shortcuts
+            </h2>
             <button
               onClick={onClose}
               className="rounded-lg p-2 text-[var(--text-secondary)] transition-all duration-[var(--duration-fast)] hover:bg-[var(--grey-700)] hover:text-white"
@@ -165,33 +166,35 @@ export default function ShortcutsPanel({ isOpen, onClose }: ShortcutsPanelProps)
 
         {/* Content */}
         <div className="max-h-[60vh] overflow-y-auto p-6">
-          {Object.entries(groupedShortcuts).map(([category, categoryShortcuts]) => (
-            <div key={category} className="mb-6 last:mb-0">
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                {category}
-              </h3>
-              <div className="space-y-2">
-                {categoryShortcuts.map((shortcut, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between rounded-lg border border-[var(--grey-700)] bg-[var(--grey-900)] px-4 py-3 transition-colors hover:border-[var(--grey-600)] hover:bg-[var(--grey-800)]"
-                  >
-                    <span className="text-white">{shortcut.description}</span>
-                    <div className="flex gap-1">
-                      {shortcut.keys.map((key, keyIdx) => (
-                        <kbd
-                          key={keyIdx}
-                          className="flex min-w-[32px] items-center justify-center rounded-md border border-[var(--grey-600)] bg-[var(--grey-800)] px-2 py-1 text-xs font-semibold text-white shadow-sm"
-                        >
-                          {formatKey(key)}
-                        </kbd>
-                      ))}
+          {Object.entries(groupedShortcuts).map(
+            ([category, categoryShortcuts]) => (
+              <div key={category} className="mb-6 last:mb-0">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                  {category}
+                </h3>
+                <div className="space-y-2">
+                  {categoryShortcuts.map((shortcut, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between rounded-lg border border-[var(--grey-700)] bg-[var(--grey-900)] px-4 py-3 transition-colors hover:border-[var(--grey-600)] hover:bg-[var(--grey-800)]"
+                    >
+                      <span className="text-white">{shortcut.description}</span>
+                      <div className="flex gap-1">
+                        {shortcut.keys.map((key, keyIdx) => (
+                          <kbd
+                            key={keyIdx}
+                            className="flex min-w-[32px] items-center justify-center rounded-md border border-[var(--grey-600)] bg-[var(--grey-800)] px-2 py-1 text-xs font-semibold text-white shadow-sm"
+                          >
+                            {formatKey(key)}
+                          </kbd>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          )}
 
           {filteredShortcuts.length === 0 && (
             <div className="py-12 text-center text-[var(--text-muted)]">
@@ -217,8 +220,15 @@ export default function ShortcutsPanel({ isOpen, onClose }: ShortcutsPanelProps)
         {/* Footer Tip */}
         <div className="border-t border-[var(--grey-700)] px-6 py-3">
           <p className="text-center text-sm text-[var(--text-muted)]">
-            Press <kbd className="rounded bg-[var(--grey-800)] px-1.5 py-0.5 font-mono text-xs text-white">?</kbd> or{" "}
-            <kbd className="rounded bg-[var(--grey-800)] px-1.5 py-0.5 font-mono text-xs text-white">Esc</kbd> to close
+            Press{" "}
+            <kbd className="rounded bg-[var(--grey-800)] px-1.5 py-0.5 font-mono text-xs text-white">
+              ?
+            </kbd>{" "}
+            or{" "}
+            <kbd className="rounded bg-[var(--grey-800)] px-1.5 py-0.5 font-mono text-xs text-white">
+              Esc
+            </kbd>{" "}
+            to close
           </p>
         </div>
       </div>

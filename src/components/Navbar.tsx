@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
-import SaveIndicator from "./SaveIndicator";
 
 interface NavbarProps {
-  // Project-related props (optional for dashboard)
   projectName?: string;
   originalProjectName?: string;
   onProjectNameChange?: (name: string) => void;
@@ -15,29 +20,40 @@ interface NavbarProps {
   isSavingName?: boolean;
   currentProjectId?: string | null;
 
-  // Save indicator props (optional)
   isSaving?: boolean;
   lastSaved?: Date | null;
   saveError?: string | null;
 
-  // Save action
   onSave?: () => void;
-
-  // Action buttons (optional - for canvas page)
   onRunDetection?: () => void;
   isGenerating?: boolean;
   onExport?: () => void;
   onChatToggle?: () => void;
   onHistoryToggle?: () => void;
+  onTemplatesToggle?: () => void;
   isChatActive?: boolean;
   isHistoryActive?: boolean;
 
-  // Optional back button
   showBackButton?: boolean;
   backButtonHref?: string;
-
-  // Optional logo display
   showLogo?: boolean;
+}
+
+interface UserState {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    avatar_url?: string;
+    full_name?: string;
+    name?: string;
+    preferred_username?: string;
+  };
+}
+
+interface ProfileState {
+  avatar_url?: string;
+  full_name?: string;
+  username?: string;
 }
 
 export default function Navbar({
@@ -50,52 +66,76 @@ export default function Navbar({
   isSaving,
   lastSaved,
   saveError,
+  onSave,
   onRunDetection,
   isGenerating,
   onExport,
   onChatToggle,
   onHistoryToggle,
+  onTemplatesToggle,
   isChatActive,
-  isHistoryActive,
-  onSave,
   showBackButton = true,
   backButtonHref = "/dashboard",
   showLogo = true,
 }: NavbarProps) {
   const router = useRouter();
   const supabase = createClient();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserState | null>(null);
+  const [profile, setProfile] = useState<ProfileState | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [avatarError, setAvatarError] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const getUser = async () => {
       try {
         const {
-          data: { user },
+          data: { user: u },
         } = await supabase.auth.getUser();
-
-        if (user) {
-          setUser(user);
-
-          // Fetch profile data from database
-          const { data: profile } = await supabase
+        if (u) {
+          setUser({
+            id: u.id,
+            email: u.email ?? undefined,
+            user_metadata: u.user_metadata as UserState["user_metadata"],
+          });
+          const { data } = await supabase
             .from("profiles")
             .select("*")
-            .eq("id", user.id)
+            .eq("id", u.id)
             .single();
-
-          if (profile) {
-            setUserProfile(profile);
-          }
+          if (data) setProfile(data as ProfileState);
         }
-      } catch (error) {
-        console.error("Error fetching user:", error);
+      } catch {
         setUser(null);
       }
     };
     getUser();
   }, [supabase]);
+
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const onClick = (e: MouseEvent) => {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [showUserMenu]);
+
+  // Focus name input on edit
+  useEffect(() => {
+    if (editingName) {
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    }
+  }, [editingName]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -103,433 +143,507 @@ export default function Navbar({
     router.refresh();
   };
 
+  const commitNameEdit = () => {
+    if (
+      currentProjectId &&
+      projectName &&
+      projectName.trim() &&
+      projectName !== originalProjectName &&
+      onSaveProjectName
+    ) {
+      onSaveProjectName();
+    }
+    setEditingName(false);
+  };
+
+  const onNameKey = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    } else if (e.key === "Escape") {
+      onProjectNameChange?.(originalProjectName ?? "");
+      setEditingName(false);
+    }
+  };
+
+  // Save dot state
+  type SaveState = "idle" | "saving" | "saved" | "error";
+  const saveState: SaveState = saveError
+    ? "error"
+    : isSaving
+      ? "saving"
+      : lastSaved
+        ? "saved"
+        : "idle";
+
+  const dotColor: Record<SaveState, string> = {
+    idle: "bg-[var(--cc-text-muted)]",
+    saving: "bg-[var(--cc-success)] cc-dot-pulse",
+    saved: "bg-[var(--cc-success)]",
+    error: "bg-[var(--cc-error)]",
+  };
+
+  const saveLabel: Record<SaveState, string> = {
+    idle: "Not saved",
+    saving: "Saving...",
+    saved: lastSaved ? `Saved · ${formatRelative(lastSaved)}` : "Saved",
+    error: "Save failed",
+  };
+
+  const displayName =
+    profile?.full_name ??
+    user?.user_metadata?.full_name ??
+    user?.user_metadata?.name ??
+    "User";
+
+  const avatarLetter = (
+    profile?.full_name ??
+    user?.user_metadata?.full_name ??
+    user?.email ??
+    "U"
+  )
+    .charAt(0)
+    .toUpperCase();
+
+  const avatarUrl =
+    profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? null;
+
+  // Reset error state when the URL we're trying to load changes,
+  // so a fresh URL gets a fresh chance before we fall back to the letter.
+  useEffect(() => {
+    setAvatarError(false);
+  }, [avatarUrl]);
+
   return (
-    <header className="flex items-center justify-between border-b border-[#2E2E2E] bg-[#1A1A1A] px-2 sm:px-3 py-2 shadow-sm">
-      <div className="flex items-center gap-2 min-w-0">
+    <header
+      className="flex h-12 items-center justify-between border-b border-[#1e1e1e] bg-[var(--cc-bg-surface)] px-3"
+      role="banner"
+    >
+      {/* Left cluster — back, logo, project name + save dot */}
+      <div className="flex min-w-0 items-center gap-2">
         {showBackButton && (
           <Link
             href={backButtonHref}
-            className="p-1.5 text-[#A0A0A0] transition-colors hover:text-white"
-            title="Back to Dashboard"
+            aria-label="Back to dashboard"
+            className="flex h-8 w-8 items-center justify-center rounded-[var(--cc-radius-button)] text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
           >
             <svg
-              className="h-5 w-5"
-              fill="none"
+              className="h-4 w-4"
               viewBox="0 0 24 24"
+              fill="none"
               stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
+              <path d="M15 18l-6-6 6-6" />
             </svg>
           </Link>
         )}
+
         {showLogo && (
           <Link
             href="/dashboard"
-            className="flex items-center gap-1.5 text-sm sm:text-base font-bold text-white transition-colors hover:text-[#FF6B00]"
+            className="flex items-center gap-2 text-[13px] font-semibold text-[var(--cc-text-primary)] transition-colors hover:text-[var(--cc-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] rounded-[var(--cc-radius-button)] px-1"
           >
-            <img
+            <Image
               src="/logo.png"
-              alt="CodeCanvas Logo"
-              className="w-6 h-6 sm:w-7 sm:h-7"
+              alt=""
+              aria-hidden="true"
+              width={20}
+              height={20}
+              className="h-5 w-5"
             />
-            <span>CodeCanvas</span>
+            <span className="hidden sm:inline">CodeCanvas</span>
           </Link>
         )}
 
-        {/* Project Name Input (Canvas Page Only) */}
-        {projectName !== undefined &&
-          onProjectNameChange &&
-          onSaveProjectName && (
-            <div className="relative">
+        {/* Divider */}
+        {projectName !== undefined ? (
+          <span
+            aria-hidden="true"
+            className="mx-1 h-4 w-px bg-[var(--cc-border-subtle)]"
+          />
+        ) : null}
+
+        {/* Project name — double-click to edit */}
+        {projectName !== undefined && onProjectNameChange ? (
+          <div className="flex min-w-0 items-center gap-2">
+            {editingName ? (
               <input
+                ref={nameInputRef}
                 type="text"
                 value={projectName}
                 onChange={(e) => onProjectNameChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    currentProjectId &&
-                    projectName !== originalProjectName
-                  ) {
-                    onSaveProjectName();
-                  }
-                }}
-                className="rounded-lg border border-[#2E2E2E] bg-[#0A0A0A] px-2 py-1.5 pr-8 text-xs font-medium text-white focus:border-[#FF6B00] focus:outline-none focus:ring-1 focus:ring-[#FF6B00]/30 w-28 sm:w-32"
-                placeholder="Untitled"
+                onBlur={commitNameEdit}
+                onKeyDown={onNameKey}
+                aria-label="Project name"
+                className="h-7 min-w-[140px] max-w-[280px] rounded-[var(--cc-radius-button)] border border-[var(--cc-accent)] bg-[var(--cc-bg-elevated)] px-2 text-[13px] font-medium text-[var(--cc-text-primary)] outline-none ring-2 ring-[var(--cc-accent-glow)]"
               />
-              {/* Save button - only shows when name changed */}
-              {projectName !== originalProjectName && projectName.trim() && (
-                <button
-                  onClick={onSaveProjectName}
-                  disabled={isSavingName || !currentProjectId}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-white text-[#0A0A0A] transition-all hover:bg-[#FF6B00] hover:text-white disabled:opacity-50"
-                  title="Save project name (Enter)"
-                >
-                  {isSavingName ? (
-                    <svg
-                      className="h-3.5 w-3.5 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="h-3.5 w-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  )}
-                </button>
-              )}
-            </div>
-          )}
-      </div>
-
-      <div className="flex items-center gap-1">
-        {/* Canvas-specific action buttons */}
-        {onRunDetection && (
-          <>
-            {/* Save Button */}
-            {onSave && (
+            ) : (
               <button
-                onClick={onSave}
-                disabled={isSaving}
-                className="flex items-center gap-1 rounded-lg bg-[#2E2E2E] px-2 py-1.5 text-xs font-semibold text-white transition-all hover:bg-white hover:text-[#0A0A0A] disabled:opacity-50"
-                title="Save Project (Ctrl+S)"
+                type="button"
+                onDoubleClick={() => setEditingName(true)}
+                onClick={() => setEditingName(true)}
+                title="Double-click to rename"
+                className="group flex h-7 max-w-[280px] items-center gap-1 truncate rounded-[var(--cc-radius-button)] px-2 text-[13px] font-medium text-[var(--cc-text-primary)] transition-colors hover:bg-[var(--cc-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
               >
+                <span className="truncate">{projectName || "Untitled"}</span>
                 <svg
-                  className="h-4 w-4"
-                  fill="none"
+                  className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-60"
                   viewBox="0 0 24 24"
+                  fill="none"
                   stroke="currentColor"
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden="true"
                 >
-                  <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-                  <path d="M17 21v-8H7v8" />
-                  <path d="M7 3v5h8" />
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
                 </svg>
-                <span className="hidden lg:inline">
-                  {isSaving ? "Saving..." : "Save"}
-                </span>
               </button>
             )}
 
-            {/* Run Detection Button */}
-            <button
-              onClick={onRunDetection}
-              disabled={isGenerating}
-              className="flex items-center gap-1 rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-2 py-1.5 text-xs font-semibold text-white transition-all hover:bg-[#FF6B00]/30 hover:border-[#FF6B00] disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Run Detection"
+            {/* Auto-save dot */}
+            <span
+              className="flex items-center gap-1.5"
+              role="status"
+              aria-live="polite"
+              title={saveLabel[saveState]}
             >
-              {isGenerating ? (
-                <>
-                  <svg
-                    className="h-4 w-4 animate-spin"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  <span className="hidden md:inline">Analyzing</span>
-                </>
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 rounded-full ${dotColor[saveState]}`}
+              />
+              <span className="hidden text-[11px] text-[var(--cc-text-secondary)] xl:inline">
+                {saveLabel[saveState]}
+              </span>
+              {isSavingName ? (
+                <span className="text-[11px] text-[var(--cc-accent)]">·</span>
+              ) : null}
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Right cluster — actions */}
+      <div className="flex items-center gap-1.5">
+        {onTemplatesToggle ? (
+          <HeaderButton
+            onClick={onTemplatesToggle}
+            label="Templates"
+            hideLabelBelow="lg"
+          >
+            <TemplatesIcon />
+          </HeaderButton>
+        ) : null}
+
+        {onSave ? (
+          <HeaderButton
+            onClick={onSave}
+            disabled={isSaving}
+            label="Save"
+            shortcut="Ctrl/⌘S"
+            hideLabelBelow="lg"
+          >
+            <SaveIcon />
+          </HeaderButton>
+        ) : null}
+
+        {onExport ? (
+          <HeaderButton onClick={onExport} label="Export" hideLabelBelow="xl">
+            <ExportIcon />
+          </HeaderButton>
+        ) : null}
+
+        {onChatToggle ? (
+          <HeaderButton
+            onClick={onChatToggle}
+            label="Chat"
+            hideLabelBelow="xl"
+            active={isChatActive}
+          >
+            <ChatIcon />
+          </HeaderButton>
+        ) : null}
+
+        {onHistoryToggle ? (
+          <HeaderButton
+            onClick={onHistoryToggle}
+            label="History"
+            hideLabelBelow="xl"
+          >
+            <HistoryIcon />
+          </HeaderButton>
+        ) : null}
+
+        {/* Run Detection — primary accent */}
+        {onRunDetection ? (
+          <button
+            onClick={onRunDetection}
+            disabled={isGenerating}
+            className="group ml-1 flex h-8 items-center gap-1.5 rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-3 text-[12px] font-medium text-white transition-all duration-150 hover:shadow-[0_0_18px_var(--cc-accent-glow-strong)] active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cc-bg-surface)] focus-visible:ring-[var(--cc-accent)]"
+            title="Run detection (generate code)"
+          >
+            {isGenerating ? (
+              <>
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                <span className="hidden md:inline">Detecting...</span>
+              </>
+            ) : (
+              <>
+                <SparkleIcon />
+                <span className="hidden md:inline">Run Detection</span>
+              </>
+            )}
+          </button>
+        ) : null}
+
+        {/* Avatar */}
+        {user ? (
+          <div ref={userMenuRef} className="relative ml-1">
+            <button
+              onClick={() => setShowUserMenu((v) => !v)}
+              aria-label="User menu"
+              aria-expanded={showUserMenu}
+              aria-haspopup="menu"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] text-[11px] font-semibold text-white transition-all hover:ring-2 hover:ring-[var(--cc-accent-glow-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+            >
+              {avatarUrl && !avatarError ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 rounded-full object-cover"
+                  onError={() => setAvatarError(true)}
+                />
               ) : (
-                <>
-                  <svg
-                    className="h-4 w-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M13 7H7v6h6V7z" />
-                    <path
-                      fillRule="evenodd"
-                      d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span className="hidden md:inline">Detect</span>
-                </>
+                <span aria-hidden="true">{avatarLetter}</span>
               )}
             </button>
 
-            {onExport && (
-              <button
-                onClick={onExport}
-                className="flex items-center gap-1 rounded-lg bg-[#2E2E2E] px-2 py-1.5 text-xs font-semibold text-white transition-all hover:bg-white hover:text-[#0A0A0A]"
-                title="Export"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+            <AnimatePresence>
+              {showUserMenu ? (
+                <motion.div
+                  role="menu"
+                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                  transition={{ duration: 0.16, ease: [0.22, 0.9, 0.28, 1] }}
+                  className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.6)]"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-                <span className="hidden lg:inline">Export</span>
-              </button>
-            )}
-
-            {onChatToggle && (
-              <button
-                onClick={onChatToggle}
-                className={`flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition-all ${
-                  isChatActive
-                    ? "bg-white text-[#0A0A0A]"
-                    : "bg-[#2E2E2E] text-white hover:bg-white hover:text-[#0A0A0A]"
-                }`}
-                title="AI Chat"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                  />
-                </svg>
-                <span className="hidden lg:inline">Chat</span>
-              </button>
-            )}
-
-            {onHistoryToggle && (
-              <button
-                onClick={onHistoryToggle}
-                className={`flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition-all ${
-                  isHistoryActive
-                    ? "bg-white text-[#0A0A0A]"
-                    : "bg-[#2E2E2E] text-white hover:bg-white hover:text-[#0A0A0A]"
-                }`}
-                title="Version History"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </button>
-            )}
-          </>
-        )}
-
-        {/* Save Indicator */}
-        {isSaving !== undefined && (
-          <div className="hidden 2xl:block w-28 shrink-0">
-            <SaveIndicator
-              isSaving={isSaving}
-              lastSaved={lastSaved ?? null}
-              error={saveError ?? null}
-            />
-          </div>
-        )}
-
-        {/* User Profile */}
-        {user && (
-          <div className="relative">
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center justify-center rounded-full p-1 transition-colors hover:ring-2 hover:ring-[#FF6B00]/30"
-              title="Profile Menu"
-            >
-              {/* Profile Picture or Initials */}
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-xs font-semibold text-white overflow-hidden">
-                {userProfile?.avatar_url || user.user_metadata?.avatar_url ? (
-                  <img
-                    src={
-                      userProfile?.avatar_url || user.user_metadata.avatar_url
-                    }
-                    alt="Profile"
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <span>
-                    {(userProfile?.full_name || user.user_metadata?.full_name)
-                      ?.charAt(0)
-                      ?.toUpperCase() ||
-                      user.email?.charAt(0).toUpperCase() ||
-                      "U"}
-                  </span>
-                )}
-              </div>
-            </button>
-
-            {/* Dropdown Menu */}
-            {showUserMenu && (
-              <div
-                className="absolute right-0 top-full mt-2 z-100 w-64 rounded-lg border border-[#2E2E2E] bg-[#1A1A1A] shadow-xl opacity-100"
-                style={{
-                  backdropFilter: "none",
-                  WebkitBackdropFilter: "none",
-                }}
-              >
-                {/* User Info in Dropdown */}
-                <div className="border-b border-[#2E2E2E] px-4 py-3">
-                  <div className="mb-1 text-sm font-medium text-white">
-                    {userProfile?.full_name ||
-                      user.user_metadata?.full_name ||
-                      user.user_metadata?.name ||
-                      "User"}
-                  </div>
-                  <div className="text-xs text-[#A0A0A0]">{user.email}</div>
-                  {user.user_metadata?.preferred_username && (
-                    <div className="mt-1 text-xs text-[#A0A0A0]">
-                      @{user.user_metadata.preferred_username}
+                  <div className="border-b border-[var(--cc-border-subtle)] px-3 py-3">
+                    <div className="text-[13px] font-medium text-[var(--cc-text-primary)] truncate">
+                      {displayName}
                     </div>
-                  )}
-                </div>
-
-                {/* Menu Items */}
-                <div className="py-2">
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                    <div className="text-[11px] text-[var(--cc-text-secondary)] truncate">
+                      {user.email}
+                    </div>
+                  </div>
+                  <div className="py-1">
+                    <MenuLink href="/dashboard" label="Dashboard">
+                      <DashboardIcon />
+                    </MenuLink>
+                    <MenuLink href="/profile" label="Profile">
+                      <ProfileIcon />
+                    </MenuLink>
+                    <div className="my-1 mx-2 h-px bg-[var(--cc-border-subtle)]" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        handleLogout();
+                      }}
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-[var(--cc-error)] transition-colors hover:bg-[var(--cc-bg-canvas)]"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                      />
-                    </svg>
-                    Dashboard
-                  </Link>
-
-                  <Link
-                    href="/profile"
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                      />
-                    </svg>
-                    Profile
-                  </Link>
-
-                  <div className="my-2 h-px bg-[#2E2E2E]" />
-
-                  <button
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      handleLogout();
-                    }}
-                    className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-400 transition-colors hover:bg-[#2E2E2E] hover:text-red-300"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                      />
-                    </svg>
-                    Logout
-                  </button>
-                </div>
-              </div>
-            )}
+                      <LogoutIcon />
+                      Log out
+                    </button>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </div>
-        )}
-
-        {/* Fallback Logout Button */}
-        {!user && (
-          <button
-            onClick={handleLogout}
-            className="rounded-lg p-2 text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white"
-            title="Logout"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-          </button>
-        )}
+        ) : null}
       </div>
     </header>
+  );
+}
+
+// ───────────────────────── Subcomponents ─────────────────────────
+
+interface HeaderButtonProps {
+  children: React.ReactNode;
+  label: string;
+  shortcut?: string;
+  active?: boolean;
+  disabled?: boolean;
+  hideLabelBelow?: "lg" | "xl";
+  onClick: () => void;
+}
+
+function HeaderButton({
+  children,
+  label,
+  shortcut,
+  active,
+  disabled,
+  hideLabelBelow = "lg",
+  onClick,
+}: HeaderButtonProps) {
+  const labelHide = hideLabelBelow === "xl" ? "xl:inline" : "lg:inline";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={shortcut ? `${label} (${shortcut})` : label}
+      className={`flex h-8 items-center gap-1.5 rounded-[var(--cc-radius-button)] px-2.5 text-[12px] font-medium transition-all duration-150 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] ${
+        active
+          ? "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-primary)]"
+          : "text-[var(--cc-text-secondary)] hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+      }`}
+    >
+      <span className="flex h-4 w-4 items-center justify-center">
+        {children}
+      </span>
+      <span className={`hidden ${labelHide}`}>{label}</span>
+    </button>
+  );
+}
+
+function MenuLink({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-canvas)] hover:text-[var(--cc-text-primary)]"
+    >
+      <span className="flex h-4 w-4 items-center justify-center">
+        {children}
+      </span>
+      {label}
+    </Link>
+  );
+}
+
+// ───────────────────────── Helpers ─────────────────────────
+
+function formatRelative(date: Date): string {
+  const sec = Math.max(1, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h ago`;
+}
+
+// ───────────────────────── Icons ─────────────────────────
+
+const iconProps = {
+  className: "h-4 w-4",
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function SaveIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+      <path d="M17 21v-8H7v8" />
+      <path d="M7 3v5h8" />
+    </svg>
+  );
+}
+function ExportIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+function ChatIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+    </svg>
+  );
+}
+function HistoryIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </svg>
+  );
+}
+function TemplatesIcon() {
+  return (
+    <svg {...iconProps}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+function SparkleIcon() {
+  return (
+    <svg {...iconProps} className="h-3.5 w-3.5">
+      <path d="M12 3v3" />
+      <path d="M12 18v3" />
+      <path d="M3 12h3" />
+      <path d="M18 12h3" />
+      <path d="M5.6 5.6l2.1 2.1" />
+      <path d="M16.3 16.3l2.1 2.1" />
+      <path d="M5.6 18.4l2.1-2.1" />
+      <path d="M16.3 7.7l2.1-2.1" />
+    </svg>
+  );
+}
+function DashboardIcon() {
+  return (
+    <svg {...iconProps}>
+      <rect x="3" y="3" width="7" height="9" />
+      <rect x="14" y="3" width="7" height="5" />
+      <rect x="14" y="12" width="7" height="9" />
+      <rect x="3" y="16" width="7" height="5" />
+    </svg>
+  );
+}
+function ProfileIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+function LogoutIcon() {
+  return (
+    <svg {...iconProps}>
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
   );
 }

@@ -1,6 +1,13 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  Suspense,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { SketchCanvasRef } from "@/components/canvas/SketchCanvas";
@@ -12,7 +19,10 @@ import LayerPanel, { type Layer } from "@/components/canvas/LayerPanel";
 import ExportDialog, { type ExportOptions } from "@/components/ExportDialog";
 import TemplatesPanel from "@/components/canvas/TemplatesPanel";
 import SaveIndicator from "@/components/SaveIndicator";
-import ZoomControls from "@/components/canvas/ZoomControls";
+import ZoomPill from "@/components/canvas/ZoomPill";
+import FloatingToolbar from "@/components/canvas/FloatingToolbar";
+import CanvasSurface from "@/components/canvas/CanvasSurface";
+import StyleRibbon from "@/components/canvas/StyleRibbon";
 import Navbar from "@/components/Navbar";
 import {
   useProjectSave,
@@ -26,6 +36,28 @@ import LivePreview from "@/components/canvas/LivePreview";
 import ChatInterface from "@/components/canvas/ChatInterface";
 import ComponentPalette from "@/components/canvas/ComponentPalette";
 import { useVersionHistory } from "@/hooks/useVersionHistory";
+import { useToast } from "@/components/ui/Toast";
+import { registerCanvasCommands } from "@/components/CommandPalette";
+import type {
+  Tool,
+  Mode,
+  RightPanel,
+  TextAnnotation,
+  CodeViewMode,
+} from "@/types/canvas";
+import {
+  ZOOM_MIN,
+  ZOOM_MAX,
+  ZOOM_DEFAULT,
+  ZOOM_STEP,
+  CODE_PANEL_MIN_HEIGHT,
+  CODE_PANEL_MAX_HEIGHT,
+} from "@/types/canvas";
+
+// Apply imported zoom + code-panel constants where bounds are enforced.
+const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+const clampCodePanelHeight = (h: number) =>
+  Math.min(CODE_PANEL_MAX_HEIGHT, Math.max(CODE_PANEL_MIN_HEIGHT, h));
 
 const SketchCanvas = dynamic(
   () => import("@/components/canvas/SketchCanvasWithHistory"),
@@ -34,300 +66,48 @@ const SketchCanvas = dynamic(
 
 const GENERATE_CODE_ENDPOINT = "/api/generate-code";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-type Tool =
-  | "select"
-  | "hand"
-  | "pen"
-  | "rectangle"
-  | "circle"
-  | "ellipse"
-  | "triangle"
-  | "arrow"
-  | "text"
-  | "erase"
-  | "bin";
-type Mode = "sketch" | "detect" | "refine" | "preview";
-type RightPanel = "properties" | "layers" | "chat" | null;
+// Canvas types are imported from @/types/canvas for cross-component use.
 
-// ---------------------------------------------------------------------------
-// Tool definitions
-// ---------------------------------------------------------------------------
-const TOOLS: {
-  id: Tool;
-  label: string;
-  shortcut: string;
-  icon: React.ReactNode;
-  group: "pointer" | "draw" | "shape" | "annotate" | "modify";
-}[] = [
-  {
-    id: "select",
-    label: "Select",
-    shortcut: "V",
-    group: "pointer",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
-        <path d="M13 13l6 6" />
-      </svg>
-    ),
-  },
-  {
-    id: "hand",
-    label: "Hand",
-    shortcut: "H",
-    group: "pointer",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M18 11V6a2 2 0 0 0-4 0v1" />
-        <path d="M14 10V4a2 2 0 0 0-4 0v2" />
-        <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
-        <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
-      </svg>
-    ),
-  },
-  {
-    id: "pen",
-    label: "Pen",
-    shortcut: "P",
-    group: "draw",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M12 19l7-7 3 3-7 7-3-3z" />
-        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-        <path d="M2 2l7.586 7.586" />
-        <circle cx="11" cy="11" r="2" />
-      </svg>
-    ),
-  },
-  {
-    id: "rectangle",
-    label: "Rectangle",
-    shortcut: "R",
-    group: "shape",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-      </svg>
-    ),
-  },
-  {
-    id: "circle",
-    label: "Circle",
-    shortcut: "O",
-    group: "shape",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="12" cy="12" r="10" />
-      </svg>
-    ),
-  },
-  {
-    id: "ellipse",
-    label: "Ellipse",
-    shortcut: "L",
-    group: "shape",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <ellipse cx="12" cy="12" rx="10" ry="6" />
-      </svg>
-    ),
-  },
-  {
-    id: "triangle",
-    label: "Triangle",
-    shortcut: "G",
-    group: "shape",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M12 2L2 22h20L12 2z" />
-      </svg>
-    ),
-  },
-  {
-    id: "arrow",
-    label: "Arrow",
-    shortcut: "A",
-    group: "shape",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <line x1="5" y1="12" x2="19" y2="12" />
-        <polyline points="12 5 19 12 12 19" />
-      </svg>
-    ),
-  },
-  {
-    id: "text",
-    label: "Text",
-    shortcut: "T",
-    group: "annotate",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <polyline points="4 7 4 4 20 4 20 7" />
-        <line x1="9" y1="20" x2="15" y2="20" />
-        <line x1="12" y1="4" x2="12" y2="20" />
-      </svg>
-    ),
-  },
-  {
-    id: "erase",
-    label: "Eraser",
-    shortcut: "E",
-    group: "modify",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M20 20H7L3 16c-.6-.6-.6-1.5 0-2.1l10-10c.6-.6 1.5-.6 2.1 0l6 6c.6.6.6 1.5 0 2.1L14 19" />
-        <path d="M7 20l-4-4" />
-      </svg>
-    ),
-  },
-  {
-    id: "bin",
-    label: "Delete",
-    shortcut: "X",
-    group: "modify",
-    icon: (
-      <svg
-        className="h-[18px] w-[18px]"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <polyline points="3 6 5 6 21 6" />
-        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-        <path d="M10 11v6" />
-        <path d="M14 11v6" />
-        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-      </svg>
-    ),
-  },
-];
-
-// Quick color presets
-const COLOR_PRESETS = [
-  "#000000",
-  "#ffffff",
-  "#ef4444",
-  "#f97316",
-  "#eab308",
-  "#22c55e",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ec4899",
-  "#6b7280",
-];
-
-const STROKE_WIDTHS = [1, 2, 3, 5, 8, 12];
+// Tool/color/width metadata is now owned by FloatingToolbar and StyleRibbon components.
 
 // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 // CANVAS PAGE
 // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 export default function CanvasPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-screen items-center justify-center bg-[#0A0A0A]">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
-        </div>
-      }
-    >
+    <Suspense fallback={<CanvasPageFallback />}>
       <CanvasPageInner />
     </Suspense>
   );
 }
 
+function CanvasPageFallback() {
+  return (
+    <div
+      className="flex h-screen items-center justify-center bg-[var(--charcoal-black)]"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <span className="sr-only">Loading canvas...</span>
+      <div
+        aria-hidden="true"
+        className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--orange-primary)] border-t-transparent"
+      />
+    </div>
+  );
+}
+
 function CanvasPageInner() {
+  const toast = useToast();
   // Ã¢â€â‚¬Ã¢â€â‚¬ Core state Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [currentTool, setCurrentTool] = useState<Tool>("pen");
   const [currentMode, setCurrentMode] = useState<Mode>("sketch");
   const [rightPanel, setRightPanel] = useState<RightPanel>("chat");
   const [showCodePanel, setShowCodePanel] = useState(false);
   const [codePanelHeight, setCodePanelHeight] = useState(350);
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [gridEnabled, setGridEnabled] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
@@ -386,15 +166,14 @@ function CanvasPageInner() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCode, setGeneratedCode] = useState("");
   const [editedCode, setEditedCode] = useState("");
-  const [codeViewMode, setCodeViewMode] = useState<
-    "code" | "preview" | "split"
-  >("code");
+  const [codeViewMode, setCodeViewMode] = useState<CodeViewMode>("code");
   const [codeLanguage] = useState<"html" | "css" | "javascript" | "typescript">(
     "javascript"
   );
   const [detectedElements, setDetectedElements] = useState<
     Array<{ type: string; bounds: unknown }>
   >([]);
+  const [usedFallback, setUsedFallback] = useState(false);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ History & versions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const history = useHistory({
@@ -412,7 +191,7 @@ function CanvasPageInner() {
   const canvasRef = useRef<SketchCanvasRef>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const codePanelDragRef = useRef(false);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ User Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -491,10 +270,11 @@ function CanvasPageInner() {
 
   // Load version history
   useEffect(() => {
-    if (currentProject?.id && !currentProject.id.startsWith("temp-")) {
-      versionHistory.fetchVersions(currentProject.id);
+    const projectId = currentProject?.id;
+    if (projectId && !projectId.startsWith("temp-")) {
+      versionHistory.fetchVersions(projectId);
     }
-  }, [currentProject?.id, versionHistory]);
+  }, [currentProject?.id, versionHistory.fetchVersions]);
 
   // Save project handler
   const handleSaveProject = useCallback(async () => {
@@ -598,15 +378,15 @@ function CanvasPageInner() {
         }
         if (e.key === "=") {
           e.preventDefault();
-          setZoom((z) => Math.min(z + 10, 300));
+          setZoom((z) => clampZoom(z + ZOOM_STEP));
         }
         if (e.key === "-") {
           e.preventDefault();
-          setZoom((z) => Math.max(z - 10, 25));
+          setZoom((z) => clampZoom(z - ZOOM_STEP));
         }
         if (e.key === "0") {
           e.preventDefault();
-          setZoom(100);
+          setZoom(ZOOM_DEFAULT);
         }
         if (e.key === "s") {
           e.preventDefault();
@@ -624,7 +404,7 @@ function CanvasPageInner() {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -5 : 5;
-        setZoom((z) => Math.min(300, Math.max(25, z + delta)));
+        setZoom((z) => clampZoom(z + delta));
       }
     };
     window.addEventListener("wheel", handleWheel, { passive: false });
@@ -699,17 +479,23 @@ function CanvasPageInner() {
   // Version history
   const handleCreateCheckpoint = async () => {
     if (!currentProject?.id) {
-      alert("Please save the project first");
+      toast.warning("Save the project first to create a checkpoint.", {
+        title: "Project not saved",
+      });
       return;
     }
-    const description = prompt("Enter checkpoint description (optional):");
+    // TODO: replace with a custom modal that allows naming a checkpoint;
+    // window.prompt is intentionally avoided. For now, use a default label.
+    const description = `Checkpoint ${new Date().toLocaleString()}`;
     const canvasData = canvasRef.current?.getCanvasData();
-    if (canvasData)
+    if (canvasData) {
       await versionHistory.createVersion(
         currentProject.id,
         canvasData,
-        description || undefined
+        description
       );
+      toast.success("Checkpoint created.", { title: "Saved" });
+    }
   };
   const handleRestoreVersion = async (versionId: string) => {
     const canvasData = await versionHistory.restoreVersion(versionId);
@@ -750,10 +536,10 @@ function CanvasPageInner() {
   // Export
   const handleExport = (options: ExportOptions) => {
     if (options.format === "png") {
-      const dataURL = canvasRef.current?.exportAsPNG();
-      if (dataURL) {
+      const result = canvasRef.current?.exportAsPNG();
+      if (result?.dataURL) {
         const a = document.createElement("a");
-        a.href = dataURL;
+        a.href = result.dataURL;
         a.download = `${projectName || "canvas"}.png`;
         a.click();
       }
@@ -792,6 +578,7 @@ function CanvasPageInner() {
     setIsGenerating(true);
     setGeneratedCode("");
     setDetectedElements([]);
+    setUsedFallback(false);
     try {
       const canvasData = canvasRef.current.getCanvasData();
       const hasContent =
@@ -800,41 +587,70 @@ function CanvasPageInner() {
           (canvasData.shapes?.length ?? 0) > 0 ||
           (canvasData.componentGroups?.length ?? 0) > 0);
       if (!hasContent) {
-        alert("Please draw or add something to the canvas first!");
+        toast.warning(
+          "Draw or add something to the canvas before generating code.",
+          {
+            title: "Canvas is empty",
+          }
+        );
         return;
       }
       const projectId = await ensureGenerationProject(canvasData);
       if (!projectId) {
         throw new Error("Failed to create a project before generation");
       }
-      const sketchImage = canvasRef.current.exportAsPNG?.() || undefined;
+      const exportResult = canvasRef.current.exportAsPNG?.();
+      const sketchImage = exportResult?.dataURL || undefined;
+      // Transform that maps canvas-coords → exported-image pixel coords.
+      // The exported PNG is a tight crop of the canvas at pixelRatio=2, so
+      // canvas (cx, cy) lands at image ((cx - offsetX) * scale, (cy - offsetY) * scale).
+      // Pre-applying this here means the backend gets text annotations in
+      // the same coord space Roboflow returns bboxes in — no scaling needed
+      // server-side, which previously broke when the export crop ≠ canvas size.
+      const exportTransform = exportResult?.transform ?? {
+        offsetX: 0,
+        offsetY: 0,
+        scale: 1,
+      };
+      const toImageSpace = (
+        cx: number,
+        cy: number,
+        cw: number,
+        ch: number
+      ) => ({
+        x: (cx - exportTransform.offsetX) * exportTransform.scale,
+        y: (cy - exportTransform.offsetY) * exportTransform.scale,
+        width: cw * exportTransform.scale,
+        height: ch * exportTransform.scale,
+      });
 
       // Collect text the user wrote on the canvas so the backend can map each
       // string to whichever detected component (navbar/section/card/footer)
-      // contains it. Uses absolute canvas coordinates for shapes inside groups.
-      type TextAnnotation = {
-        text: string;
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-      };
+      // contains it. Uses absolute canvas coordinates for shapes inside groups,
+      // then transforms into exported-image space.
       const textAnnotations: TextAnnotation[] = [];
       const pushIfText = (
-        s: { type?: string; text?: string; x?: number; y?: number; width?: number; height?: number },
+        s: {
+          type?: string;
+          text?: string;
+          x?: number;
+          y?: number;
+          width?: number;
+          height?: number;
+        },
         offsetX = 0,
         offsetY = 0
       ) => {
         const value = (s.text || "").trim();
         if (!value) return;
         if (s.type !== "text" && !s.text) return;
-        textAnnotations.push({
-          text: value,
-          x: (s.x ?? 0) + offsetX,
-          y: (s.y ?? 0) + offsetY,
-          width: s.width ?? 0,
-          height: s.height ?? 0,
-        });
+        const inImage = toImageSpace(
+          (s.x ?? 0) + offsetX,
+          (s.y ?? 0) + offsetY,
+          s.width ?? 0,
+          s.height ?? 0
+        );
+        textAnnotations.push({ text: value, ...inImage });
       };
       for (const shape of canvasData.shapes ?? []) pushIfText(shape);
       for (const group of canvasData.componentGroups ?? []) {
@@ -865,15 +681,15 @@ function CanvasPageInner() {
       setGeneratedCode(result.code);
       setEditedCode(result.code);
       setDetectedElements(result.detectedElements ?? result.elements ?? []);
+      setUsedFallback(Boolean(result.usedFallback));
       setCurrentMode("preview");
       setShowCodePanel(true);
     } catch (err) {
-      console.error("Error running detection:", err);
-      alert(
+      const message =
         err instanceof Error
           ? err.message
-          : "Failed to generate code. Please try again."
-      );
+          : "Failed to generate code. Please try again.";
+      toast.error(message, { title: "Generation failed" });
     } finally {
       setIsGenerating(false);
     }
@@ -888,7 +704,7 @@ function CanvasPageInner() {
       const startH = codePanelHeight;
       const onMove = (ev: MouseEvent) => {
         const delta = startY - ev.clientY;
-        setCodePanelHeight(Math.min(600, Math.max(200, startH + delta)));
+        setCodePanelHeight(clampCodePanelHeight(startH + delta));
       };
       const onUp = () => {
         codePanelDragRef.current = false;
@@ -900,6 +716,144 @@ function CanvasPageInner() {
     },
     [codePanelHeight]
   );
+
+  // Stable refs let us register commands once without re-registering on every render
+  // when callbacks like handleRunDetection get a new identity.
+  const runDetectionRef = useRef<() => void>(() => {});
+  const saveProjectRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    runDetectionRef.current = () => {
+      void handleRunDetection();
+    };
+  });
+  useEffect(() => {
+    saveProjectRef.current = () => {
+      void handleSaveProject();
+    };
+  }, [handleSaveProject]);
+
+  // Publish canvas-area commands to the global Cmd+K palette while this page is mounted.
+  useEffect(() => {
+    return registerCanvasCommands([
+      {
+        id: "canvas:run-detection",
+        title: "Run detection",
+        subtitle: "Generate code from the current sketch",
+        keywords: "detect generate code roboflow gemini",
+        shortcut: "Run",
+        group: "Canvas",
+        onSelect: () => runDetectionRef.current(),
+      },
+      {
+        id: "canvas:save",
+        title: "Save project",
+        subtitle: "Persist the current canvas to your library",
+        keywords: "save persist project",
+        shortcut: "Ctrl/⌘S",
+        group: "Canvas",
+        onSelect: () => saveProjectRef.current(),
+      },
+      {
+        id: "canvas:toggle-code-panel",
+        title: "Toggle code panel",
+        subtitle: "Show or hide the generated code editor",
+        keywords: "code panel editor monaco",
+        shortcut: "Ctrl/⌘`",
+        group: "View",
+        onSelect: () => setShowCodePanel((p) => !p),
+      },
+      {
+        id: "canvas:toggle-right-panel",
+        title: "Toggle right panel",
+        subtitle: "Switch between properties, layers, and chat",
+        keywords: "panel sidebar properties layers chat",
+        shortcut: "Ctrl/⌘\\",
+        group: "View",
+        onSelect: () => setRightPanel((p) => (p ? null : "chat")),
+      },
+      {
+        id: "canvas:open-templates",
+        title: "Open templates",
+        subtitle: "Insert a starter sketch from the template library",
+        keywords: "templates starter library presets",
+        group: "Canvas",
+        onSelect: () => setShowTemplates(true),
+      },
+      {
+        id: "canvas:open-components",
+        title: "Open component library",
+        subtitle: "Insert a saved component group",
+        keywords: "components library navbar footer card",
+        group: "Canvas",
+        onSelect: () => setShowComponents(true),
+      },
+      {
+        id: "canvas:export",
+        title: "Export",
+        subtitle: "Download canvas as PNG or generated code as JSON",
+        keywords: "export download png json image",
+        group: "Canvas",
+        onSelect: () => setShowExport(true),
+      },
+      {
+        id: "canvas:zoom-reset",
+        title: "Reset zoom to 100%",
+        subtitle: "Return the canvas to its default scale",
+        keywords: "zoom reset 100 fit",
+        shortcut: "Ctrl/⌘0",
+        group: "View",
+        onSelect: () => setZoom(ZOOM_DEFAULT),
+      },
+    ]);
+  }, []);
+
+  // Hydrate split ratio from localStorage and persist on change.
+  useEffect(() => {
+    const stored = localStorage.getItem("cc:splitRatio");
+    if (stored) {
+      const parsed = parseFloat(stored);
+      if (!isNaN(parsed) && parsed >= 0.15 && parsed <= 0.85) {
+        setSplitRatio(parsed);
+      }
+    }
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("cc:splitRatio", String(splitRatio));
+  }, [splitRatio]);
+
+  const handleCopyCode = useCallback(async () => {
+    const text = editedCode || generatedCode;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 1500);
+    } catch (err) {
+      console.error("Clipboard write failed:", err);
+    }
+  }, [editedCode, generatedCode]);
+
+  const handleSplitDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    const container = handle.parentElement;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const onMove = (ev: MouseEvent) => {
+      const ratio = (ev.clientX - rect.left) / rect.width;
+      setSplitRatio(Math.min(0.85, Math.max(0.15, ratio)));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
 
   // Map expanded tool Ã¢â€ â€™ what SketchCanvas understands
   const toolForCanvas = (): string => {
@@ -918,7 +872,7 @@ function CanvasPageInner() {
   // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 
   return (
-    <div className="flex h-screen flex-col bg-[#0A0A0A] overflow-hidden select-none">
+    <div className="flex h-screen flex-col bg-[var(--cc-bg-canvas)] overflow-hidden select-none">
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Top Navbar Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <Navbar
         projectName={projectName}
@@ -934,6 +888,7 @@ function CanvasPageInner() {
         onRunDetection={handleRunDetection}
         isGenerating={isGenerating}
         onExport={() => setShowExport(true)}
+        onTemplatesToggle={() => setShowTemplates(true)}
         onChatToggle={() =>
           setRightPanel(rightPanel === "chat" ? null : "chat")
         }
@@ -945,447 +900,91 @@ function CanvasPageInner() {
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Main workspace Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="flex flex-1 overflow-hidden">
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Left toolbar Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        <aside className="flex w-[52px] flex-col items-center border-r border-[#1E1E1E] bg-[#111111] py-2">
-          {/* Tool groups */}
-          {(["pointer", "draw", "shape", "annotate", "modify"] as const).map(
-            (group, gi) => (
-              <div key={group} className="w-full">
-                {gi > 0 && (
-                  <div className="mx-auto my-1.5 h-px w-7 bg-[#2A2A2A]" />
-                )}
-                {TOOLS.filter((t) => t.group === group).map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setCurrentTool(t.id)}
-                    title={`${t.label} (${t.shortcut})`}
-                    className={`group relative mx-auto flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-150 ${
-                      currentTool === t.id
-                        ? "bg-[#FF6B00] text-white shadow-[0_0_12px_rgba(255,107,0,.35)]"
-                        : "text-[#B0B0B0] hover:bg-[#1E1E1E] hover:text-white"
-                    }`}
-                  >
-                    {t.icon}
-                    {/* Tooltip */}
-                    <span className="pointer-events-none absolute left-full ml-3 whitespace-nowrap rounded-md bg-[#1A1A1A] border border-[#2E2E2E] px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 z-50">
-                      {t.label}{" "}
-                      <kbd className="ml-1 rounded bg-[#2E2E2E] px-1 py-0.5 text-[10px] text-[#A0A0A0]">
-                        {t.shortcut}
-                      </kbd>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )
-          )}
-
-          <div className="flex-1" />
-
-          {/* Bottom quick-access */}
-          <div className="mx-auto mb-1 h-px w-7 bg-[#2A2A2A]" />
-
-          <button
-            onClick={() => setShowTemplates(true)}
-            title="Templates"
-            className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg text-[#B0B0B0] transition-all hover:bg-[#1E1E1E] hover:text-white"
-          >
-            <svg
-              className="h-[18px] w-[18px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-            </svg>
-          </button>
-
-          <button
-            onClick={() => setShowComponents(true)}
-            title="Components"
-            className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg text-[#B0B0B0] transition-all hover:bg-[#1E1E1E] hover:text-white"
-          >
-            <svg
-              className="h-[18px] w-[18px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-          </button>
-
-          <button
-            onClick={() => setShowShortcuts(true)}
-            title="Keyboard Shortcuts (?)"
-            className="mx-auto mb-1 flex h-9 w-9 items-center justify-center rounded-lg text-[#B0B0B0] transition-all hover:bg-[#1E1E1E] hover:text-white"
-          >
-            <svg
-              className="h-[18px] w-[18px]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </button>
-        </aside>
+        {/* Left toolbar is now a floating pill mounted inside the canvas surface (see <FloatingToolbar /> below). */}
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Center column Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          {/* Ã¢â€â‚¬Ã¢â€â‚¬ Sub-toolbar: style ribbon Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-          <div className="flex h-11 items-center gap-3 border-b border-[#1E1E1E] bg-[#111111] px-3 overflow-x-auto">
-            {/* Stroke color */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">
-                Stroke
-              </span>
-              <div className="flex items-center gap-1">
-                {COLOR_PRESETS.slice(0, 6).map((c) => (
-                  <button
-                    key={`s-${c}`}
-                    onClick={() => setStrokeColor(c)}
-                    className={`h-5 w-5 rounded-full border-2 transition-all ${
-                      strokeColor === c
-                        ? "border-[#FF6B00] scale-110"
-                        : "border-transparent hover:border-[#555]"
-                    }`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-                <label className="relative ml-0.5 h-5 w-5 cursor-pointer">
-                  <input
-                    type="color"
-                    value={strokeColor}
-                    onChange={(e) => setStrokeColor(e.target.value)}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  />
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-[#555]">
-                    <svg
-                      className="h-3 w-3 text-[#888]"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <div className="h-5 w-px bg-[#2A2A2A]" />
-
-            {/* Fill color */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">
-                Fill
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setFillColor("transparent")}
-                  className={`h-5 w-5 rounded-full border-2 transition-all ${
-                    fillColor === "transparent"
-                      ? "border-[#FF6B00] scale-110"
-                      : "border-transparent hover:border-[#555]"
-                  }`}
-                  title="No fill"
-                >
-                  <svg
-                    className="h-full w-full text-[#999]"
-                    viewBox="0 0 24 24"
-                  >
-                    <line
-                      x1="4"
-                      y1="4"
-                      x2="20"
-                      y2="20"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    />
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="8"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                    />
-                  </svg>
-                </button>
-                {COLOR_PRESETS.slice(0, 5).map((c) => (
-                  <button
-                    key={`f-${c}`}
-                    onClick={() => setFillColor(c)}
-                    className={`h-5 w-5 rounded-full border-2 transition-all ${
-                      fillColor === c
-                        ? "border-[#FF6B00] scale-110"
-                        : "border-transparent hover:border-[#555]"
-                    }`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-                <label className="relative ml-0.5 h-5 w-5 cursor-pointer">
-                  <input
-                    type="color"
-                    value={fillColor === "transparent" ? "#ffffff" : fillColor}
-                    onChange={(e) => setFillColor(e.target.value)}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  />
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-[#555]">
-                    <svg
-                      className="h-3 w-3 text-[#888]"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <div className="h-5 w-px bg-[#2A2A2A]" />
-
-            {/* Stroke width */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-[#999]">
-                Width
-              </span>
-              <div className="flex items-center gap-0.5">
-                {STROKE_WIDTHS.map((w) => (
-                  <button
-                    key={w}
-                    onClick={() => setStrokeWidth(w)}
-                    title={`${w}px`}
-                    className={`flex h-7 w-7 items-center justify-center rounded transition-all ${
-                      strokeWidth === w
-                        ? "bg-[#FF6B00]/20 text-[#FF6B00]"
-                        : "text-[#999] hover:bg-[#1E1E1E] hover:text-white"
-                    }`}
-                  >
-                    <div
-                      className="rounded-full bg-current"
-                      style={{
-                        width: Math.min(w + 2, 14),
-                        height: Math.min(w + 2, 14),
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="h-5 w-px bg-[#2A2A2A]" />
-
-            {/* Grid & Snap */}
-            <button
-              onClick={() => setGridEnabled((p) => !p)}
-              title="Toggle Grid"
-              className={`flex h-7 items-center gap-1 rounded px-2 text-[11px] font-medium transition-all ${
-                gridEnabled
-                  ? "bg-[#FF6B00]/15 text-[#FF6B00]"
-                  : "text-[#999] hover:bg-[#1E1E1E] hover:text-white"
-              }`}
-            >
-              <svg
-                className="h-3.5 w-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path d="M3 3h18v18H3V3zM3 9h18M3 15h18M9 3v18M15 3v18" />
-              </svg>
-              Grid
-            </button>
-            <button
-              onClick={() => setSnapEnabled((p) => !p)}
-              title="Toggle Snap"
-              className={`flex h-7 items-center gap-1 rounded px-2 text-[11px] font-medium transition-all ${
-                snapEnabled
-                  ? "bg-[#FF6B00]/15 text-[#FF6B00]"
-                  : "text-[#999] hover:bg-[#1E1E1E] hover:text-white"
-              }`}
-            >
-              <svg
-                className="h-3.5 w-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path d="M19 10L19 5L14 5" />
-                <path d="M5 14L5 19L10 19" />
-              </svg>
-              Snap
-            </button>
-
-            {/* Spacer */}
-            <div className="flex-1" />
-
-            {/* Undo / Redo */}
-            <div className="flex items-center gap-0.5">
-              <button
-                onClick={() => history.undo()}
-                disabled={!history.canUndo}
-                title="Undo (Ctrl+Z)"
-                className="flex h-7 w-7 items-center justify-center rounded text-[#B0B0B0] transition-all hover:bg-[#1E1E1E] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 7v6h6" />
-                  <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-                </svg>
-              </button>
-              <button
-                onClick={() => history.redo()}
-                disabled={!history.canRedo}
-                title="Redo (Ctrl+Shift+Z)"
-                className="flex h-7 w-7 items-center justify-center rounded text-[#B0B0B0] transition-all hover:bg-[#1E1E1E] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 7v6h-6" />
-                  <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="h-5 w-px bg-[#2A2A2A]" />
-
-            {/* Right panel toggles */}
-            <div className="flex items-center gap-0.5">
-              {[
-                {
-                  panel: "properties" as RightPanel,
-                  label: "Properties",
-                  icon: (
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="3" />
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                    </svg>
-                  ),
-                },
-                {
-                  panel: "layers" as RightPanel,
-                  label: "Layers",
-                  icon: (
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                      <path d="M2 17l10 5 10-5" />
-                      <path d="M2 12l10 5 10-5" />
-                    </svg>
-                  ),
-                },
-                {
-                  panel: "chat" as RightPanel,
-                  label: "AI Chat",
-                  icon: (
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
-                  ),
-                },
-              ].map(({ panel, label, icon }) => (
-                <button
-                  key={panel}
-                  onClick={() =>
-                    setRightPanel(rightPanel === panel ? null : panel)
-                  }
-                  title={label}
-                  className={`flex h-7 w-7 items-center justify-center rounded transition-all ${
-                    rightPanel === panel
-                      ? "bg-[#FF6B00]/15 text-[#FF6B00]"
-                      : "text-[#B0B0B0] hover:bg-[#1E1E1E] hover:text-white"
-                  }`}
-                >
-                  {icon}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Style ribbon is now floating at the bottom of the canvas (see <StyleRibbon /> below). */}
 
           {/* Ã¢â€â‚¬Ã¢â€â‚¬ Canvas area Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-          <main className="relative flex-1 overflow-hidden bg-[#0A0A0A]">
-            <div className="flex h-full items-center justify-center p-2 sm:p-4 md:p-6">
-              <SketchCanvas
-                ref={canvasRef}
-                tool={toolForCanvas()}
-                mode={currentMode}
-                gridEnabled={gridEnabled}
-                snapEnabled={snapEnabled}
-                importedDesign={importedDesign}
-                strokeColor={strokeColor}
-                fillColor={fillColor}
-                strokeWidth={strokeWidth}
-                zoom={zoom}
-                canvasState={history.state}
-                onStateChange={history.setState}
-              />
-            </div>
+          <main className="relative flex-1 overflow-hidden bg-[var(--cc-bg-canvas)]">
+            <CanvasSurface
+              isEmpty={(() => {
+                const s = history.state as
+                  | {
+                      lines?: unknown[];
+                      shapes?: unknown[];
+                      componentGroups?: unknown[];
+                    }
+                  | undefined;
+                if (!s) return true;
+                return (
+                  (s.lines?.length ?? 0) === 0 &&
+                  (s.shapes?.length ?? 0) === 0 &&
+                  (s.componentGroups?.length ?? 0) === 0
+                );
+              })()}
+            >
+              <div className="flex h-full items-center justify-center p-2 sm:p-4 md:p-6">
+                <SketchCanvas
+                  ref={canvasRef}
+                  tool={toolForCanvas()}
+                  mode={currentMode}
+                  gridEnabled={gridEnabled}
+                  snapEnabled={snapEnabled}
+                  importedDesign={importedDesign}
+                  strokeColor={strokeColor}
+                  fillColor={fillColor}
+                  strokeWidth={strokeWidth}
+                  zoom={zoom}
+                  canvasState={history.state}
+                  onStateChange={history.setState}
+                />
+              </div>
+            </CanvasSurface>
 
-            {/* Zoom controls overlay */}
-            <ZoomControls
+            {/* Floating left toolbar — drawing tools */}
+            <FloatingToolbar
+              currentTool={currentTool}
+              onSelectTool={setCurrentTool}
+            />
+
+            {/* Floating bottom style ribbon — slides in/out per tool */}
+            <StyleRibbon
+              currentTool={currentTool}
+              strokeColor={strokeColor}
+              fillColor={fillColor}
+              strokeWidth={strokeWidth}
+              onStrokeColorChange={setStrokeColor}
+              onFillColorChange={setFillColor}
+              onStrokeWidthChange={setStrokeWidth}
+            />
+
+            {/* Frosted-glass zoom pill */}
+            <ZoomPill
               zoom={zoom}
               onZoomChange={setZoom}
               onFitToScreen={handleFitToScreen}
             />
+
+            {/* Code panel toggle (when hidden) */}
+            {!showCodePanel && (
+              <button
+                onClick={() => setShowCodePanel(true)}
+                className="absolute bottom-4 right-4 z-30 flex items-center gap-2 rounded-lg bg-[#1A1A1A] border border-[#2E2E2E] px-3 py-2 text-xs font-medium text-[#A0A0A0] shadow-lg transition-all hover:border-[#FF6B00] hover:text-white hover:shadow-xl"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                Code
+              </button>
+            )}
           </main>
 
           {/* Ã¢â€â‚¬Ã¢â€â‚¬ Code panel (collapsible, resizable) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
@@ -1420,21 +1019,124 @@ function CanvasPageInner() {
                       </button>
                     ))}
                   </div>
-                  <button
-                    onClick={() => setShowCodePanel(false)}
-                    className="rounded p-1 text-[#B0B0B0] transition-colors hover:bg-[#1E1E1E] hover:text-white"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleCopyCode}
+                      disabled={!generatedCode && !editedCode}
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[#B0B0B0] transition-colors hover:bg-[#1E1E1E] hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[#B0B0B0]"
+                      title="Copy code to clipboard"
                     >
-                      <path d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
+                      {codeCopied ? (
+                        <>
+                          <svg
+                            className="h-3.5 w-3.5 text-green-400"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                          >
+                            <path d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-green-400">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg
+                            className="h-3.5 w-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <rect x="9" y="9" width="13" height="13" rx="2" />
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                          </svg>
+                          Copy
+                        </>
+                      )}
+                    </button>
+                    <div className="mx-1 h-4 w-px bg-[#1E1E1E]" />
+                    <button
+                      onClick={() => setShowCodePanel(false)}
+                      className="rounded p-1 text-[#B0B0B0] transition-colors hover:bg-[#1E1E1E] hover:text-white"
+                      title="Collapse code panel"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
+
+                {/* Detection summary bar */}
+                {(generatedCode || editedCode) &&
+                  (usedFallback || detectedElements.length > 0) && (
+                    <div
+                      className={`flex items-center gap-2 border-b px-3 py-1.5 text-[11px] ${
+                        usedFallback
+                          ? "border-yellow-500/30 bg-yellow-500/5 text-yellow-300"
+                          : "border-[#1E1E1E] bg-[#0A0A0A] text-[#A0A0A0]"
+                      }`}
+                    >
+                      {usedFallback ? (
+                        <>
+                          <svg
+                            className="h-3.5 w-3.5 shrink-0"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                          </svg>
+                          <span>
+                            No UI elements detected. Showing a default
+                            template. Try drawing larger, clearer boxes.
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <svg
+                            className="h-3.5 w-3.5 shrink-0 text-[#FF6B00]"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="font-medium text-[#D0D0D0]">
+                            Detected:
+                          </span>
+                          <span>
+                            {Object.entries(
+                              detectedElements.reduce<Record<string, number>>(
+                                (acc, el) => {
+                                  const t = (
+                                    el.type || "element"
+                                  ).toLowerCase();
+                                  acc[t] = (acc[t] || 0) + 1;
+                                  return acc;
+                                },
+                                {}
+                              )
+                            )
+                              .map(
+                                ([type, count]) =>
+                                  `${count} ${type}${count > 1 ? "s" : ""}`
+                              )
+                              .join(" · ")}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
 
                 {/* Content */}
                 <div className="flex-1 overflow-hidden">
@@ -1456,7 +1158,13 @@ function CanvasPageInner() {
                       )}
                       {codeViewMode === "split" && (
                         <div className="flex h-full">
-                          <div className="flex-1 border-r border-[#1E1E1E]">
+                          <div
+                            className="h-full overflow-hidden"
+                            style={{
+                              flexBasis: `${splitRatio * 100}%`,
+                              flexShrink: 0,
+                            }}
+                          >
                             <MonacoCodeEditor
                               value={editedCode || generatedCode}
                               language={codeLanguage}
@@ -1464,10 +1172,18 @@ function CanvasPageInner() {
                               height="100%"
                             />
                           </div>
-                          <div className="flex-1">
+                          <div
+                            onMouseDown={handleSplitDrag}
+                            onDoubleClick={() => setSplitRatio(0.5)}
+                            className="group relative flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-[#1E1E1E] hover:bg-[#FF6B00]/40"
+                            title="Drag to resize · double-click to reset"
+                          >
+                            <div className="h-8 w-0.5 rounded-full bg-[#3E3E3E] transition-colors group-hover:bg-[#FF6B00]" />
+                          </div>
+                          <div className="h-full flex-1 overflow-hidden">
                             <LivePreview
                               code={editedCode || generatedCode}
-                              language="html"
+                              language="react"
                             />
                           </div>
                         </div>
@@ -1658,9 +1374,11 @@ function CanvasPageInner() {
             {/* Chat panel — sketch-first workflow: hasCode gates chat input */}
             {rightPanel === "chat" && (
               <ChatInterface
+                key={currentProject?.id ?? "no-project"}
                 onSendMessage={handleChatMessage}
                 isProcessing={isGenerating}
                 hasCode={!!(editedCode || generatedCode)}
+                projectId={currentProject?.id}
               />
             )}
           </aside>
@@ -1671,7 +1389,7 @@ function CanvasPageInner() {
       {!showCodePanel && (
         <button
           onClick={() => setShowCodePanel(true)}
-          className="fixed bottom-14 right-4 z-20 flex items-center gap-2 rounded-lg bg-[#1A1A1A] border border-[#2E2E2E] px-3 py-2 text-xs font-medium text-[#A0A0A0] shadow-lg transition-all hover:border-[#FF6B00] hover:text-white hover:shadow-xl"
+          className="hidden fixed bottom-14 right-4 z-20 flex items-center gap-2 rounded-lg bg-[#1A1A1A] border border-[#2E2E2E] px-3 py-2 text-xs font-medium text-[#A0A0A0] shadow-lg transition-all hover:border-[#FF6B00] hover:text-white hover:shadow-xl"
         >
           <svg
             className="h-4 w-4"
@@ -1722,7 +1440,7 @@ function CanvasPageInner() {
                 }}
                 className="w-full rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-6 py-3 font-semibold text-white transition-all hover:bg-[#FF6B00]/30 hover:shadow-[0_0_20px_rgba(255,107,0,0.4)]"
               >
-                Ready to Roll Ã¢â‚¬â€ Analyze Design Ã¢â€ â€™
+                Analyze Design
               </button>
               <button
                 onClick={() => {

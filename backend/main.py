@@ -286,6 +286,14 @@ def load_project_or_403(supabase, project_id: str, user_id: str):
 
 _TEXT_MATCH_OVERLAP = 0.5  # at least 50% of the text shape must lie inside the element
 
+# A container whose bbox area is at least this fraction of the canvas is "oversized"
+# — text annotations attaching to it should be listed positionally, not joined.
+_OVERSIZED_CONTAINER_RATIO = 0.55
+
+# Synthesis bands: top/bottom 12% of the canvas height by default.
+_TOP_BAND_RATIO = 0.12
+_BOTTOM_BAND_RATIO = 0.12
+
 
 def _bbox_overlap_ratio(
     ax: float, ay: float, aw: float, ah: float,
@@ -305,22 +313,221 @@ def _bbox_overlap_ratio(
     return (iw * ih) / (aw * ah)
 
 
+def _infer_canvas_extents(
+    elements: List[Any],
+    annotations: List[TextAnnotation],
+    canvas_size: Optional[tuple],
+) -> tuple:
+    """
+    Best-effort canvas (x_min, y_min, x_max, y_max) in the same coordinate space
+    that Roboflow's bounds and the canvas annotations live in.
+
+    We can't rely on canvasData.width/height alone because Roboflow returns image-
+    pixel coordinates and the sketch image may be rendered at a different scale
+    than the canvas. So we take the union of all detected bounds + annotation
+    positions, which is guaranteed to be in the right space.
+    """
+    xs_min: List[float] = []
+    ys_min: List[float] = []
+    xs_max: List[float] = []
+    ys_max: List[float] = []
+
+    for elem in elements:
+        b = getattr(elem, "bounds", None) or {}
+        try:
+            x = float(b.get("x", 0))
+            y = float(b.get("y", 0))
+            w = float(b.get("width", 0))
+            h = float(b.get("height", 0))
+        except (TypeError, ValueError):
+            continue
+        if w <= 0 or h <= 0:
+            continue
+        xs_min.append(x); ys_min.append(y)
+        xs_max.append(x + w); ys_max.append(y + h)
+
+    for ann in annotations:
+        xs_min.append(float(ann.x))
+        ys_min.append(float(ann.y))
+        xs_max.append(float(ann.x) + max(float(ann.width), 1.0))
+        ys_max.append(float(ann.y) + max(float(ann.height), 1.0))
+
+    if not xs_min:
+        # Last resort: use canvas_size if provided.
+        if canvas_size:
+            return (0.0, 0.0, float(canvas_size[0]), float(canvas_size[1]))
+        return (0.0, 0.0, 1000.0, 600.0)
+
+    return (min(xs_min), min(ys_min), max(xs_max), max(ys_max))
+
+
+def _synthesize_missing_containers(
+    elements: List[Any],
+    annotations: List[TextAnnotation],
+    canvas_size: Optional[tuple],
+    *,
+    debug: bool = False,
+) -> List[Any]:
+    """
+    Recovery synthesizer for missed navbar / footer containers.
+
+    Fires ONLY when there are text annotations in the top/bottom band that
+    don't fit inside any detected element (i.e., the user typed nav-link
+    or footer-link labels but the model never detected the navbar/footer
+    rectangle to hold them). In that case, we synthesize a thin container
+    so the text-attachment matcher has somewhere to drop the labels.
+
+    Previously this also fired on clusters of detected `card` elements,
+    which over-triggered: a row of action buttons in a dialog (e.g.
+    Yes / No) falsely became a "footer". Cards are content; only
+    standalone unattached labels signal an unrendered container.
+
+    New entries are marked with `attributes["synthetic"] = True` so the
+    prompt can flag them to Gemini.
+    """
+    from app.models.inference import ExternalModelElement  # local import to avoid cycles
+
+    if not annotations:
+        return elements
+
+    has_navbar = any((getattr(e, "type", "") or "").lower() == "navbar" for e in elements)
+    has_footer = any((getattr(e, "type", "") or "").lower() == "footer" for e in elements)
+    if has_navbar and has_footer:
+        return elements
+
+    # Identify annotations that don't already fit inside any detected element.
+    # Same overlap rule as `_attach_text_annotations` so the two stay in sync.
+    def _is_attached(ann: TextAnnotation) -> bool:
+        for elem in elements:
+            b = getattr(elem, "bounds", None) or {}
+            try:
+                ex = float(b.get("x", 0)); ey = float(b.get("y", 0))
+                ew = float(b.get("width", 0)); eh = float(b.get("height", 0))
+            except (TypeError, ValueError):
+                continue
+            if ew <= 0 or eh <= 0:
+                continue
+            if ann.width > 0 and ann.height > 0:
+                if _bbox_overlap_ratio(
+                    ann.x, ann.y, ann.width, ann.height, ex, ey, ew, eh
+                ) >= _TEXT_MATCH_OVERLAP:
+                    return True
+            else:
+                cx = float(ann.x); cy = float(ann.y)
+                if ex <= cx <= ex + ew and ey <= cy <= ey + eh:
+                    return True
+        return False
+
+    unattached_anns = [a for a in annotations if not _is_attached(a)]
+    if not unattached_anns:
+        return elements
+
+    x_min, y_min, x_max, y_max = _infer_canvas_extents(elements, annotations, canvas_size)
+    canvas_h = max(y_max - y_min, 1.0)
+    canvas_w = max(x_max - x_min, 1.0)
+    top_band_y = y_min + canvas_h * _TOP_BAND_RATIO
+    bottom_band_y = y_max - canvas_h * _BOTTOM_BAND_RATIO
+
+    def _ann_center(ann: TextAnnotation) -> tuple:
+        cx = float(ann.x) + max(float(ann.width), 1.0) / 2.0
+        cy = float(ann.y) + max(float(ann.height), 1.0) / 2.0
+        return cx, cy
+
+    ann_centers: List[tuple] = [_ann_center(a) for a in unattached_anns]
+    new_elements: List[Any] = list(elements)
+
+    if not has_navbar:
+        top_centers = [c for c in ann_centers if c[1] <= top_band_y]
+        if len(top_centers) >= 2:
+            band_top = y_min
+            band_bottom = max(c[1] for c in top_centers) + canvas_h * 0.03
+            band_bottom = min(band_bottom, top_band_y + canvas_h * 0.04)
+            navbar_elem = ExternalModelElement(
+                id="synthetic-navbar",
+                type="navbar",
+                confidence=0.0,
+                label="Navbar",
+                bounds={
+                    "x": x_min,
+                    "y": band_top,
+                    "width": canvas_w,
+                    "height": max(band_bottom - band_top, canvas_h * 0.06),
+                },
+                attributes={
+                    "synthetic": True,
+                    "reason": f"no navbar detected; inferred from {len(top_centers)} unattached top-band text label(s)",
+                },
+            )
+            new_elements.append(navbar_elem)
+            if debug:
+                print(
+                    f"[debug] synthesized navbar from {len(top_centers)} unattached top-band annotation(s) "
+                    f"y in [{band_top:.0f},{band_bottom:.0f}]"
+                )
+
+    if not has_footer:
+        bottom_centers = [c for c in ann_centers if c[1] >= bottom_band_y]
+        if len(bottom_centers) >= 2:
+            band_top = min(c[1] for c in bottom_centers) - canvas_h * 0.03
+            band_top = max(band_top, bottom_band_y - canvas_h * 0.04)
+            band_bottom = y_max
+            footer_elem = ExternalModelElement(
+                id="synthetic-footer",
+                type="footer",
+                confidence=0.0,
+                label="Footer",
+                bounds={
+                    "x": x_min,
+                    "y": band_top,
+                    "width": canvas_w,
+                    "height": max(band_bottom - band_top, canvas_h * 0.06),
+                },
+                attributes={
+                    "synthetic": True,
+                    "reason": f"no footer detected; inferred from {len(bottom_centers)} unattached bottom-band text label(s)",
+                },
+            )
+            new_elements.append(footer_elem)
+            if debug:
+                print(
+                    f"[debug] synthesized footer from {len(bottom_centers)} unattached bottom-band annotation(s) "
+                    f"y in [{band_top:.0f},{band_bottom:.0f}]"
+                )
+
+    # Sort by y, tie-broken by height so a synthesized navbar at y=0 lands BEFORE
+    # an oversized section that also starts at y=0 — otherwise Gemini sees the
+    # navbar after the section in "ordered top to bottom".
+    new_elements.sort(
+        key=lambda el: (
+            float((el.bounds or {}).get("y", 0.0)),
+            float((el.bounds or {}).get("height", 0.0)),
+        )
+    )
+    return new_elements
+
+
 def _attach_text_annotations(
     elements: List[Any],
     annotations: List[TextAnnotation],
+    canvas_size: Optional[tuple] = None,
     *,
     debug: bool = False,
 ) -> List[str]:
     """
-    Mutate `elements` to attach matching annotation text into element.attributes['label_text'].
+    Mutate `elements` to attach matching annotation text into element.attributes.
 
-    Match rule:
-      - If the text shape has area: match the smallest element whose bbox contains
-        at least _TEXT_MATCH_OVERLAP (50%) of the text's area. This rejects text
-        that visually sits "on top of" / overlapping a shape's edge but is mostly
-        outside it.
-      - If the text shape has zero width or height (a bare point): fall back to
-        center-point containment in the smallest enclosing element.
+    Two attach modes per element:
+      1. `label_text` (joined string) — used when an element is a normal-sized
+         component and gets one or two text labels. This is the historical mode.
+      2. `positioned_texts` (list of {text, x, y, width, height}) — used when the
+         only matching container is OVERSIZED (>= _OVERSIZED_CONTAINER_RATIO of
+         the canvas) AND multiple texts land in it. In that case we keep their
+         spatial info so Gemini can lay them out instead of seeing one blob.
+
+    Match rule (unchanged):
+      - text with area: smallest element whose bbox contains ≥ _TEXT_MATCH_OVERLAP
+        of the text's area
+      - bare-point text: center-point containment in smallest enclosing element
 
     Returns the list of annotation texts that didn't match any element.
     """
@@ -328,6 +535,16 @@ def _attach_text_annotations(
     if not annotations:
         return unmatched
 
+    # Pre-compute canvas area for the oversized check.
+    if canvas_size:
+        canvas_area = float(canvas_size[0]) * float(canvas_size[1])
+    else:
+        x_min, y_min, x_max, y_max = _infer_canvas_extents(elements, annotations, None)
+        canvas_area = max((x_max - x_min) * (y_max - y_min), 1.0)
+
+    # First pass: figure out which element each annotation matches to (so we can
+    # decide per-element whether to use joined or positioned mode based on count).
+    matches: List[tuple] = []  # (annotation, best_elem_or_None, best_overlap, best_area)
     for ann in annotations:
         text = (ann.text or "").strip()
         if not text:
@@ -369,6 +586,20 @@ def _attach_text_annotations(
                         best_area = area
                         best_overlap = 1.0
 
+        matches.append((ann, text, best, best_overlap, best_area))
+
+    # Second pass: count per-element matches so we know which elements are
+    # "oversized + crowded" → switch to positioned mode for those.
+    counts: Dict[int, int] = {}
+    for _, _, best, _, _ in matches:
+        if best is not None:
+            counts[id(best)] = counts.get(id(best), 0) + 1
+
+    def _is_oversized(elem: Any, area: float) -> bool:
+        return canvas_area > 0 and (area / canvas_area) >= _OVERSIZED_CONTAINER_RATIO
+
+    # Third pass: actually attach.
+    for ann, text, best, best_overlap, best_area in matches:
         if best is None:
             if debug:
                 print(f"[debug] annotation '{text}' UNMATCHED → extra_text")
@@ -376,14 +607,33 @@ def _attach_text_annotations(
             continue
 
         attrs = dict(getattr(best, "attributes", None) or {})
-        existing = attrs.get("label_text")
-        attrs["label_text"] = f"{existing} / {text}" if existing else text
+        use_positioned = _is_oversized(best, best_area) and counts.get(id(best), 0) >= 2
+
+        if use_positioned:
+            positioned = list(attrs.get("positioned_texts") or [])
+            positioned.append({
+                "text": text,
+                "x": float(ann.x),
+                "y": float(ann.y),
+                "width": float(ann.width),
+                "height": float(ann.height),
+            })
+            attrs["positioned_texts"] = positioned
+            if debug:
+                print(
+                    f"[debug] annotation '{text}' → {best.type} "
+                    f"(overlap={best_overlap:.0%}, oversized container → positioned mode)"
+                )
+        else:
+            existing = attrs.get("label_text")
+            attrs["label_text"] = f"{existing} / {text}" if existing else text
+            if debug:
+                print(
+                    f"[debug] annotation '{text}' → {best.type} "
+                    f"(overlap={best_overlap:.0%}, bbox area={best_area:.0f})"
+                )
+
         best.attributes = attrs
-        if debug:
-            print(
-                f"[debug] annotation '{text}' → {best.type} "
-                f"(overlap={best_overlap:.0%}, bbox area={best_area:.0f})"
-            )
 
     return unmatched
 
@@ -466,9 +716,36 @@ async def resolve_external_model_output(
         ann_count = len(request.textAnnotations or [])
         print(f"[debug] {ann_count} text annotation(s) from canvas")
 
+    # Coordinate space.
+    # The frontend's exportAsPNG returns the crop transform alongside the PNG,
+    # and canvas/page.tsx pre-applies that transform to every text annotation
+    # before sending. So request.textAnnotations are ALREADY in the same
+    # image-pixel space Roboflow returns its bboxes in — no scaling here.
+    # (Naive "image_size / canvas_size" scaling is wrong because the PNG is a
+    # tight CROP of the canvas, not a uniform scale of it.)
+    meta = roboflow_output.metadata or {}
+    image_w = float(meta.get("image_width") or canvas_size[0])
+    image_h = float(meta.get("image_height") or canvas_size[1])
+    inferred_canvas_size = (image_w, image_h)
+
+    annotations = request.textAnnotations or []
+    if debug and annotations:
+        print(
+            f"[debug] {len(annotations)} text annotation(s) (already in image space "
+            f"{int(image_w)}x{int(image_h)})"
+        )
+
+    roboflow_output.elements = _synthesize_missing_containers(
+        roboflow_output.elements,
+        annotations,
+        inferred_canvas_size,
+        debug=debug,
+    )
+
     extra_text = _attach_text_annotations(
         roboflow_output.elements,
-        request.textAnnotations or [],
+        annotations,
+        canvas_size=inferred_canvas_size,
         debug=debug,
     )
 

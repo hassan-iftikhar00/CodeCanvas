@@ -123,7 +123,7 @@ const SketchCanvasWithHistory = forwardRef<
         if (canvasRef.current) {
           return canvasRef.current.exportAsPNG();
         }
-        return "";
+        return { dataURL: "", transform: { offsetX: 0, offsetY: 0, scale: 1 } };
       },
       exportAsDataURL: (mimeType?: string, quality?: number) => {
         if (canvasRef.current) {
@@ -166,7 +166,7 @@ const SketchCanvasWithHistory = forwardRef<
 
     // Sync canvas state changes with parent (for capturing new changes)
     useEffect(() => {
-      if (!canvasState || isApplyingHistoryRef.current) return; // Don't capture changes while applying history
+      if (!canvasState) return; // Don't bail on isApplyingHistoryRef here — the interval tick re-checks it. Bailing out at this level skips creating the interval after undo, which leaves the parent's history.state stale and breaks the empty-state placeholder.
 
       // Poll for canvas changes every 500ms
       const interval = setInterval(() => {

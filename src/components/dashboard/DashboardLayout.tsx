@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { openCommandPalette } from "@/components/CommandPalette";
@@ -18,10 +19,12 @@ interface UserProfile {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const getUser = async () => {
@@ -33,7 +36,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       } else {
         setUser(user);
 
-        // Fetch profile data from database
         const { data: profile } = await supabase
           .from("profiles")
           .select("*")
@@ -48,150 +50,120 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     getUser();
   }, [router, supabase]);
 
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showUserMenu]);
+
+  const initials =
+    (userProfile?.full_name || user?.email)?.[0]?.toUpperCase() || "U";
+
   return (
-    <div className="flex h-screen bg-[#0A0A0A] text-white">
+    <div className="flex h-screen bg-[var(--cc-bg-canvas)] text-[var(--cc-text-primary)]">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-[#2E2E2E] flex flex-col">
-        <div className="px-4 py-5 border-b border-[#2E2E2E]">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="CodeCanvas Logo" className="w-8 h-8" />
-            <span className="text-xl font-bold">CodeCanvas</span>
+      <aside className="flex w-60 flex-col border-r border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)]">
+        <div className="flex h-12 items-center gap-2 border-b border-[var(--cc-border-subtle)] px-4">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="" className="h-6 w-6" />
+            <span className="text-[14px] font-semibold tracking-tight">
+              CodeCanvas
+            </span>
           </Link>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
-          <Link
+        <nav className="flex-1 space-y-0.5 p-2">
+          <NavItem
             href="/dashboard"
-            className="flex items-center gap-3 rounded-lg bg-[#2E2E2E] px-3 py-2 text-sm font-medium text-white"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            label="Projects"
+            active={pathname === "/dashboard"}
+            icon={
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
+                strokeWidth={1.8}
                 d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
               />
-            </svg>
-            Projects
-          </Link>
+            }
+          />
 
-          {/* Templates Option */}
-          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#A0A0A0] hover:bg-[#1A1A1A] hover:text-white transition-colors">
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+          <NavItem
+            href="/canvas"
+            label="Canvas"
+            icon={
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                strokeWidth={1.8}
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
-            </svg>
-            Templates
-          </button>
+            }
+          />
 
-          {/* Tools Option - new icon, with tools functionality */}
-          <button
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#A0A0A0] hover:bg-[#1A1A1A] hover:text-white transition-colors"
-            title="Tools"
-            onClick={() => (window.location.href = "/canvas")}
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9.75 17L9 21m5.25-4l.75 4M4.5 10.5l15 0M6.75 7.5l10.5 0"
-              />
-            </svg>
-            Tools
-          </button>
-
-          {/* Profile Option */}
-          <Link
+          <NavItem
             href="/profile"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#A0A0A0] hover:bg-[#1A1A1A] hover:text-white transition-colors"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            label="Profile"
+            active={pathname === "/profile"}
+            icon={
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
+                strokeWidth={1.8}
                 d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
               />
-            </svg>
-            Profile
-          </Link>
+            }
+          />
 
-          {/* Settings Option */}
-          <Link
+          <NavItem
             href="/profile"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#A0A0A0] hover:bg-[#1A1A1A] hover:text-white transition-colors"
-          >
-            <svg
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            Settings
-          </Link>
+            label="Settings"
+            icon={
+              <>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </>
+            }
+          />
         </nav>
 
-        {/* User Profile */}
-        <div className="p-4 border-t border-[#2E2E2E] mt-auto">
+        {/* User card */}
+        <div className="border-t border-[var(--cc-border-subtle)] p-2">
           <Link
             href="/profile"
-            className="flex items-center gap-3 rounded-lg hover:bg-[#1A1A1A] px-2 py-2 -mx-2 transition-colors"
+            className="flex items-center gap-2.5 rounded-[var(--cc-radius-button)] px-2 py-2 transition-colors hover:bg-[var(--cc-bg-elevated)]"
           >
-            <div className="h-10 w-10 rounded-full bg-[#FF6B00] flex items-center justify-center text-white font-bold overflow-hidden">
-              {userProfile?.avatar_url ? (
-                <img
-                  src={userProfile.avatar_url}
-                  alt="Profile"
-                  className="h-10 w-10 rounded-full object-cover"
-                />
-              ) : (
-                (userProfile?.full_name || user?.email)?.[0]?.toUpperCase() ||
-                "U"
-              )}
-            </div>
+            <Avatar
+              size={28}
+              avatarUrl={userProfile?.avatar_url}
+              initials={initials}
+            />
             <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium text-white">
+              <p className="truncate text-[12px] font-medium text-[var(--cc-text-primary)]">
                 {userProfile?.full_name || user?.email || "User"}
               </p>
-              <p className="text-xs text-[#A0A0A0]">View Profile</p>
+              <p className="text-[11px] text-[var(--cc-text-muted)]">
+                View profile
+              </p>
             </div>
           </Link>
           <button
@@ -199,149 +171,220 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               await supabase.auth.signOut();
               router.push("/");
             }}
-            className="mt-2 w-full text-xs text-[#A0A0A0] hover:text-white text-left px-2 py-1 rounded hover:bg-[#1A1A1A] transition-colors"
+            className="mt-1 w-full rounded-[var(--cc-radius-button)] px-2 py-1.5 text-left text-[11px] text-[var(--cc-text-muted)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
           >
             Sign out
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Navbar */}
-        <header className="border-b border-[#2E2E2E] bg-[#1A1A1A] px-6 py-3 flex items-center justify-between">
+      {/* Main */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Top bar */}
+        <header className="flex h-12 items-center justify-between border-b border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] px-4">
           <button
             onClick={openCommandPalette}
-            className="flex items-center gap-3 rounded-xl border border-[#2E2E2E] bg-[#111111] px-4 py-2 text-sm text-[#A0A0A0] transition-all hover:border-[#FF6B00] hover:text-white"
+            aria-label="Open command palette"
+            className="flex items-center gap-2.5 rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-1.5 text-[12px] text-[var(--cc-text-secondary)] transition-colors hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
           >
             <svg
-              className="h-4 w-4"
+              className="h-3.5 w-3.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              strokeWidth={2}
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
                 d="m21 21-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
             <span>Search projects and commands</span>
-            <span className="rounded-full border border-[#2E2E2E] px-2 py-1 text-[10px] uppercase tracking-[0.22em] text-[#888888]">
+            <kbd className="rounded-[var(--cc-radius-tag)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--cc-text-muted)]">
               Ctrl K
-            </span>
+            </kbd>
           </button>
 
-          {/* User Profile with Dropdown */}
           {user && (
-            <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center justify-center rounded-full p-1 transition-colors hover:ring-2 hover:ring-[#FF6B00]/30"
-                title="Profile Menu"
+            <div className="relative" ref={userMenuRef}>
+              <motion.button
+                whileTap={{ scale: 0.94 }}
+                onClick={() => setShowUserMenu((v) => !v)}
+                aria-label="Open profile menu"
+                aria-expanded={showUserMenu}
+                className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[var(--cc-accent)] text-[12px] font-semibold text-white transition-shadow hover:shadow-[0_0_0_2px_var(--cc-accent-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
               >
-                <div className="h-8 w-8 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-sm font-bold overflow-hidden">
-                  {userProfile?.avatar_url ? (
-                    <img
-                      src={userProfile.avatar_url}
-                      alt="Profile"
-                      className="h-8 w-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    (userProfile?.full_name ||
-                      user?.email)?.[0]?.toUpperCase() || "U"
-                  )}
-                </div>
-              </button>
+                <Avatar
+                  size={28}
+                  avatarUrl={userProfile?.avatar_url}
+                  initials={initials}
+                />
+              </motion.button>
 
-              {/* Dropdown Menu */}
-              {showUserMenu && (
-                <div className="absolute right-0 top-full mt-2 z-100 w-64 rounded-lg border border-[#2E2E2E] bg-[#1A1A1A] shadow-xl">
-                  {/* User Info in Dropdown */}
-                  <div className="border-b border-[#2E2E2E] px-4 py-3">
-                    <div className="mb-1 text-sm font-medium text-white">
-                      {userProfile?.full_name || user?.email || "User"}
+              <AnimatePresence>
+                {showUserMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                    transition={{ duration: 0.15, ease: [0.22, 0.9, 0.28, 1] }}
+                    className="absolute right-0 top-full z-50 mt-1.5 w-56 overflow-hidden rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.7)]"
+                    role="menu"
+                  >
+                    <div className="border-b border-[var(--cc-border-subtle)] px-3 py-2.5">
+                      <div className="text-[12px] font-medium text-[var(--cc-text-primary)]">
+                        {userProfile?.full_name || user?.email || "User"}
+                      </div>
+                      <div className="mt-0.5 truncate text-[11px] text-[var(--cc-text-muted)]">
+                        {user?.email}
+                      </div>
                     </div>
-                    <div className="text-xs text-[#A0A0A0]">{user?.email}</div>
-                  </div>
 
-                  {/* Menu Items */}
-                  <div className="py-2">
-                    <Link
-                      href="/dashboard"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                    <div className="py-1">
+                      <MenuItem
+                        href="/dashboard"
+                        label="Dashboard"
+                        icon="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                      />
+                      <MenuItem
+                        href="/profile"
+                        label="Profile"
+                        icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+
+                      <div className="my-1 h-px bg-[var(--cc-border-subtle)]" />
+
+                      <button
+                        onClick={async () => {
+                          await supabase.auth.signOut();
+                          router.push("/");
+                        }}
+                        role="menuitem"
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] text-[var(--cc-error)] transition-colors hover:bg-[var(--cc-bg-elevated)]"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                        <svg
+                          className="h-3.5 w-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
                           strokeWidth={2}
-                          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                        />
-                      </svg>
-                      Dashboard
-                    </Link>
-
-                    <Link
-                      href="/profile"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      </svg>
-                      Profile
-                    </Link>
-
-                    <div className="my-2 h-px bg-[#2E2E2E]" />
-
-                    <button
-                      onClick={async () => {
-                        await supabase.auth.signOut();
-                        router.push("/");
-                      }}
-                      className="flex w-full items-center gap-3 px-4 py-2 text-sm text-red-400 transition-colors hover:bg-[#2E2E2E] hover:text-red-300"
-                    >
-                      <svg
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                        />
-                      </svg>
-                      Logout
-                    </button>
-                  </div>
-                </div>
-              )}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                          />
+                        </svg>
+                        Sign out
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </header>
 
-        {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-[var(--cc-bg-canvas)]">
+          {children}
+        </main>
       </div>
+    </div>
+  );
+}
+
+function NavItem({
+  href,
+  label,
+  icon,
+  active = false,
+}: {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  active?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-2.5 rounded-[var(--cc-radius-button)] px-2.5 py-2 text-[13px] font-medium transition-colors ${
+        active
+          ? "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-primary)]"
+          : "text-[var(--cc-text-secondary)] hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+      }`}
+    >
+      <svg
+        className="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        aria-hidden="true"
+      >
+        {icon}
+      </svg>
+      {label}
+    </Link>
+  );
+}
+
+function MenuItem({
+  href,
+  label,
+  icon,
+}: {
+  href: string;
+  label: string;
+  icon: string;
+}) {
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      className="flex items-center gap-2.5 px-3 py-2 text-[12px] text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+    >
+      <svg
+        className="h-3.5 w-3.5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
+      </svg>
+      {label}
+    </Link>
+  );
+}
+
+function Avatar({
+  size,
+  avatarUrl,
+  initials,
+}: {
+  size: number;
+  avatarUrl?: string | null;
+  initials: string;
+}) {
+  return (
+    <div
+      className="flex flex-none items-center justify-center overflow-hidden rounded-full bg-[var(--cc-accent)] font-semibold text-white"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size <= 24 ? 10 : size <= 32 ? 11 : 14,
+      }}
+    >
+      {avatarUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={avatarUrl}
+          alt=""
+          className="h-full w-full rounded-full object-cover"
+        />
+      ) : (
+        initials
+      )}
     </div>
   );
 }

@@ -9,8 +9,8 @@ This README is the single source of truth for local setup.
 - Frontend: Next.js 16 + React 19 + TypeScript
 - Auth/data/storage: Supabase
 - Optional AI services:
-   - FastAPI service for sketch detection (`backend/main.py`)
-   - OpenRouter API key for chat-based code refinement
+  - FastAPI service for sketch detection (`backend/main.py`)
+  - OpenRouter API key for chat-based code refinement
 
 ## Prerequisites
 
@@ -101,6 +101,8 @@ Open: `http://localhost:3000`
 
 ```bash
 cd backend
+../venv/Scripts/activate
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # Windows
 python -m venv venv
@@ -136,10 +138,10 @@ pnpm start
 ## 6. Required and Optional Services
 
 - Required:
-   - Supabase project (auth + PostgreSQL + storage)
+  - Supabase project (auth + PostgreSQL + storage)
 - Optional:
-   - FastAPI backend at `FASTAPI_URL`
-   - OpenRouter key for chat refinement (`OPENROUTER_API_KEY`)
+  - FastAPI backend at `FASTAPI_URL`
+  - OpenRouter key for chat refinement (`OPENROUTER_API_KEY`)
 
 ## 7. Common Commands
 
