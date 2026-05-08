@@ -229,7 +229,7 @@ export default function DemoTheatre() {
         {stage === 0 && (
           <div className="flex flex-col items-center justify-center space-y-8">
             <div className="inline-flex items-center rounded-full bg-[#2E2E2E] px-4 py-1.5 text-sm font-medium text-[#A0A0A0] mb-2">
-              ✨ Sketch-to-code in seconds
+              Sketch-to-code in seconds
             </div>
             <h1 className="text-5xl font-bold text-white mb-4">
               Draw Your <span className="text-[#FF6B00]">Vision</span>
@@ -282,9 +282,7 @@ export default function DemoTheatre() {
               <div className="w-full max-w-md animate-fade-in">
                 <div className="rounded-xl border-2 border-[#2E2E2E] bg-[#1A1A1A] p-4 shadow-lg">
                   <div className="flex items-center gap-3">
-                    <div className="shrink-0 w-8 h-8 rounded-full bg-[#FF6B00]/20 flex items-center justify-center">
-                      <span className="text-[#FF6B00] text-sm">💬</span>
-                    </div>
+                    <div className="shrink-0 w-8 h-8 rounded-full bg-[#FF6B00]/20" />
                     <div className="flex-1">
                       <p className="text-xs text-[#A0A0A0] mb-1">
                         Additional Instructions (optional)
@@ -331,7 +329,7 @@ export default function DemoTheatre() {
           <div className="space-y-6">
             <div className="text-center mb-8">
               <div className="inline-flex items-center rounded-full bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-4 py-1.5 text-sm font-medium text-[#FF6B00] mb-4">
-                ✨ Ready to Export
+                Ready to Export
               </div>
               <h2 className="text-4xl font-bold text-white">
                 Your Code is <span className="text-[#FF6B00]">Ready!</span>
@@ -431,7 +429,7 @@ export default function DemoTheatre() {
                       <span>Live • Auto-updating</span>
                     </div>
                     <span className="text-xs text-[#FF6B00]">
-                      ⚡ Generated in 2.3s
+                      Generated in 2.3s
                     </span>
                   </div>
                 </div>

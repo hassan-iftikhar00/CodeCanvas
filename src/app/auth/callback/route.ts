@@ -5,10 +5,10 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/canvas";
+  const next = searchParams.get("next") ?? "/dashboard";
 
   if (!code) {
-    console.error("❌ Missing authorization code");
+    console.error("Missing authorization code");
     return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`);
   }
 
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          console.log("🔥 setAll called with", cookiesToSet.length, "cookies");
+          console.log("setAll called with", cookiesToSet.length, "cookies");
           cookiesToSet.forEach(({ name, value, options }) => {
             cookieStore.set(name, value, options);
           });
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
   );
 
   // Start the session exchange
-  console.log("🔍 Exchanging code for session...");
+  console.log("Exchanging code for session...");
   const exchangePromise = supabase.auth.exchangeCodeForSession(code);
 
   // Wait for BOTH the exchange AND setAll to complete
@@ -51,11 +51,11 @@ export async function GET(request: Request) {
   ]);
 
   if (error) {
-    console.error("❌ Exchange failed:", error.message);
+    console.error("Exchange failed:", error.message);
     return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`);
   }
 
-  console.log("✅ Session created, cookies captured:", responseCookies.length);
+  console.log("Session created, cookies captured:", responseCookies.length);
 
   // Now create the redirect with the captured cookies
   const redirectUrl = `${origin}${next}`;
@@ -66,6 +66,6 @@ export async function GET(request: Request) {
     response.cookies.set(name, value, options);
   });
 
-  console.log("✅ Cookies applied to redirect response");
+  console.log("Cookies applied to redirect response");
   return response;
 }

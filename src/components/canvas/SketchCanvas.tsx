@@ -124,7 +124,18 @@ export interface SketchCanvasRef {
   };
   clearCanvas: () => void;
   insertTemplate: (data: TemplateCanvasData, templateName?: string) => void;
-  exportAsPNG: () => string;
+  /**
+   * Export the user's drawing as a PNG suitable for AI detection.
+   * Also returns the transform that maps canvas-space coordinates to the
+   * exported image's pixel coordinates: `image_xy = (canvas_xy - offset) * scale`.
+   * Callers (e.g. canvas/page.tsx Run Detection) use this transform to send
+   * text annotations in the same coord space the AI receives, so bbox matching
+   * on the backend doesn't need to guess at the crop.
+   */
+  exportAsPNG: () => {
+    dataURL: string;
+    transform: { offsetX: number; offsetY: number; scale: number };
+  };
   exportAsDataURL: (mimeType?: string, quality?: number) => string;
 }
 
@@ -308,10 +319,84 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         }
       },
       exportAsPNG: () => {
-        if (!stageRef.current) return "";
-        // Export immediately without selection - transformer won't be included in export
-        const dataURL = stageRef.current.toDataURL({ pixelRatio: 2 });
-        return dataURL;
+        const PIXEL_RATIO = 2;
+        const empty = {
+          dataURL: "",
+          transform: { offsetX: 0, offsetY: 0, scale: 1 },
+        };
+        if (!stageRef.current) return empty;
+        // The exported PNG is the input to the AI detector, so it must be
+        // a clean, tight image of the user's drawing — no grid lines, no
+        // empty viewport space, no zoom/pan artifacts.
+        //
+        // Approach:
+        //   1. Hide the grid layer (background) so its 20px-spaced lines don't
+        //      get detected as false-positive cards.
+        //   2. Reset stage position + content-layer scale to identity so the
+        //      content's bounding box is in the same coord space as toDataURL.
+        //   3. Compute the content layer's tight bounding box and export THAT
+        //      rectangle. Avoids cropping when the drawing extends below the
+        //      visible viewport.
+        //   4. Return the transform (offset + scale) alongside the PNG so the
+        //      caller can map canvas-coord text annotations into image-pixel
+        //      coords: `image_xy = (canvas_xy - offset) * scale`.
+        //   5. Restore the saved transforms so the user's view is unchanged.
+        //
+        // TODO(M-followup, aspect ratio): the stage's containerSize is
+        // responsive to the viewport, so a tall bottom panel can squash the
+        // drawing area into a wide-thin strip. The detector was trained on
+        // roughly page-shaped images; pinning the canvas to a stable logical
+        // aspect would improve detection accuracy.
+        const stage = stageRef.current;
+        const layers = stage.getLayers();
+        if (layers.length < 2) {
+          return {
+            dataURL: stage.toDataURL({ pixelRatio: PIXEL_RATIO }),
+            transform: { offsetX: 0, offsetY: 0, scale: PIXEL_RATIO },
+          };
+        }
+        const gridLayer = layers[0];
+        const contentLayer = layers[1];
+
+        const savedStagePos = { x: stage.x(), y: stage.y() };
+        const savedStageScale = stage.scaleX();
+        const savedContentScale = contentLayer.scaleX();
+        const gridWasVisible = gridLayer.visible();
+
+        gridLayer.hide();
+        stage.position({ x: 0, y: 0 });
+        stage.scale({ x: 1, y: 1 });
+        contentLayer.scale({ x: 1, y: 1 });
+        stage.batchDraw();
+
+        let dataURL = "";
+        let transform = { offsetX: 0, offsetY: 0, scale: PIXEL_RATIO };
+        try {
+          const bounds = contentLayer.getClientRect({ relativeTo: stage });
+          if (bounds.width <= 0 || bounds.height <= 0) {
+            dataURL = stage.toDataURL({ pixelRatio: PIXEL_RATIO });
+          } else {
+            const PAD = 24;
+            const offsetX = Math.max(0, bounds.x - PAD);
+            const offsetY = Math.max(0, bounds.y - PAD);
+            dataURL = stage.toDataURL({
+              x: offsetX,
+              y: offsetY,
+              width: bounds.width + PAD * 2,
+              height: bounds.height + PAD * 2,
+              pixelRatio: PIXEL_RATIO,
+            });
+            transform = { offsetX, offsetY, scale: PIXEL_RATIO };
+          }
+        } finally {
+          stage.position(savedStagePos);
+          stage.scale({ x: savedStageScale, y: savedStageScale });
+          contentLayer.scale({ x: savedContentScale, y: savedContentScale });
+          if (gridWasVisible) gridLayer.show();
+          stage.batchDraw();
+        }
+
+        return { dataURL, transform };
       },
       exportAsDataURL: (mimeType = "image/png", quality = 1) => {
         if (!stageRef.current) return "";

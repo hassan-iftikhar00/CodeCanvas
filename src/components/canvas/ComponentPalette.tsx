@@ -25,7 +25,7 @@ const COMPONENTS: Component[] = [
   {
     id: "button",
     name: "Button",
-    icon: "🔘",
+    icon: "",
     description: "Interactive button",
     canvasData: {
       shapes: [
@@ -38,7 +38,7 @@ const COMPONENTS: Component[] = [
   {
     id: "input",
     name: "Input Field",
-    icon: "📝",
+    icon: "",
     description: "Text input",
     canvasData: {
       shapes: [
@@ -51,7 +51,7 @@ const COMPONENTS: Component[] = [
   {
     id: "card",
     name: "Card",
-    icon: "🃏",
+    icon: "",
     description: "Content card",
     canvasData: {
       shapes: [
@@ -67,7 +67,7 @@ const COMPONENTS: Component[] = [
   {
     id: "navbar",
     name: "Navbar",
-    icon: "🧭",
+    icon: "",
     description: "Navigation bar",
     canvasData: {
       shapes: [
@@ -81,7 +81,7 @@ const COMPONENTS: Component[] = [
   {
     id: "hero",
     name: "Hero Section",
-    icon: "🎯",
+    icon: "",
     description: "Hero banner",
     canvasData: {
       shapes: [
@@ -97,7 +97,7 @@ const COMPONENTS: Component[] = [
   {
     id: "footer",
     name: "Footer",
-    icon: "📐",
+    icon: "",
     description: "Page footer",
     canvasData: {
       shapes: [

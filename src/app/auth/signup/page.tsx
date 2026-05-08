@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 
 const MIN_PASSWORD_LENGTH = 6;
@@ -383,25 +384,25 @@ export default function SignupPage() {
   const isAnyLoading = loading || isGoogleLoading || isGitHubLoading;
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-[#0A0A0A]">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -left-40 w-96 h-96 bg-gradient-to-br from-[#FF6B00]/20 to-transparent rounded-full blur-3xl animate-pulse" />
-        <div
-          className="absolute -bottom-40 -right-40 w-96 h-96 bg-gradient-to-tr from-[#FF6B00]/10 to-transparent rounded-full blur-3xl animate-pulse"
-          style={{ animationDelay: "1s" }}
-        />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#FF6B00]/5 rounded-full blur-3xl" />
+    <div className="relative flex min-h-screen overflow-hidden bg-[var(--cc-bg-canvas)]">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -left-40 h-80 w-80 rounded-full bg-[var(--cc-accent-glow)] blur-[100px]" />
+        <div className="absolute -bottom-40 -right-40 h-80 w-80 rounded-full bg-[var(--cc-accent-glow)] blur-[100px]" />
       </div>
 
       {/* Left Panel - Signup Form */}
       <div className="flex flex-1 items-center justify-center p-4 sm:p-6 md:p-8 order-2 lg:order-1">
-        <div className="w-full max-w-sm animate-slide-in-up">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.24, ease: [0.22, 0.9, 0.28, 1] }}
+          className="w-full max-w-sm"
+        >
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-6">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-xl sm:text-2xl font-bold text-white hover:text-[#FF6B00] transition-colors"
+              className="inline-flex items-center gap-2 text-xl sm:text-2xl font-bold text-[var(--cc-text-primary)] hover:text-[var(--cc-accent)] transition-colors"
             >
               <img
                 src="/logo.png"
@@ -414,22 +415,19 @@ export default function SignupPage() {
 
           {/* Form Card */}
           <div className="relative">
-            {/* Glow effect behind card */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#FF6B00]/20 via-[#FF6B00]/10 to-[#FF6B00]/20 rounded-3xl blur-xl opacity-50" />
-
-            <div className="relative rounded-xl border border-[#2E2E2E] bg-[#1A1A1A]/80 backdrop-blur-xl p-5 sm:p-6 shadow-2xl">
+            <div className="relative rounded-[12px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-5 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.7)] sm:p-6">
               <div className="text-center mb-5 sm:mb-6">
-                <h2 className="text-lg sm:text-xl font-bold text-white mb-1">
+                <h2 className="text-lg sm:text-xl font-bold text-[var(--cc-text-primary)] mb-1">
                   Create your account
                 </h2>
-                <p className="text-xs sm:text-sm text-[#A0A0A0]">
+                <p className="text-xs sm:text-sm text-[var(--cc-text-secondary)]">
                   Start building amazing designs today
                 </p>
               </div>
 
               <form onSubmit={handleSignup} className="space-y-4">
                 {error && (
-                  <div className="flex items-center gap-3 rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-sm text-red-400 animate-shake">
+                  <div className="flex items-center gap-3 rounded-xl bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.35)] p-4 text-sm text-[var(--cc-error)] animate-shake">
                     <svg
                       className="w-5 h-5 flex-shrink-0"
                       fill="none"
@@ -450,14 +448,14 @@ export default function SignupPage() {
                 <div className="space-y-2">
                   <label
                     htmlFor="fullName"
-                    className="block text-sm font-medium text-[#A0A0A0]"
+                    className="block text-sm font-medium text-[var(--cc-text-secondary)]"
                   >
                     Full name
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <svg
-                        className="h-4 w-4 text-[#666666]"
+                        className="h-4 w-4 text-[var(--cc-text-muted)]"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -481,15 +479,15 @@ export default function SignupPage() {
                       className={`block w-full rounded-lg border ${
                         validationState.fullName.touched &&
                         validationState.fullName.error
-                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-[#2E2E2E] focus:border-[#FF6B00] focus:ring-[#FF6B00]/20"
-                      } bg-[#0A0A0A]/50 pl-10 pr-3 py-2.5 text-sm text-white placeholder-[#666666] transition-all focus:outline-none focus:ring-2 focus:bg-[#0A0A0A] disabled:opacity-50 disabled:cursor-not-allowed`}
+                          ? "border-[var(--cc-error)] focus:border-[var(--cc-error)] focus:ring-[rgba(239,68,68,0.2)]"
+                          : "border-[var(--cc-border-subtle)] focus:border-[var(--cc-accent)] focus:ring-[var(--cc-accent-glow)]"
+                      } bg-[var(--cc-bg-canvas)]/50 pl-10 pr-3 py-2.5 text-sm text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] transition-all focus:outline-none focus:ring-2 focus:bg-[var(--cc-bg-canvas)] disabled:opacity-50 disabled:cursor-not-allowed`}
                       placeholder="John Doe"
                     />
                   </div>
                   {validationState.fullName.touched &&
                     validationState.fullName.error && (
-                      <div className="flex items-center gap-2 text-sm text-red-400 animate-fade-in">
+                      <div className="flex items-center gap-2 text-sm text-[var(--cc-error)] animate-fade-in">
                         <svg
                           className="w-4 h-4 flex-shrink-0"
                           fill="none"
@@ -511,14 +509,14 @@ export default function SignupPage() {
                 <div className="space-y-2">
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-[#A0A0A0]"
+                    className="block text-sm font-medium text-[var(--cc-text-secondary)]"
                   >
                     Email address
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <svg
-                        className="h-4 w-4 text-[#666666]"
+                        className="h-4 w-4 text-[var(--cc-text-muted)]"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -543,15 +541,15 @@ export default function SignupPage() {
                       className={`block w-full rounded-lg border ${
                         validationState.email.touched &&
                         validationState.email.error
-                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-[#2E2E2E] focus:border-[#FF6B00] focus:ring-[#FF6B00]/20"
-                      } bg-[#0A0A0A]/50 pl-10 pr-3 py-2.5 text-sm text-white placeholder-[#666666] transition-all focus:outline-none focus:ring-2 focus:bg-[#0A0A0A] disabled:opacity-50 disabled:cursor-not-allowed`}
+                          ? "border-[var(--cc-error)] focus:border-[var(--cc-error)] focus:ring-[rgba(239,68,68,0.2)]"
+                          : "border-[var(--cc-border-subtle)] focus:border-[var(--cc-accent)] focus:ring-[var(--cc-accent-glow)]"
+                      } bg-[var(--cc-bg-canvas)]/50 pl-10 pr-3 py-2.5 text-sm text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] transition-all focus:outline-none focus:ring-2 focus:bg-[var(--cc-bg-canvas)] disabled:opacity-50 disabled:cursor-not-allowed`}
                       placeholder="you@example.com"
                     />
                   </div>
                   {validationState.email.touched &&
                     validationState.email.error && (
-                      <div className="flex items-center gap-2 text-sm text-red-400 animate-fade-in">
+                      <div className="flex items-center gap-2 text-sm text-[var(--cc-error)] animate-fade-in">
                         <svg
                           className="w-4 h-4 flex-shrink-0"
                           fill="none"
@@ -573,14 +571,14 @@ export default function SignupPage() {
                 <div className="space-y-2">
                   <label
                     htmlFor="password"
-                    className="block text-sm font-medium text-[#A0A0A0]"
+                    className="block text-sm font-medium text-[var(--cc-text-secondary)]"
                   >
                     Password
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                       <svg
-                        className="h-5 w-5 text-[#666666]"
+                        className="h-5 w-5 text-[var(--cc-text-muted)]"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -605,16 +603,16 @@ export default function SignupPage() {
                       className={`block w-full rounded-lg border ${
                         validationState.password.touched &&
                         validationState.password.error
-                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                          : "border-[#2E2E2E] focus:border-[#FF6B00] focus:ring-[#FF6B00]/20"
-                      } bg-[#0A0A0A]/50 pl-10 pr-10 py-2.5 text-sm text-white placeholder-[#666666] transition-all focus:outline-none focus:ring-2 focus:bg-[#0A0A0A] disabled:opacity-50 disabled:cursor-not-allowed`}
+                          ? "border-[var(--cc-error)] focus:border-[var(--cc-error)] focus:ring-[rgba(239,68,68,0.2)]"
+                          : "border-[var(--cc-border-subtle)] focus:border-[var(--cc-accent)] focus:ring-[var(--cc-accent-glow)]"
+                      } bg-[var(--cc-bg-canvas)]/50 pl-10 pr-10 py-2.5 text-sm text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] transition-all focus:outline-none focus:ring-2 focus:bg-[var(--cc-bg-canvas)] disabled:opacity-50 disabled:cursor-not-allowed`}
                       placeholder="••••••••"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isAnyLoading}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#666666] hover:text-[#A0A0A0] transition-colors disabled:opacity-50"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-[var(--cc-text-muted)] hover:text-[var(--cc-text-secondary)] transition-colors disabled:opacity-50"
                     >
                       {showPassword ? (
                         <svg
@@ -655,7 +653,7 @@ export default function SignupPage() {
                   </div>
                   {validationState.password.touched &&
                     validationState.password.error && (
-                      <div className="flex items-center gap-2 text-sm text-red-400 animate-fade-in">
+                      <div className="flex items-center gap-2 text-sm text-[var(--cc-error)] animate-fade-in">
                         <svg
                           className="w-4 h-4 flex-shrink-0"
                           fill="none"
@@ -675,23 +673,23 @@ export default function SignupPage() {
                   {password && !validationState.password.error && (
                     <div className="space-y-2 animate-fade-in">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-[#666666]">
+                        <span className="text-[var(--cc-text-muted)]">
                           Password strength
                         </span>
                         <span
                           className={`font-medium ${
                             passwordStrength.level === "strong"
-                              ? "text-green-400"
+                              ? "text-[var(--cc-success)]"
                               : passwordStrength.level === "medium"
-                                ? "text-orange-400"
-                                : "text-red-400"
+                                ? "text-[var(--cc-accent)]"
+                                : "text-[var(--cc-error)]"
                           }`}
                         >
                           {passwordStrength.level.charAt(0).toUpperCase() +
                             passwordStrength.level.slice(1)}
                         </span>
                       </div>
-                      <div className="h-2 bg-[#2E2E2E] rounded-full overflow-hidden">
+                      <div className="h-2 bg-[var(--cc-bg-elevated)] rounded-full overflow-hidden">
                         <div
                           className={`h-full transition-all duration-300 ${
                             passwordStrength.level === "strong"
@@ -712,14 +710,14 @@ export default function SignupPage() {
                 <div className="space-y-2">
                   <label
                     htmlFor="confirmPassword"
-                    className="block text-sm font-medium text-[#A0A0A0]"
+                    className="block text-sm font-medium text-[var(--cc-text-secondary)]"
                   >
                     Confirm Password
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                       <svg
-                        className="h-5 w-5 text-[#666666]"
+                        className="h-5 w-5 text-[var(--cc-text-muted)]"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -746,13 +744,13 @@ export default function SignupPage() {
                       className={`block w-full rounded-xl border ${
                         validationState.confirmPassword.touched &&
                         validationState.confirmPassword.error
-                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
+                          ? "border-[var(--cc-error)] focus:border-[var(--cc-error)] focus:ring-[rgba(239,68,68,0.2)]"
                           : confirmPassword &&
                               !validationState.confirmPassword.error &&
                               validationState.confirmPassword.touched
-                            ? "border-green-500 focus:border-green-500 focus:ring-green-500/20"
-                            : "border-[#2E2E2E] focus:border-[#FF6B00] focus:ring-[#FF6B00]/20"
-                      } bg-[#0A0A0A]/50 pl-12 pr-12 py-3.5 text-white placeholder-[#666666] transition-all focus:outline-none focus:ring-2 focus:bg-[#0A0A0A] disabled:opacity-50 disabled:cursor-not-allowed`}
+                            ? "border-[var(--cc-success)] focus:border-[var(--cc-success)] focus:ring-[rgba(34,197,94,0.2)]"
+                            : "border-[var(--cc-border-subtle)] focus:border-[var(--cc-accent)] focus:ring-[var(--cc-accent-glow)]"
+                      } bg-[var(--cc-bg-canvas)]/50 pl-12 pr-12 py-3.5 text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] transition-all focus:outline-none focus:ring-2 focus:bg-[var(--cc-bg-canvas)] disabled:opacity-50 disabled:cursor-not-allowed`}
                       placeholder="••••••••"
                     />
                     <button
@@ -761,7 +759,7 @@ export default function SignupPage() {
                         setShowConfirmPassword(!showConfirmPassword)
                       }
                       disabled={isAnyLoading}
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#666666] hover:text-[#A0A0A0] transition-colors disabled:opacity-50"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-[var(--cc-text-muted)] hover:text-[var(--cc-text-secondary)] transition-colors disabled:opacity-50"
                     >
                       {showConfirmPassword ? (
                         <svg
@@ -802,7 +800,7 @@ export default function SignupPage() {
                   </div>
                   {validationState.confirmPassword.touched &&
                     validationState.confirmPassword.error && (
-                      <div className="flex items-center gap-2 text-sm text-red-400 animate-fade-in">
+                      <div className="flex items-center gap-2 text-sm text-[var(--cc-error)] animate-fade-in">
                         <svg
                           className="w-4 h-4 flex-shrink-0"
                           fill="none"
@@ -822,7 +820,7 @@ export default function SignupPage() {
                   {confirmPassword &&
                     !validationState.confirmPassword.error &&
                     validationState.confirmPassword.touched && (
-                      <div className="flex items-center gap-2 text-sm text-green-400 animate-fade-in">
+                      <div className="flex items-center gap-2 text-sm text-[var(--cc-success)] animate-fade-in">
                         <svg
                           className="w-4 h-4 flex-shrink-0"
                           fill="none"
@@ -841,10 +839,11 @@ export default function SignupPage() {
                     )}
                 </div>
 
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
                   type="submit"
                   disabled={loading}
-                  className="relative w-full overflow-hidden rounded-lg bg-gradient-to-r from-[#FF6B00] to-[#CC5800] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#FF6B00]/25 transition-all hover:shadow-[#FF6B00]/40 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed group"
+                  className="group relative w-full overflow-hidden rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
                     {loading ? (
@@ -874,29 +873,29 @@ export default function SignupPage() {
                       <>
                         Create account
                         <svg
-                          className="w-5 h-5 transition-transform group-hover:translate-x-1"
+                          className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
                           fill="none"
                           viewBox="0 0 24 24"
                           stroke="currentColor"
+                          strokeWidth={2}
                         >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
-                            strokeWidth={2}
                             d="M13 7l5 5m0 0l-5 5m5-5H6"
                           />
                         </svg>
                       </>
                     )}
                   </span>
-                </button>
+                </motion.button>
 
                 <div className="relative my-6">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-[#2E2E2E]" />
+                    <div className="w-full border-t border-[var(--cc-border-subtle)]" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="bg-[#1A1A1A] px-4 text-[#666666]">
+                    <span className="bg-[var(--cc-bg-elevated)] px-4 text-[var(--cc-text-muted)]">
                       or continue with
                     </span>
                   </div>
@@ -906,7 +905,7 @@ export default function SignupPage() {
                   type="button"
                   onClick={handleGoogleSignup}
                   disabled={isAnyLoading}
-                  className="w-full rounded-lg border border-[#2E2E2E] bg-[#0A0A0A]/50 px-4 py-2.5 text-xs sm:text-sm font-medium text-white transition-all hover:bg-[#2E2E2E] hover:border-[#3E3E3E] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded-lg border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)]/50 px-4 py-2.5 text-xs sm:text-sm font-medium text-[var(--cc-text-primary)] transition-all hover:bg-[var(--cc-bg-elevated)] hover:border-[var(--cc-border-emphasis)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-center gap-2 sm:gap-3">
                     {isGoogleLoading ? (
@@ -963,7 +962,7 @@ export default function SignupPage() {
                   type="button"
                   onClick={handleGitHubSignup}
                   disabled={isAnyLoading}
-                  className="w-full rounded-lg border border-[#2E2E2E] bg-[#0A0A0A]/50 px-4 py-2.5 text-xs sm:text-sm font-medium text-white transition-all hover:bg-[#2E2E2E] hover:border-[#3E3E3E] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full rounded-lg border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)]/50 px-4 py-2.5 text-xs sm:text-sm font-medium text-[var(--cc-text-primary)] transition-all hover:bg-[var(--cc-bg-elevated)] hover:border-[var(--cc-border-emphasis)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex items-center justify-center gap-2 sm:gap-3">
                     {isGitHubLoading ? (
@@ -1006,11 +1005,11 @@ export default function SignupPage() {
                 </button>
               </form>
 
-              <p className="mt-8 text-center text-sm text-[#666666]">
+              <p className="mt-8 text-center text-sm text-[var(--cc-text-muted)]">
                 Already have an account?{" "}
                 <Link
                   href="/auth/login"
-                  className="font-semibold text-[#FF6B00] hover:text-[#FF8533] transition-colors"
+                  className="font-semibold text-[var(--cc-accent)] hover:text-[#ff8533] transition-colors"
                 >
                   Sign in
                 </Link>
@@ -1019,32 +1018,32 @@ export default function SignupPage() {
           </div>
 
           {/* Footer */}
-          <p className="mt-8 text-center text-xs text-[#666666]">
+          <p className="mt-8 text-center text-xs text-[var(--cc-text-muted)]">
             By creating an account, you agree to our{" "}
             <Link
               href="#"
-              className="text-[#A0A0A0] hover:text-white transition-colors"
+              className="text-[var(--cc-text-secondary)] hover:text-[var(--cc-text-primary)] transition-colors"
             >
               Terms of Service
             </Link>{" "}
             and{" "}
             <Link
               href="#"
-              className="text-[#A0A0A0] hover:text-white transition-colors"
+              className="text-[var(--cc-text-secondary)] hover:text-[var(--cc-text-primary)] transition-colors"
             >
               Privacy Policy
             </Link>
           </p>
-        </div>
+        </motion.div>
       </div>
 
       {/* Right Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative items-center justify-center p-12 bg-gradient-to-bl from-[#0A0A0A] via-[#1A1A1A] to-[#0A0A0A] order-1 lg:order-2">
+      <div className="relative order-1 hidden items-center justify-center border-l border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-12 lg:order-2 lg:flex lg:w-1/2 xl:w-3/5">
         <div className="relative z-10 max-w-lg text-center">
           {/* Logo Icon */}
-          <div className="mb-8 inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF6B00] to-[#CC5800] shadow-[0_0_60px_rgba(255,107,0,0.4)]">
+          <div className="mb-7 inline-flex h-16 w-16 items-center justify-center rounded-[12px] bg-[var(--cc-accent)] shadow-[0_0_40px_var(--cc-accent-glow-strong)]">
             <svg
-              className="w-10 h-10 text-white"
+              className="h-8 w-8 text-white"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -1058,12 +1057,12 @@ export default function SignupPage() {
             </svg>
           </div>
 
-          <h1 className="text-5xl font-bold text-white mb-4 tracking-tight">
-            Join <span className="text-[#FF6B00]">CodeCanvas</span>
+          <h1 className="mb-3 text-[32px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
+            Join <span className="text-[var(--cc-accent)]">CodeCanvas</span>
           </h1>
 
-          <p className="text-xl text-[#A0A0A0] mb-12 leading-relaxed">
-            Join thousands of designers and developers creating amazing UI
+          <p className="mb-10 text-[15px] leading-relaxed text-[var(--cc-text-secondary)]">
+            Join thousands of designers and developers creating amazing UI.
           </p>
 
           {/* Benefits List */}
@@ -1077,18 +1076,24 @@ export default function SignupPage() {
               { icon: "M5 13l4 4L19 7", text: "Export to React, Vue, or HTML" },
               { icon: "M5 13l4 4L19 7", text: "Collaborate with your team" },
             ].map((item, i) => (
-              <div
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  duration: 0.3,
+                  delay: 0.15 + i * 0.06,
+                  ease: [0.22, 0.9, 0.28, 1],
+                }}
                 key={i}
-                className="flex items-center gap-3 animate-slide-in-left"
-                style={{ animationDelay: `${i * 100}ms` }}
+                className="flex items-center gap-2.5"
               >
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[#FF6B00]/20 flex items-center justify-center">
+                <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[var(--cc-accent-glow)]">
                   <svg
-                    className="w-4 h-4 text-[#FF6B00]"
+                    className="h-3 w-3 text-[var(--cc-accent)]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                   >
                     <path
                       strokeLinecap="round"
@@ -1097,23 +1102,27 @@ export default function SignupPage() {
                     />
                   </svg>
                 </div>
-                <span className="text-[#A0A0A0]">{item.text}</span>
-              </div>
+                <span className="text-[13px] text-[var(--cc-text-secondary)]">
+                  {item.text}
+                </span>
+              </motion.div>
             ))}
           </div>
 
           {/* Stats */}
-          <div className="mt-12 flex justify-center gap-8">
+          <div className="mt-10 flex justify-center gap-7">
             {[
               { value: "10k+", label: "Users" },
               { value: "50k+", label: "Designs" },
               { value: "99%", label: "Uptime" },
-            ].map((stat, i) => (
-              <div key={i} className="text-center">
-                <div className="text-2xl font-bold text-white">
+            ].map((stat) => (
+              <div key={stat.label} className="text-center">
+                <div className="text-[20px] font-semibold text-[var(--cc-text-primary)]">
                   {stat.value}
                 </div>
-                <div className="text-sm text-[#666666]">{stat.label}</div>
+                <div className="mt-0.5 text-[11px] uppercase tracking-wider text-[var(--cc-text-muted)]">
+                  {stat.label}
+                </div>
               </div>
             ))}
           </div>

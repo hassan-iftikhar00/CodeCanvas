@@ -322,10 +322,10 @@ export function searchTemplates(query: string): Template[] {
 }
 
 export const TEMPLATE_CATEGORIES = [
-  { id: "forms", label: "Forms", icon: "📝" },
-  { id: "navigation", label: "Navigation", icon: "🧭" },
-  { id: "hero", label: "Hero Sections", icon: "🎯" },
-  { id: "cards", label: "Cards", icon: "🃏" },
-  { id: "layout", label: "Layouts", icon: "📐" },
-  { id: "other", label: "Other", icon: "✨" },
+  { id: "forms", label: "Forms", icon: "" },
+  { id: "navigation", label: "Navigation", icon: "" },
+  { id: "hero", label: "Hero Sections", icon: "" },
+  { id: "cards", label: "Cards", icon: "" },
+  { id: "layout", label: "Layouts", icon: "" },
+  { id: "other", label: "Other", icon: "" },
 ] as const;

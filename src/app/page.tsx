@@ -27,11 +27,18 @@ export default function Home() {
   // Don't auto-redirect - let users see the landing page
   // They can click "Open Canvas" or login to access the app
 
-  const handleContinueDesign = () => {
-    // Save the strokes to localStorage
+  const handleContinueDesign = async () => {
+    // Save the strokes to localStorage so they survive an auth round-trip
     localStorage.setItem("miniCanvasDesign", JSON.stringify(strokes));
-    // Redirect to canvas page
-    router.push("/canvas?fromMini=true");
+    const target = "/canvas?fromMini=true";
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.push(`/auth/login?redirectTo=${encodeURIComponent(target)}`);
+    } else {
+      router.push(target);
+    }
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -118,9 +125,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A]">
+    <div className="min-h-screen bg-[var(--cc-bg-canvas)]">
       {/* Navigation Header */}
-      <nav className="relative z-20 border-b border-[#2E2E2E]">
+      <nav className="relative z-20 border-b border-[var(--cc-border-subtle)]">
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
@@ -136,13 +143,13 @@ export default function Home() {
             <div className="flex items-center gap-2 sm:gap-4">
               <Link
                 href="/auth/login"
-                className="rounded-lg px-3 py-2 text-xs font-medium text-[#A0A0A0] transition-colors hover:text-white sm:px-4 sm:text-sm"
+                className="rounded-lg px-3 py-2 text-xs font-medium text-[var(--cc-text-secondary)] transition-colors hover:text-white sm:px-4 sm:text-sm"
               >
                 Log in
               </Link>
               <Link
                 href="/canvas"
-                className="rounded-lg bg-[#FF6B00] px-3 py-2 text-xs font-bold text-white transition-all hover:bg-[#E66000] hover:shadow-[0_0_20px_rgba(255,107,0,0.3)] sm:px-4 sm:text-sm"
+                className="rounded-lg bg-[var(--cc-accent)] px-3 py-2 text-xs font-bold text-white transition-all hover:bg-[#e66000] hover:shadow-[0_0_20px_rgba(255,107,0,0.3)] sm:px-4 sm:text-sm"
               >
                 Get Started
               </Link>
@@ -173,8 +180,8 @@ export default function Home() {
           <div className="grid gap-8 sm:gap-12 lg:grid-cols-2 lg:gap-16 items-center">
             {/* Left: Hero Copy */}
             <div className="space-y-6 sm:space-y-8 pointer-events-auto">
-              <div className="inline-flex items-center rounded-full bg-[#2E2E2E] px-4 py-1.5 text-sm font-medium text-[#A0A0A0]">
-                ✨ Sketch-to-code in seconds
+              <div className="inline-flex items-center rounded-full bg-[var(--cc-bg-elevated)] px-4 py-1.5 text-sm font-medium text-[var(--cc-text-secondary)]">
+                Sketch-to-code in seconds
               </div>
 
               <div className="space-y-0">
@@ -191,7 +198,7 @@ export default function Home() {
                   Describe.
                 </h1>
                 <h1
-                  className="text-4xl font-bold tracking-tight text-[#FF6B00] sm:text-5xl md:text-6xl lg:text-7xl animate-slide-in-up animate-glow-pulse"
+                  className="text-4xl font-bold tracking-tight text-[var(--cc-accent)] sm:text-5xl md:text-6xl lg:text-7xl animate-slide-in-up animate-glow-pulse"
                   style={{ animationDelay: "0.3s" }}
                 >
                   Ship.
@@ -199,7 +206,7 @@ export default function Home() {
               </div>
 
               <p
-                className="text-base leading-relaxed text-[#A0A0A0] max-w-lg sm:text-lg md:text-xl animate-fade-in"
+                className="text-base leading-relaxed text-[var(--cc-text-secondary)] max-w-lg sm:text-lg md:text-xl animate-fade-in"
                 style={{
                   animationDelay: "0.5s",
                   opacity: 0,
@@ -220,7 +227,7 @@ export default function Home() {
               >
                 <Link
                   href="/canvas"
-                  className="btn-base ripple group inline-flex items-center justify-center rounded-xl glass-orange px-6 py-3 text-sm font-semibold text-white glow-orange-hover focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-offset-2 focus:ring-offset-[#0A0A0A] sm:px-8 sm:py-4 sm:text-base"
+                  className="btn-base ripple group inline-flex items-center justify-center rounded-xl glass-orange px-6 py-3 text-sm font-semibold text-white glow-orange-hover focus:outline-none focus:ring-2 focus:ring-[var(--cc-accent)] focus:ring-offset-2 focus:ring-offset-[var(--cc-bg-canvas)] sm:px-8 sm:py-4 sm:text-base"
                 >
                   Open Canvas
                   <svg
@@ -238,14 +245,14 @@ export default function Home() {
                   </svg>
                 </Link>
 
-                <button className="btn-base glass-light inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold text-white transition-all duration-[var(--duration-base)] hover:glass focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-offset-2 focus:ring-offset-[#0A0A0A] sm:px-8 sm:py-4 sm:text-base">
+                <button className="btn-base glass-light inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold text-white transition-all duration-[var(--duration-base)] hover:glass focus:outline-none focus:ring-2 focus:ring-[var(--cc-accent)] focus:ring-offset-2 focus:ring-offset-[var(--cc-bg-canvas)] sm:px-8 sm:py-4 sm:text-base">
                   Watch Demo
                 </button>
               </div>
 
               {/* Feature Pills */}
               <div className="flex flex-wrap gap-3 pt-4">
-                <div className="flex items-center gap-2 rounded-lg bg-[#1A1A1A] border border-[#2E2E2E] px-4 py-2 text-sm font-medium text-[#A0A0A0]">
+                <div className="flex items-center gap-2 rounded-lg bg-[var(--cc-bg-elevated)] border border-[var(--cc-border-subtle)] px-4 py-2 text-sm font-medium text-[var(--cc-text-secondary)]">
                   <svg
                     className="h-4 w-4"
                     fill="currentColor"
@@ -259,7 +266,7 @@ export default function Home() {
                   </svg>
                   Live Preview
                 </div>
-                <div className="flex items-center gap-2 rounded-lg bg-[#1A1A1A] border border-[#2E2E2E] px-4 py-2 text-sm font-medium text-[#A0A0A0]">
+                <div className="flex items-center gap-2 rounded-lg bg-[var(--cc-bg-elevated)] border border-[var(--cc-border-subtle)] px-4 py-2 text-sm font-medium text-[var(--cc-text-secondary)]">
                   <svg
                     className="h-4 w-4"
                     fill="currentColor"
@@ -273,7 +280,7 @@ export default function Home() {
                   </svg>
                   AI-Powered Recognition
                 </div>
-                <div className="flex items-center gap-2 rounded-lg bg-[#1A1A1A] border border-[#2E2E2E] px-4 py-2 text-sm font-medium text-[#A0A0A0]">
+                <div className="flex items-center gap-2 rounded-lg bg-[var(--cc-bg-elevated)] border border-[var(--cc-border-subtle)] px-4 py-2 text-sm font-medium text-[var(--cc-text-secondary)]">
                   <svg
                     className="h-4 w-4"
                     fill="currentColor"
@@ -292,14 +299,14 @@ export default function Home() {
 
             {/* Right: Interactive Mini Canvas */}
             <div className="relative pointer-events-auto">
-              <div className="relative rounded-2xl bg-[#1A1A1A] border border-[#2E2E2E] p-6 shadow-panel transition-all duration-300 hover:shadow-lg">
+              <div className="relative rounded-2xl bg-[var(--cc-bg-elevated)] border border-[var(--cc-border-subtle)] p-6 shadow-panel transition-all duration-300 hover:shadow-lg">
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-white">
                     Try it now | Draw a button
                   </h3>
                   <button
                     onClick={clearCanvas}
-                    className="rounded-lg bg-[#2E2E2E] px-3 py-1.5 text-xs font-medium text-[#A0A0A0] transition-colors hover:bg-white hover:text-[#0A0A0A]"
+                    className="rounded-lg bg-[var(--cc-bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--cc-text-secondary)] transition-colors hover:bg-white hover:text-[#0A0A0A]"
                   >
                     Clear
                   </button>
@@ -307,7 +314,7 @@ export default function Home() {
 
                 <canvas
                   ref={canvasRef}
-                  className="w-full cursor-crosshair rounded-lg border-2 border-[#2E2E2E] bg-white paper-texture"
+                  className="w-full cursor-crosshair rounded-lg border-2 border-[var(--cc-border-subtle)] bg-white paper-texture"
                   style={{ width: "100%", height: "300px" }}
                   onMouseDown={startDrawing}
                   onMouseMove={draw}
@@ -316,22 +323,22 @@ export default function Home() {
                 />
 
                 {strokes.length > 0 && (
-                  <div className="mt-4 rounded-lg border-2 border-dashed border-[#2E2E2E] bg-[#1A1A1A] p-4">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#A0A0A0]">
+                  <div className="mt-4 rounded-lg border-2 border-dashed border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] p-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--cc-text-secondary)]">
                       Live Preview
                     </p>
                     <button
                       onClick={handleContinueDesign}
-                      className="w-full rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 backdrop-blur-md px-6 py-3 font-semibold text-white shadow-md transition-all hover:bg-[#FF6B00]/30 hover:border-[#FF6B00] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,107,0,0.4)]"
+                      className="w-full rounded-lg bg-[var(--cc-accent)]/20 border border-[#FF6B00]/50 backdrop-blur-md px-6 py-3 font-semibold text-white shadow-md transition-all hover:bg-[var(--cc-accent)]/30 hover:border-[#FF6B00] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,107,0,0.4)]"
                     >
-                      Continue in Canvas →
+                      Continue in Canvas
                     </button>
                   </div>
                 )}
               </div>
 
               {/* Decorative Element */}
-              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-[#FF6B00]/10 blur-3xl" />
+              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-[var(--cc-accent-glow)] blur-3xl" />
               <div className="absolute -bottom-4 -left-4 h-32 w-32 rounded-full bg-white/5 blur-3xl" />
             </div>
           </div>
@@ -339,7 +346,7 @@ export default function Home() {
       </main>
 
       {/* Features Section */}
-      <section className="border-t border-[#2E2E2E] bg-[#0A0A0A] py-16 sm:py-24">
+      <section className="border-t border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] py-16 sm:py-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           {/* Video Demo Section */}
           <div className="mb-24">
@@ -347,14 +354,14 @@ export default function Home() {
               <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
                 See It In Action
               </h2>
-              <p className="mt-4 text-lg text-[#A0A0A0]">
+              <p className="mt-4 text-lg text-[var(--cc-text-secondary)]">
                 Watch how CodeCanvas transforms sketches into production-ready
                 code
               </p>
             </div>
 
             <div className="relative mx-auto max-w-5xl">
-              <div className="relative rounded-2xl border border-[#2E2E2E] bg-[#1A1A1A] p-4 shadow-2xl ">
+              <div className="relative rounded-2xl border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] p-4 shadow-2xl ">
                 <video
                   className="w-full rounded-lg"
                   autoPlay
@@ -371,7 +378,7 @@ export default function Home() {
               </div>
 
               {/* Decorative blur effects */}
-              <div className="absolute -left-10 top-1/2 h-40 w-40 rounded-full bg-[#FF6B00]/20 blur-3xl" />
+              <div className="absolute -left-10 top-1/2 h-40 w-40 rounded-full bg-[var(--cc-accent)]/20 blur-3xl" />
               <div className="absolute -right-10 top-1/4 h-40 w-40 rounded-full bg-white/5 blur-3xl" />
             </div>
           </div>
@@ -380,7 +387,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
               Why CodeCanvas?
             </h2>
-            <p className="mt-4 text-lg text-[#A0A0A0]">
+            <p className="mt-4 text-lg text-[var(--cc-text-secondary)]">
               Fast, intuitive, and built for makers
             </p>
           </div>
@@ -388,37 +395,31 @@ export default function Home() {
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
-                icon: "✏️",
                 title: "Natural Sketching",
                 description:
-                  "Draw components just like on paper - our AI understands your intent.",
+                  "Draw components just like on paper. Our model understands your intent.",
               },
               {
-                icon: "🤖",
                 title: "Smart Recognition",
                 description:
-                  "Advanced ML detects buttons, inputs, layouts and converts them to clean code.",
+                  "Detects buttons, inputs, and layouts and converts them to clean code.",
               },
               {
-                icon: "⚡",
                 title: "Live Preview",
                 description:
-                  "See your design come to life instantly with real-time code generation.",
+                  "See your design come to life with real-time code generation.",
               },
               {
-                icon: "💬",
                 title: "Natural Language",
                 description:
-                  "Describe interactions and behavior - we'll generate the logic.",
+                  "Describe interactions and behavior, and the logic is generated for you.",
               },
               {
-                icon: "📦",
                 title: "Export Ready",
                 description:
-                  "Download production-ready code with proper structure and best practices.",
+                  "Download code with proper structure and sensible defaults.",
               },
               {
-                icon: "🎨",
                 title: "Style Freedom",
                 description:
                   "Choose your framework, styling approach, and coding patterns.",
@@ -426,13 +427,12 @@ export default function Home() {
             ].map((feature, idx) => (
               <div
                 key={idx}
-                className="group rounded-xl border border-[#2E2E2E] bg-[#1A1A1A] p-6 transition-all duration-300 hover:border-white/20 hover:shadow-md"
+                className="group rounded-xl border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] p-6 transition-all duration-300 hover:border-white/20 hover:shadow-md"
               >
-                <div className="mb-3 text-4xl">{feature.icon}</div>
                 <h3 className="mb-2 text-lg font-semibold text-white">
                   {feature.title}
                 </h3>
-                <p className="text-sm leading-relaxed text-[#A0A0A0]">
+                <p className="text-sm leading-relaxed text-[var(--cc-text-secondary)]">
                   {feature.description}
                 </p>
               </div>
@@ -448,18 +448,18 @@ export default function Home() {
       <Testimonials />
 
       {/* CTA Section */}
-      <section className="relative bg-[#1A1A1A] border-t border-[#2E2E2E] py-16 sm:py-24 overflow-hidden">
+      <section className="relative bg-[var(--cc-bg-elevated)] border-t border-[var(--cc-border-subtle)] py-16 sm:py-24 overflow-hidden">
         <div className="relative z-10 mx-auto max-w-4xl px-6 text-center lg:px-8">
           <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
             Ready to build faster?
           </h2>
-          <p className="mt-6 text-lg leading-8 text-[#A0A0A0]">
+          <p className="mt-6 text-lg leading-8 text-[var(--cc-text-secondary)]">
             Start sketching your next project today. No credit card required.
           </p>
           <div className="mt-10 flex items-center justify-center gap-4">
             <Link
               href="/canvas"
-              className="inline-flex items-center justify-center rounded-xl bg-[#FF6B00]/20 border border-[#FF6B00]/50 backdrop-blur-md px-8 py-4 text-base font-semibold text-white transition-all duration-[var(--duration-base)] hover:bg-[#FF6B00]/30 hover:border-[#FF6B00] hover:scale-105 hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] focus:outline-none focus:ring-2 focus:ring-[#FF6B00] focus:ring-offset-2 focus:ring-offset-[#1A1A1A]"
+              className="inline-flex items-center justify-center rounded-xl bg-[var(--cc-accent)]/20 border border-[#FF6B00]/50 backdrop-blur-md px-8 py-4 text-base font-semibold text-white transition-all duration-[var(--duration-base)] hover:bg-[var(--cc-accent)]/30 hover:border-[#FF6B00] hover:scale-105 hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] focus:outline-none focus:ring-2 focus:ring-[var(--cc-accent)] focus:ring-offset-2 focus:ring-offset-[#1A1A1A]"
             >
               Get Started Free
             </Link>

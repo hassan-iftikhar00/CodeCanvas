@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface ProjectVersion {
@@ -6,8 +6,27 @@ interface ProjectVersion {
   project_id: string;
   version_number: number;
   canvas_data: any;
+  generated_code?: string;
+  prompt_used?: string | null;
   created_at: string;
   description?: string;
+}
+
+function getSupabaseErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    const maybeMessage = (err as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage.trim().length > 0) {
+      return maybeMessage;
+    }
+
+    const maybeDetails = (err as { details?: unknown }).details;
+    if (typeof maybeDetails === "string" && maybeDetails.trim().length > 0) {
+      return maybeDetails;
+    }
+  }
+  return fallback;
 }
 
 interface UseVersionHistoryReturn {
@@ -32,7 +51,12 @@ export function useVersionHistory(): UseVersionHistoryReturn {
   const [versions, setVersions] = useState<ProjectVersion[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+
+  // NOTE: DB schema was unified to the canonical form where version history lives
+  // in `iterations` (see supabase migrations). Legacy code referenced
+  // `project_versions`, which may no longer exist.
+  const versionsTable = "iterations";
 
   const fetchVersions = useCallback(
     async (projectId: string) => {
@@ -41,24 +65,30 @@ export function useVersionHistory(): UseVersionHistoryReturn {
 
       try {
         const { data, error: fetchError } = await supabase
-          .from("project_versions")
+          .from(versionsTable)
           .select("*")
           .eq("project_id", projectId)
           .order("version_number", { ascending: false });
 
         if (fetchError) throw fetchError;
 
-        setVersions(data || []);
+        const mapped = (data || []).map((row: any) => ({
+          ...row,
+          description: row?.prompt_used ?? row?.description,
+        }));
+        setVersions(mapped);
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to fetch versions";
+        const errorMessage = getSupabaseErrorMessage(
+          err,
+          "Failed to fetch versions"
+        );
         setError(errorMessage);
-        console.error("Fetch versions error:", err);
+        console.error("Fetch versions error:", errorMessage, err);
       } finally {
         setLoading(false);
       }
     },
-    [supabase]
+    [supabase, versionsTable]
   );
 
   const createVersion = useCallback(
@@ -70,26 +100,15 @@ export function useVersionHistory(): UseVersionHistoryReturn {
       setError(null);
 
       try {
-        // Get next version number
-        const { data: latestVersion } = await supabase
-          .from("project_versions")
-          .select("version_number")
-          .eq("project_id", projectId)
-          .order("version_number", { ascending: false })
-          .limit(1)
-          .single();
-
-        const nextVersionNumber = latestVersion
-          ? latestVersion.version_number + 1
-          : 1;
-
         const { error: createError } = await supabase
-          .from("project_versions")
+          .from(versionsTable)
           .insert({
             project_id: projectId,
-            version_number: nextVersionNumber,
             canvas_data: canvasData,
-            description,
+            // Canonical schema requires this; checkpoints don't generate code yet.
+            generated_code: "",
+            // Store checkpoint label in prompt_used; UI reads it as description.
+            prompt_used: description,
           });
 
         if (createError) throw createError;
@@ -99,14 +118,16 @@ export function useVersionHistory(): UseVersionHistoryReturn {
 
         return true;
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to create version";
+        const errorMessage = getSupabaseErrorMessage(
+          err,
+          "Failed to create version"
+        );
         setError(errorMessage);
-        console.error("Create version error:", err);
+        console.error("Create version error:", errorMessage, err);
         return false;
       }
     },
-    [supabase, fetchVersions]
+    [supabase, fetchVersions, versionsTable]
   );
 
   const restoreVersion = useCallback(
@@ -115,7 +136,7 @@ export function useVersionHistory(): UseVersionHistoryReturn {
 
       try {
         const { data, error: restoreError } = await supabase
-          .from("project_versions")
+          .from(versionsTable)
           .select("*")
           .eq("id", versionId)
           .single();
@@ -124,14 +145,16 @@ export function useVersionHistory(): UseVersionHistoryReturn {
 
         return data.canvas_data;
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to restore version";
+        const errorMessage = getSupabaseErrorMessage(
+          err,
+          "Failed to restore version"
+        );
         setError(errorMessage);
-        console.error("Restore version error:", err);
+        console.error("Restore version error:", errorMessage, err);
         return null;
       }
     },
-    [supabase]
+    [supabase, versionsTable]
   );
 
   const deleteVersion = useCallback(
@@ -140,7 +163,7 @@ export function useVersionHistory(): UseVersionHistoryReturn {
 
       try {
         const { error: deleteError } = await supabase
-          .from("project_versions")
+          .from(versionsTable)
           .delete()
           .eq("id", versionId);
 
@@ -151,14 +174,16 @@ export function useVersionHistory(): UseVersionHistoryReturn {
 
         return true;
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to delete version";
+        const errorMessage = getSupabaseErrorMessage(
+          err,
+          "Failed to delete version"
+        );
         setError(errorMessage);
-        console.error("Delete version error:", err);
+        console.error("Delete version error:", errorMessage, err);
         return false;
       }
     },
-    [supabase]
+    [supabase, versionsTable]
   );
 
   const compareVersions = useCallback(
@@ -170,8 +195,8 @@ export function useVersionHistory(): UseVersionHistoryReturn {
 
       try {
         const [{ data: v1 }, { data: v2 }] = await Promise.all([
-          supabase.from("project_versions").select("*").eq("id", v1Id).single(),
-          supabase.from("project_versions").select("*").eq("id", v2Id).single(),
+          supabase.from(versionsTable).select("*").eq("id", v1Id).single(),
+          supabase.from(versionsTable).select("*").eq("id", v2Id).single(),
         ]);
 
         if (!v1 || !v2) throw new Error("Version not found");
@@ -181,14 +206,16 @@ export function useVersionHistory(): UseVersionHistoryReturn {
           v2: v2.canvas_data,
         };
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to compare versions";
+        const errorMessage = getSupabaseErrorMessage(
+          err,
+          "Failed to compare versions"
+        );
         setError(errorMessage);
-        console.error("Compare versions error:", err);
+        console.error("Compare versions error:", errorMessage, err);
         return null;
       }
     },
-    [supabase]
+    [supabase, versionsTable]
   );
 
   return {

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 import {
   normalizeProject,
@@ -9,13 +10,25 @@ import {
   type DashboardProject,
 } from "@/lib/dashboard-projects";
 
+export interface CanvasCommand {
+  id: string;
+  title: string;
+  subtitle: string;
+  keywords?: string;
+  shortcut?: string;
+  group?: string;
+  onSelect: () => void | Promise<void>;
+}
+
 type PaletteAction =
   | {
       id: string;
       title: string;
       subtitle: string;
       keywords: string;
-      type: "command";
+      shortcut?: string;
+      group: string;
+      kind: "command";
       onSelect: () => void | Promise<void>;
     }
   | {
@@ -23,18 +36,41 @@ type PaletteAction =
       title: string;
       subtitle: string;
       keywords: string;
-      type: "project";
+      group: string;
+      kind: "project";
       project: DashboardProject;
       onSelect: () => void | Promise<void>;
     };
 
 const COMMAND_PALETTE_EVENT = "codecanvas:open-command-palette";
+const REGISTER_EVENT = "codecanvas:register-canvas-commands";
+
+let canvasCommandRegistry: CanvasCommand[] = [];
+
+const dispatchRegistryChange = () => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(REGISTER_EVENT));
+  }
+};
 
 export function openCommandPalette() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(COMMAND_PALETTE_EVENT));
   }
 }
+
+export function registerCanvasCommands(commands: CanvasCommand[]): () => void {
+  canvasCommandRegistry = [...canvasCommandRegistry, ...commands];
+  dispatchRegistryChange();
+  const ids = new Set(commands.map((c) => c.id));
+  return () => {
+    canvasCommandRegistry = canvasCommandRegistry.filter((c) => !ids.has(c.id));
+    dispatchRegistryChange();
+  };
+}
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export default function CommandPalette() {
   const router = useRouter();
@@ -45,91 +81,95 @@ export default function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [canvasCommands, setCanvasCommands] = useState<CanvasCommand[]>(
+    () => canvasCommandRegistry
+  );
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const fetchProjects = useCallback(async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
     if (!user) {
       setProjects([]);
       return;
     }
-
     const { data, error } = await supabase
       .from("projects")
       .select("*")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(12);
-
-    if (error) {
-      console.error("Command palette project fetch failed:", error);
-      return;
-    }
-
+    if (error) return;
     setProjects((data ?? []).map(normalizeProject));
   }, [supabase]);
 
+  // Subscribe to canvas command registry changes
+  useEffect(() => {
+    const sync = () => setCanvasCommands([...canvasCommandRegistry]);
+    window.addEventListener(REGISTER_EVENT, sync);
+    return () => window.removeEventListener(REGISTER_EVENT, sync);
+  }, []);
+
+  // Global open/close: Ctrl/Cmd+K
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const isShortcut =
         (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k";
-
       if (isShortcut) {
         event.preventDefault();
         setIsOpen((current) => !current);
         setShowShortcuts(false);
       }
-
-      if (event.key === "Escape") {
-        setIsOpen(false);
-        setShowShortcuts(false);
-      }
     };
-
     const onOpenPalette = () => {
       setIsOpen(true);
       setShowShortcuts(false);
     };
-
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener(COMMAND_PALETTE_EVENT, onOpenPalette);
-
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener(COMMAND_PALETTE_EVENT, onOpenPalette);
     };
   }, []);
 
+  // Focus management: trap focus when open, restore on close
+  useEffect(() => {
+    if (!isOpen) return;
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    fetchProjects();
+    requestAnimationFrame(() => inputRef.current?.focus());
+    return () => {
+      previousFocusRef.current?.focus?.();
+    };
+  }, [isOpen, fetchProjects]);
+
+  // Reset state when closed
   useEffect(() => {
     if (!isOpen) {
       setQuery("");
       setSelectedIndex(0);
-      return;
+      setShowShortcuts(false);
     }
-
-    fetchProjects();
-  }, [fetchProjects, isOpen]);
+  }, [isOpen]);
 
   const createProject = useCallback(async () => {
-    if (isCreatingProject) {
-      return;
-    }
-
+    if (isCreatingProject) return;
     setIsCreatingProject(true);
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
       if (!user) {
         router.push("/auth/login");
         return;
       }
-
       let createdProject: Record<string, unknown> | null = null;
-
       const canonicalInsert = await supabase
         .from("projects")
         .insert({
@@ -140,7 +180,6 @@ export default function CommandPalette() {
         })
         .select()
         .single();
-
       if (canonicalInsert.error) {
         const legacyInsert = await supabase
           .from("projects")
@@ -151,26 +190,16 @@ export default function CommandPalette() {
           })
           .select()
           .single();
-
-        if (legacyInsert.error) {
-          throw legacyInsert.error;
-        }
-
+        if (legacyInsert.error) throw legacyInsert.error;
         createdProject = legacyInsert.data;
       } else {
         createdProject = canonicalInsert.data;
       }
-
-      if (!createdProject?.id) {
-        return;
-      }
-
+      if (!createdProject?.id) return;
       const normalizedProject = normalizeProject(createdProject);
       recordProjectActivity(normalizedProject.id, "created");
       setIsOpen(false);
       router.push(`/canvas?id=${normalizedProject.id}`);
-    } catch (error) {
-      console.error("Command palette create project failed:", error);
     } finally {
       setIsCreatingProject(false);
     }
@@ -183,7 +212,9 @@ export default function CommandPalette() {
         title: isCreatingProject ? "Creating project..." : "New project",
         subtitle: "Start a blank canvas project",
         keywords: "new create project canvas",
-        type: "command",
+        kind: "command",
+        group: "General",
+        shortcut: "N",
         onSelect: createProject,
       },
       {
@@ -191,7 +222,8 @@ export default function CommandPalette() {
         title: "Open dashboard",
         subtitle: "Go to your projects home",
         keywords: "dashboard home projects",
-        type: "command",
+        kind: "command",
+        group: "Navigation",
         onSelect: () => {
           setIsOpen(false);
           router.push("/dashboard");
@@ -202,7 +234,8 @@ export default function CommandPalette() {
         title: "Open settings",
         subtitle: "Manage profile and account settings",
         keywords: "settings profile account preferences",
-        type: "command",
+        kind: "command",
+        group: "Navigation",
         onSelect: () => {
           setIsOpen(false);
           router.push("/profile");
@@ -213,13 +246,31 @@ export default function CommandPalette() {
         title: "Keyboard shortcuts",
         subtitle: "See the main navigation shortcuts",
         keywords: "shortcuts help keyboard",
-        type: "command",
-        onSelect: () => {
-          setShowShortcuts(true);
-        },
+        kind: "command",
+        group: "Help",
+        shortcut: "?",
+        onSelect: () => setShowShortcuts(true),
       },
     ],
     [createProject, isCreatingProject, router]
+  );
+
+  const canvasActions = useMemo<PaletteAction[]>(
+    () =>
+      canvasCommands.map((c) => ({
+        id: c.id,
+        title: c.title,
+        subtitle: c.subtitle,
+        keywords: c.keywords ?? "",
+        shortcut: c.shortcut,
+        group: c.group ?? "Canvas",
+        kind: "command" as const,
+        onSelect: async () => {
+          await c.onSelect();
+          setIsOpen(false);
+        },
+      })),
+    [canvasCommands]
   );
 
   const projectActions = useMemo<PaletteAction[]>(
@@ -229,7 +280,8 @@ export default function CommandPalette() {
         title: project.title,
         subtitle: `${project.framework.toUpperCase()} project`,
         keywords: `${project.title} ${project.framework} open project`,
-        type: "project",
+        kind: "project" as const,
+        group: "Projects",
         project,
         onSelect: () => {
           recordProjectActivity(project.id, "opened");
@@ -241,180 +293,283 @@ export default function CommandPalette() {
   );
 
   const filteredActions = useMemo(() => {
-    const lowerQuery = query.trim().toLowerCase();
-    const allActions = [...baseActions, ...projectActions];
-
-    if (!lowerQuery) {
-      return allActions;
-    }
-
-    return allActions.filter((action) =>
-      `${action.title} ${action.subtitle} ${action.keywords}`
-        .toLowerCase()
-        .includes(lowerQuery)
+    const q = query.trim().toLowerCase();
+    const all = [...canvasActions, ...baseActions, ...projectActions];
+    if (!q) return all;
+    return all.filter((a) =>
+      `${a.title} ${a.subtitle} ${a.keywords}`.toLowerCase().includes(q)
     );
-  }, [baseActions, projectActions, query]);
+  }, [baseActions, canvasActions, projectActions, query]);
+
+  const groupedActions = useMemo(() => {
+    const groups = new Map<string, PaletteAction[]>();
+    filteredActions.forEach((a) => {
+      const list = groups.get(a.group) ?? [];
+      list.push(a);
+      groups.set(a.group, list);
+    });
+    let cursor = 0;
+    return Array.from(groups.entries()).map(([group, items]) => {
+      const startIndex = cursor;
+      cursor += items.length;
+      return { group, items, startIndex };
+    });
+  }, [filteredActions]);
 
   useEffect(() => {
     setSelectedIndex(0);
   }, [query, showShortcuts]);
 
+  // Keyboard navigation
   useEffect(() => {
-    if (!isOpen || showShortcuts) {
-      return;
-    }
-
+    if (!isOpen || showShortcuts) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsOpen(false);
+        return;
+      }
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        setSelectedIndex((current) =>
-          Math.min(current + 1, Math.max(filteredActions.length - 1, 0))
+        setSelectedIndex((c) =>
+          Math.min(c + 1, Math.max(filteredActions.length - 1, 0))
         );
-      }
-
-      if (event.key === "ArrowUp") {
+      } else if (event.key === "ArrowUp") {
         event.preventDefault();
-        setSelectedIndex((current) => Math.max(current - 1, 0));
-      }
-
-      if (event.key === "Enter") {
+        setSelectedIndex((c) => Math.max(c - 1, 0));
+      } else if (event.key === "Enter") {
         const action = filteredActions[selectedIndex];
-        if (!action) {
-          return;
+        if (action) {
+          event.preventDefault();
+          void action.onSelect();
         }
-
-        event.preventDefault();
-        void action.onSelect();
+      } else if (event.key === "Tab") {
+        // Focus trap inside dialog
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+        const focusables =
+          dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
-
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [filteredActions, isOpen, selectedIndex, showShortcuts]);
 
-  if (!isOpen) {
-    return null;
-  }
+  // Auto-scroll selected into view
+  useEffect(() => {
+    if (!listRef.current) return;
+    const selected = listRef.current.querySelector<HTMLElement>(
+      `[data-cmd-index="${selectedIndex}"]`
+    );
+    selected?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 px-4 pt-20 backdrop-blur-sm">
-      <button
-        type="button"
-        aria-label="Close command palette overlay"
-        className="absolute inset-0 cursor-default"
-        onClick={() => {
-          setIsOpen(false);
-          setShowShortcuts(false);
-        }}
-      />
-
-      <div className="relative z-[101] w-full max-w-2xl overflow-hidden rounded-3xl border border-[#2E2E2E] bg-[#111111] shadow-2xl">
-        <div className="border-b border-[#2E2E2E] px-4 py-3">
-          <div className="flex items-center gap-3 rounded-2xl border border-[#2E2E2E] bg-[#0A0A0A] px-4 py-3">
-            <svg
-              className="h-5 w-5 text-[#666666]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="m21 21-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              autoFocus
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search projects, commands, and navigation..."
-              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-[#666666]"
-            />
-            <span className="rounded-full border border-[#2E2E2E] px-2 py-1 text-[10px] uppercase tracking-[0.24em] text-[#888888]">
-              Ctrl K
-            </span>
-          </div>
-        </div>
-
-        {showShortcuts ? (
-          <div className="space-y-3 px-4 py-4 text-sm text-[#CFCFCF]">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">
-                Keyboard Shortcuts
-              </h2>
-              <button
-                onClick={() => setShowShortcuts(false)}
-                className="rounded-full border border-[#2E2E2E] px-3 py-1 text-xs text-[#A0A0A0] transition-colors hover:border-[#FF6B00] hover:text-white"
-              >
-                Back
-              </button>
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          key="palette"
+          className="fixed inset-0 z-[var(--z-modal,50)] flex items-start justify-center px-4 pt-20"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: [0.22, 0.9, 0.28, 1] }}
+        >
+          <div
+            aria-hidden="true"
+            onClick={() => setIsOpen(false)}
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+          />
+          <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
+            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ duration: 0.22, ease: [0.22, 1.4, 0.32, 1] }}
+            className="relative z-[var(--z-popover,60)] w-full max-w-2xl overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border-grey)] bg-[var(--grey-800)] shadow-[var(--shadow-2xl)]"
+          >
+            <div className="border-b border-[var(--border-grey)] px-4 py-3">
+              <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border-grey)] bg-[var(--grey-900)] px-4 py-3 focus-within:border-[var(--orange-primary)] focus-within:shadow-[0_0_0_3px_var(--orange-glow)] transition-shadow">
+                <svg
+                  aria-hidden="true"
+                  className="h-5 w-5 text-[var(--text-muted)]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="m21 21-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                <input
+                  ref={inputRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search commands, projects, navigation..."
+                  aria-label="Search commands"
+                  aria-controls="palette-listbox"
+                  aria-activedescendant={
+                    filteredActions[selectedIndex]?.id ?? undefined
+                  }
+                  className="w-full bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                />
+                <kbd className="rounded-full border border-[var(--border-grey)] px-2 py-1 text-[10px] uppercase tracking-[0.24em] text-[var(--text-secondary)]">
+                  Esc
+                </kbd>
+              </div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <ShortcutRow
-                shortcut="Ctrl/Cmd + K"
-                label="Open command palette"
-              />
-              <ShortcutRow shortcut="Esc" label="Close overlays and menus" />
-              <ShortcutRow
-                shortcut="Ctrl/Cmd + S"
-                label="Save project on canvas"
-              />
-              <ShortcutRow
-                shortcut="Shift + ?"
-                label="Open shortcuts panel on canvas"
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="max-h-[28rem] overflow-y-auto px-2 py-2">
-            {filteredActions.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-[#888888]">
-                No results for “{query}”.
+
+            {showShortcuts ? (
+              <div className="space-y-3 px-4 py-4 text-sm text-[var(--text-secondary)]">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-[var(--text-primary)]">
+                    Keyboard shortcuts
+                  </h2>
+                  <button
+                    onClick={() => setShowShortcuts(false)}
+                    className="rounded-full border border-[var(--border-grey)] px-3 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:border-[var(--orange-primary)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orange-primary)]"
+                  >
+                    Back
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <ShortcutRow
+                    shortcut="Ctrl/Cmd + K"
+                    label="Toggle command palette"
+                  />
+                  <ShortcutRow shortcut="Esc" label="Close overlays" />
+                  <ShortcutRow shortcut="Ctrl/Cmd + S" label="Save project" />
+                  <ShortcutRow shortcut="Ctrl/Cmd + Z" label="Undo" />
+                  <ShortcutRow shortcut="Ctrl/Cmd + Shift + Z" label="Redo" />
+                  <ShortcutRow
+                    shortcut="Ctrl/Cmd + \\"
+                    label="Toggle right panel"
+                  />
+                  <ShortcutRow
+                    shortcut="Ctrl/Cmd + `"
+                    label="Toggle code panel"
+                  />
+                  <ShortcutRow shortcut="?" label="Show shortcuts" />
+                </div>
               </div>
             ) : (
-              filteredActions.map((action, index) => (
-                <button
-                  key={action.id}
-                  onClick={() => void action.onSelect()}
-                  className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left transition-colors ${
-                    selectedIndex === index
-                      ? "bg-[#1B1B1B] text-white"
-                      : "text-[#C5C5C5] hover:bg-[#171717] hover:text-white"
-                  }`}
-                >
-                  <div>
-                    <div className="text-sm font-medium">{action.title}</div>
-                    <div className="mt-1 text-xs text-[#8C8C8C]">
-                      {action.subtitle}
-                    </div>
+              <div
+                ref={listRef}
+                id="palette-listbox"
+                role="listbox"
+                aria-label="Available commands"
+                className="max-h-[28rem] overflow-y-auto px-2 py-2"
+              >
+                {filteredActions.length === 0 ? (
+                  <div className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">
+                    No results for &ldquo;{query}&rdquo;.
                   </div>
-                  <span
-                    className={`rounded-full px-2 py-1 text-[10px] uppercase tracking-[0.22em] ${
-                      action.type === "project"
-                        ? "bg-[#0F2B22] text-[#7CE5B2]"
-                        : "bg-[#20160D] text-[#FFB97A]"
-                    }`}
-                  >
-                    {action.type === "project" ? "Project" : "Command"}
-                  </span>
-                </button>
-              ))
+                ) : (
+                  groupedActions.map(({ group, items, startIndex }) => (
+                    <div key={group} className="mb-2 last:mb-0">
+                      <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                        {group}
+                      </div>
+                      {items.map((action, i) => {
+                        const idx = startIndex + i;
+                        const isSelected = selectedIndex === idx;
+                        return (
+                          <button
+                            key={action.id}
+                            id={action.id}
+                            data-cmd-index={idx}
+                            role="option"
+                            aria-selected={isSelected}
+                            onMouseEnter={() => setSelectedIndex(idx)}
+                            onClick={() => void action.onSelect()}
+                            className={`flex w-full items-center justify-between rounded-[var(--radius-md)] px-3 py-2.5 text-left transition-colors focus-visible:outline-none ${
+                              isSelected
+                                ? "bg-[var(--grey-700)] text-[var(--text-primary)]"
+                                : "text-[var(--text-secondary)] hover:bg-[var(--grey-700)]/60"
+                            }`}
+                          >
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate">
+                                {action.title}
+                              </div>
+                              <div className="mt-0.5 text-xs text-[var(--text-muted)] truncate">
+                                {action.subtitle}
+                              </div>
+                            </div>
+                            <div className="ml-3 flex flex-none items-center gap-2">
+                              {action.kind === "command" && action.shortcut ? (
+                                <kbd className="rounded-[var(--radius-xs)] border border-[var(--border-grey)] bg-[var(--grey-900)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-secondary)]">
+                                  {action.shortcut}
+                                </kbd>
+                              ) : null}
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] ${
+                                  action.kind === "project"
+                                    ? "bg-[var(--success-bg)] text-[var(--success-light)]"
+                                    : "bg-[var(--orange-subtle)] text-[var(--orange-300)]"
+                                }`}
+                              >
+                                {action.kind === "project"
+                                  ? "Project"
+                                  : "Command"}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))
+                )}
+              </div>
             )}
-          </div>
-        )}
-      </div>
-    </div>
+
+            <div className="flex items-center justify-between border-t border-[var(--border-grey)] bg-[var(--grey-900)] px-4 py-2 text-[10px] uppercase tracking-[0.2em] text-[var(--text-muted)]">
+              <div className="flex items-center gap-3">
+                <span>
+                  <kbd className="font-mono">↑↓</kbd> Navigate
+                </span>
+                <span>
+                  <kbd className="font-mono">↵</kbd> Select
+                </span>
+                <span>
+                  <kbd className="font-mono">Esc</kbd> Close
+                </span>
+              </div>
+              <span>
+                {filteredActions.length} result
+                {filteredActions.length === 1 ? "" : "s"}
+              </span>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }
 
 function ShortcutRow({ shortcut, label }: { shortcut: string; label: string }) {
   return (
-    <div className="rounded-2xl border border-[#2E2E2E] bg-[#0A0A0A] px-4 py-3">
-      <div className="text-[10px] uppercase tracking-[0.24em] text-[#7F7F7F]">
+    <div className="rounded-[var(--radius-md)] border border-[var(--border-grey)] bg-[var(--grey-900)] px-4 py-3">
+      <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-muted)]">
         {shortcut}
       </div>
-      <div className="mt-1 text-sm text-white">{label}</div>
+      <div className="mt-1 text-sm text-[var(--text-primary)]">{label}</div>
     </div>
   );
 }

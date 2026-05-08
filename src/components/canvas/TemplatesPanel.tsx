@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   templates,
   TEMPLATE_CATEGORIES,
@@ -20,180 +21,318 @@ export default function TemplatesPanel({
 }: TemplatesPanelProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  const filteredTemplates = templates.filter((template) => {
+  const filtered = templates.filter((t) => {
     const matchesCategory =
-      selectedCategory === "all" || template.category === selectedCategory;
+      selectedCategory === "all" || t.category === selectedCategory;
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      template.tags.some((tag) =>
-        tag.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      !q ||
+      t.name.toLowerCase().includes(q) ||
+      t.description.toLowerCase().includes(q) ||
+      t.tags.some((tag) => tag.toLowerCase().includes(q));
     return matchesCategory && matchesSearch;
   });
 
-  if (!isOpen) {
-    return null;
-  }
+  // Focus management
+  useEffect(() => {
+    if (!isOpen) return;
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    requestAnimationFrame(() => searchRef.current?.focus());
+    return () => {
+      previousFocusRef.current?.focus?.();
+    };
+  }, [isOpen]);
+
+  // Esc to close
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-10 bg-black/30 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      />
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.div
+          key="templates-modal"
+          className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: [0.22, 0.9, 0.28, 1] }}
+        >
+          {/* Backdrop */}
+          <button
+            type="button"
+            aria-label="Close templates"
+            onClick={onClose}
+            className="absolute inset-0 cursor-default bg-black/70 backdrop-blur-[4px]"
+          />
 
-      {/* Panel */}
-      <div className="fixed left-0 top-0 z-30 h-screen w-80 animate-slide-in-left glass-strong shadow-2xl">
-        {/* Header */}
-        <div className="border-b border-[var(--grey-700)] p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">Templates</h2>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--grey-700)] hover:text-white"
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <svg
-              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search templates..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-[var(--grey-700)] bg-[var(--grey-900)] py-2 pl-10 pr-3 text-sm text-white placeholder:text-[var(--text-muted)] focus:border-[var(--orange-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--orange-glow)]"
-            />
-          </div>
-        </div>
-
-        {/* Category Tabs */}
-        <div className="overflow-x-auto border-b border-[var(--grey-700)] px-4 py-2">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setSelectedCategory("all")}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                selectedCategory === "all"
-                  ? "bg-[var(--orange-primary)] text-white shadow-[var(--shadow-orange-glow-sm)]"
-                  : "bg-[var(--grey-800)] text-[var(--text-secondary)] hover:bg-[var(--grey-700)] hover:text-white"
-              }`}
-            >
-              All
-            </button>
-            {TEMPLATE_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                  selectedCategory === cat.id
-                    ? "bg-[var(--orange-primary)] text-white shadow-[var(--shadow-orange-glow-sm)]"
-                    : "bg-[var(--grey-800)] text-[var(--text-secondary)] hover:bg-[var(--grey-700)] hover:text-white"
-                }`}
-              >
-                {cat.icon} {cat.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Templates List */}
-        <div className="h-[calc(100vh-180px)] overflow-y-auto p-4">
-          {filteredTemplates.length === 0 ? (
-            <div className="py-12 text-center">
-              <svg
-                className="mx-auto mb-3 h-12 w-12 text-[var(--text-muted)] opacity-50"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <p className="text-sm text-[var(--text-muted)]">
-                No templates found
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredTemplates.map((template) => (
-                <button
-                  key={template.id}
-                  onClick={() => {
-                    onInsertTemplate(template);
-                    onClose();
-                  }}
-                  className="group w-full rounded-xl border border-[var(--grey-700)] bg-[var(--grey-900)] p-4 text-left transition-all hover:border-[var(--orange-primary)] hover:bg-[var(--grey-800)] hover:shadow-[var(--shadow-orange-glow-sm)]"
+          <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="templates-title"
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.97, y: 4 }}
+            transition={{ duration: 0.22, ease: [0.22, 1.4, 0.32, 1] }}
+            className="relative z-[61] flex w-full max-w-[720px] max-h-[80vh] flex-col overflow-hidden rounded-[12px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] shadow-[0_30px_60px_-20px_rgba(0,0,0,0.8)]"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[var(--cc-border-subtle)] px-5 py-4">
+              <div>
+                <h2
+                  id="templates-title"
+                  className="text-[16px] font-semibold text-[var(--cc-text-primary)]"
                 >
-                  <div className="mb-2 flex items-start justify-between">
-                    <h3 className="font-semibold text-white">
-                      {template.name}
-                    </h3>
-                    <svg
-                      className="h-5 w-5 text-[var(--text-muted)] transition-transform group-hover:translate-x-1 group-hover:text-[var(--orange-primary)]"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                  </div>
-                  <p className="mb-2 text-xs text-[var(--text-muted)]">
-                    {template.description}
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {template.tags.slice(0, 3).map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded bg-[var(--grey-800)] px-2 py-0.5 text-xs text-[var(--text-secondary)]"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-              ))}
+                  Templates
+                </h2>
+                <p className="mt-0.5 text-[12px] text-[var(--cc-text-secondary)]">
+                  Insert a starter sketch to bootstrap your canvas
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="flex h-8 w-8 items-center justify-center rounded-[var(--cc-radius-button)] text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  className="h-4 w-4"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
-          )}
+
+            {/* Search */}
+            <div className="border-b border-[var(--cc-border-subtle)] px-5 py-3">
+              <div className="flex items-center gap-2 rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2 transition-colors focus-within:border-[var(--cc-accent)] focus-within:shadow-[0_0_0_3px_var(--cc-accent-glow)]">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  className="h-4 w-4 text-[var(--cc-text-muted)]"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search templates by name, description, or tag..."
+                  aria-label="Search templates"
+                  className="flex-1 bg-transparent text-[13px] text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] focus:outline-none"
+                />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    aria-label="Clear search"
+                    className="rounded-[var(--cc-radius-tag)] px-1 text-[var(--cc-text-muted)] transition-colors hover:text-[var(--cc-text-primary)]"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      className="h-3.5 w-3.5"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Categories */}
+            <div className="border-b border-[var(--cc-border-subtle)] px-5 py-3">
+              <div className="flex flex-wrap gap-1.5">
+                <CategoryPill
+                  active={selectedCategory === "all"}
+                  onClick={() => setSelectedCategory("all")}
+                >
+                  All
+                </CategoryPill>
+                {TEMPLATE_CATEGORIES.map((cat) => (
+                  <CategoryPill
+                    key={cat.id}
+                    active={selectedCategory === cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                  >
+                    <span aria-hidden="true">{cat.icon}</span> {cat.label}
+                  </CategoryPill>
+                ))}
+              </div>
+            </div>
+
+            {/* Grid */}
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {filtered.length === 0 ? (
+                <EmptyState query={searchQuery} />
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {filtered.map((template) => (
+                    <TemplateCard
+                      key={template.id}
+                      template={template}
+                      onInsert={() => {
+                        onInsertTemplate(template);
+                        onClose();
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between border-t border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-5 py-2.5 text-[11px] text-[var(--cc-text-muted)]">
+              <span>
+                {filtered.length} template{filtered.length === 1 ? "" : "s"}
+              </span>
+              <span>
+                Press{" "}
+                <kbd className="mx-0.5 rounded-[var(--cc-radius-tag)] bg-[var(--cc-bg-canvas)] px-1.5 py-0.5 font-mono">
+                  Esc
+                </kbd>{" "}
+                to close
+              </span>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+function CategoryPill({
+  children,
+  active,
+  onClick,
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] ${
+        active
+          ? "bg-[var(--cc-accent)] text-white"
+          : "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] hover:bg-[var(--cc-border-subtle)] hover:text-[var(--cc-text-primary)]"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TemplateCard({
+  template,
+  onInsert,
+}: {
+  template: Template;
+  onInsert: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onInsert}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.18, ease: [0.22, 0.9, 0.28, 1] }}
+      className="group flex flex-col overflow-hidden rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-left transition-colors hover:border-[var(--cc-accent)]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+    >
+      {/* Thumbnail */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--cc-bg-canvas)]">
+        <div className="absolute inset-0 cc-dot-grid opacity-60" />
+        <div className="absolute inset-0 flex items-center justify-center text-[var(--cc-text-muted)]">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.25}
+            className="h-10 w-10 opacity-50 transition-transform duration-200 group-hover:scale-110 group-hover:text-[var(--cc-accent)]"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M3 9h18" />
+            <path d="M9 21V9" />
+          </svg>
         </div>
       </div>
-    </>
+
+      {/* Body */}
+      <div className="flex flex-col gap-1.5 p-3">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-[13px] font-medium text-[var(--cc-text-primary)] truncate">
+            {template.name}
+          </h3>
+          <span className="flex-none rounded-[var(--cc-radius-tag)] bg-[var(--cc-bg-canvas)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--cc-text-muted)]">
+            {template.category}
+          </span>
+        </div>
+        <p className="text-[11px] text-[var(--cc-text-secondary)] line-clamp-2">
+          {template.description}
+        </p>
+      </div>
+    </motion.button>
+  );
+}
+
+function EmptyState({ query }: { query: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-muted)]">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          className="h-5 w-5"
+          strokeLinecap="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+      </span>
+      <p className="text-[13px] text-[var(--cc-text-secondary)]">
+        No templates found{query ? ` for "${query}"` : ""}.
+      </p>
+      <p className="mt-1 text-[11px] text-[var(--cc-text-muted)]">
+        Try a different category or search term.
+      </p>
+    </div>
   );
 }

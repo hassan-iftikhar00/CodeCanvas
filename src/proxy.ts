@@ -33,10 +33,10 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  console.log("🔐 Proxy - Path:", request.nextUrl.pathname);
-  console.log("👤 Proxy - User:", user ? user.email : "Not authenticated");
+  console.log("Proxy - Path:", request.nextUrl.pathname);
+  console.log("Proxy - User:", user ? user.email : "Not authenticated");
   console.log(
-    "🍪 Proxy - Cookies:",
+    "Proxy - Cookies:",
     request.cookies
       .getAll()
       .map((c) => c.name)

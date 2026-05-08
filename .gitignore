@@ -10,6 +10,11 @@
 !.yarn/releases
 !.yarn/versions
 
+.claude/
+
+# backend runtime debug artifacts
+backend/debug/
+
 # testing
 /coverage
 

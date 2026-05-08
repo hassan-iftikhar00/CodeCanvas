@@ -1,15 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { motion } from "motion/react";
 
 export default function AuthCodeErrorPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0A0A0A] px-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--cc-bg-canvas)] px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
+        className="w-full max-w-md space-y-6"
+      >
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.25)]">
             <svg
-              className="h-8 w-8 text-red-500"
+              className="h-6 w-6 text-[var(--cc-error)]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -22,56 +28,60 @@ export default function AuthCodeErrorPage() {
               />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-white">
+          <h2 className="text-[20px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
             Authentication Failed
           </h2>
-          <p className="mt-2 text-sm text-[#A0A0A0]">
-            We couldn&apos;t complete your sign-in with Google.
+          <p className="mt-1.5 text-[13px] text-[var(--cc-text-secondary)]">
+            We couldn&apos;t complete your sign-in.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-[#2E2E2E] bg-[#1A1A1A] p-6">
-          <h3 className="mb-3 font-semibold text-white">Possible reasons:</h3>
-          <ul className="space-y-2 text-sm text-[#A0A0A0]">
+        <div className="rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-5">
+          <h3 className="mb-3 text-[13px] font-semibold text-[var(--cc-text-primary)]">
+            Possible reasons
+          </h3>
+          <ul className="space-y-2 text-[13px] text-[var(--cc-text-secondary)]">
             <li className="flex gap-2">
-              <span className="text-[#FF6B00]">•</span>
+              <span className="text-[var(--cc-accent)]">•</span>
               <span>The authentication code expired</span>
             </li>
             <li className="flex gap-2">
-              <span className="text-[#FF6B00]">•</span>
+              <span className="text-[var(--cc-accent)]">•</span>
               <span>Your browser blocked third-party cookies</span>
             </li>
             <li className="flex gap-2">
-              <span className="text-[#FF6B00]">•</span>
+              <span className="text-[var(--cc-accent)]">•</span>
               <span>The redirect URL isn&apos;t whitelisted in Supabase</span>
             </li>
           </ul>
 
-          <div className="mt-6 space-y-3">
+          <div className="mt-5 space-y-2">
             <Link
               href="/auth/login"
-              className="block w-full rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-6 py-3 text-center font-semibold text-white transition-all hover:bg-[#FF6B00]/30 hover:border-[#FF6B00]"
+              className="block w-full rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-4 py-2.5 text-center text-[13px] font-semibold text-white transition-all hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cc-bg-canvas)]"
             >
               Try Again
             </Link>
             <Link
               href="/"
-              className="block w-full rounded-lg border border-[#2E2E2E] bg-transparent px-6 py-3 text-center text-sm font-medium text-[#A0A0A0] transition-all hover:bg-[#2E2E2E] hover:text-white"
+              className="block w-full rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-transparent px-4 py-2.5 text-center text-[13px] font-medium text-[var(--cc-text-secondary)] transition-all hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
             >
               Back to Home
             </Link>
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#2E2E2E] bg-[#1A1A1A]/50 p-4">
-          <p className="text-xs text-[#666666]">
-            <strong className="text-[#A0A0A0]">Developer tip:</strong> Check
-            your browser console (F12) for detailed error messages, or verify
-            your Supabase Dashboard &rarr; Authentication &rarr; URL
+        <div className="rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)]/60 p-4">
+          <p className="text-[11px] leading-relaxed text-[var(--cc-text-muted)]">
+            <strong className="text-[var(--cc-text-secondary)]">
+              Developer tip:
+            </strong>{" "}
+            Check your browser console (F12) for detailed error messages, or
+            verify your Supabase Dashboard &rarr; Authentication &rarr; URL
             Configuration settings.
           </p>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
