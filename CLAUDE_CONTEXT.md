@@ -2,7 +2,7 @@
 
 > Read this file before helping with any task.
 > This is a FYP (Final Year Project) at a university.
-> Last updated: April 2026
+> Last updated: May 2026
 
 ---
 
@@ -47,28 +47,37 @@ Users draw UI wireframes/sketches on a canvas (like drawing boxes for buttons, n
 ```
 Step 1: User draws sketch on canvas
         File: src/components/canvas/SketchCanvas.tsx
+        Chrome: FloatingToolbar, StyleRibbon, ZoomPill, CanvasSurface
 
 Step 2: User clicks "Run Detection"
-        File: src/app/canvas/page.tsx (handleRunDetection)
+        File: src/app/canvas/page.tsx
 
-Step 3: Sketch image sent to FastAPI backend
-        File: src/app/api/generate-code/route.ts
+Step 3: Sketch image POSTed to FastAPI
+        Frontend proxy: src/app/api/generate-code/route.ts
+        Backend endpoint: POST /api/predict in backend/main.py
 
 Step 4: FastAPI calls Roboflow API
         File: backend/app/models/inference.py (SketchDetector)
         Returns: [navbar, section, card, footer] with positions
 
-Step 5: Detected components sorted top-to-bottom
-        Then sent to Gemini API with a prompt
+Step 5: Backend attaches text annotations to detected elements
+        File: backend/main.py (_attach_text_annotations,
+        _synthesize_missing_containers, _infer_canvas_extents)
+        Handles oversized containers and top/bottom-band navbar/footer
+        recovery when the model misses them.
 
 Step 6: Gemini generates React + Tailwind code
-        File: backend/code_generator.py (CodeGenerator)
+        File: backend/app/models/inference.py
+        Entry points: _build_gemini_prompt + generate_with_gemini
+        Class: CodeGenerator (also in inference.py — no separate
+        code_generator.py file)
 
 Step 7: Code returned to frontend and displayed
         File: src/app/canvas/page.tsx (code panel)
 
 Step 8: User can refine code via chat
-        File: src/app/api/generate-code/route.ts
+        Frontend: src/components/canvas/ChatInterface.tsx
+        Backend: refine_chat_with_openrouter in backend/main.py
         Uses: OpenRouter API (separate from Gemini)
 ```
 
@@ -217,8 +226,8 @@ Key takeaways:
 
 | LLM                | Purpose                                          | Status                        |
 | ------------------ | ------------------------------------------------ | ----------------------------- |
-| **Gemini 2.5 Pro** | Initial code generation from detected components | 🔴 To be integrated (Task H4) |
-| **Gemini Flash**   | Fallback if 2.5 Pro is slow                      | 🔴 To be integrated           |
+| **Gemini 2.5 Pro** | Initial code generation from detected components | ✅ Integrated (commit 2bb44ed) |
+| **Gemini Flash**   | Fallback if 2.5 Pro is slow                      | ✅ Available as fallback      |
 | **OpenRouter**     | Chat-based code refinement ONLY                  | ✅ Already working            |
 
 ### Why Two LLMs?
@@ -288,46 +297,80 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 ### ✅ Fully Done
 
 - Canvas drawing interface (Konva.js)
+- **Redesigned canvas workspace** (commit d42f2aa) — extracted
+  `CanvasSurface`, `FloatingToolbar`, `StyleRibbon`, `ZoomPill`;
+  shared types in `src/types/canvas.ts`
+- **H4: Roboflow + Gemini pipeline** wired end-to-end (commit 2bb44ed)
+- **Backend text-to-element matching hardened** (commit d42f2aa) —
+  canvas-extent inference, oversized-container handling, top/bottom-band
+  navbar/footer synthesis with mis-fire guards
 - User authentication (Supabase)
-- Project save/load (partially broken schema — Bilal fixing)
+- Project save/load — `useProjectSave` now uses canonical `title` /
+  `thumbnail_url` columns (M1 done)
 - OpenRouter chat refinement
 - Fallback template-based code generation
 - Database setup and migrations
-- Version history UI
+- Version history — `useVersionHistory` queries `iterations` table
+  with `version_number` ordering (M2 done)
+- Project rename — `updateProjectTitle` in `useProjectSave` (M3 done)
+- Toast notifications — `src/components/ui/Toast.tsx` (M10 done)
+- Canvas keyboard shortcuts — `useCanvasShortcuts` hook (M14 done
+  for canvas; rest of app may still need bindings)
+- Profile page rework (M7 — landed alongside auth polish)
 
 ### ⚠️ Partially Done
 
-- Sketch detection (fallback works, Roboflow not yet integrated)
-- Code generation (templates work, Gemini not yet integrated)
-- Dashboard project management (rename handler is empty)
-- Frontend hooks (wrong DB column names)
+- Dashboard project management — card actions present, polish ongoing
+- Sketch detection accuracy — Roboflow integrated, but `card`
+  precision is structurally low (58% — see Shahwaiz section);
+  synthesis heuristics compensate but don't replace better training
 
 ### ❌ Not Started / In Progress
 
-- H4: Roboflow + Gemini integration (Hassan's task)
-- B1: DB schema unification (Bilal)
-- M3: Project rename implementation (Maarij)
-- CI/CD pipeline (Bilal)
-- Onboarding flow (Maarij)
-- Settings/profile page (Maarij)
-- Dark mode (Maarij)
-- Export as ZIP (Bilal)
-- Framework selector (Bilal)
+- B1: DB schema unification (Bilal — most critical)
+- B5/B6: Framework selector + Export as ZIP (Bilal)
+- B9: CI/CD pipeline (Bilal)
+- M6: Onboarding flow (Maarij)
+- M11: Dark mode (Maarij)
+- M12: Mobile responsiveness (Maarij)
+- M13: Animations beyond canvas chrome (Maarij)
 
 ---
 
 ## Key Files Map
 
+### Frontend — canvas chrome (post-redesign)
+
+| File                                          | Purpose                                                 |
+| --------------------------------------------- | ------------------------------------------------------- |
+| `src/app/canvas/page.tsx`                     | Orchestrator: composes chrome, owns detection trigger   |
+| `src/components/canvas/SketchCanvas.tsx`      | Konva drawing surface                                   |
+| `src/components/canvas/SketchCanvasWithHistory.tsx` | Drawing surface + undo/redo wiring                |
+| `src/components/canvas/CanvasSurface.tsx`     | Dot-grid workspace + empty-state hint                   |
+| `src/components/canvas/FloatingToolbar.tsx`   | Tool picker (select/pen/shapes/erase) w/ shortcuts      |
+| `src/components/canvas/StyleRibbon.tsx`       | Stroke / fill / width / opacity controls                |
+| `src/components/canvas/ZoomPill.tsx`          | Zoom presets + fit-to-screen                            |
+| `src/components/canvas/ChatInterface.tsx`     | OpenRouter chat refinement panel                        |
+| `src/components/canvas/LivePreview.tsx`       | Code → live preview iframe                              |
+| `src/types/canvas.ts`                         | Canonical `Tool`, `Mode`, zoom constants, `TOOL_KEY_MAP` |
+| `src/hooks/useCanvasShortcuts.ts`             | Keyboard shortcut handler for canvas page               |
+| `src/components/ui/Toast.tsx`                 | App-wide toast provider                                 |
+
+### Frontend — data + routes
+
 | File                                     | Purpose                                            |
 | ---------------------------------------- | -------------------------------------------------- |
-| `src/app/canvas/page.tsx`                | Main canvas page, detection trigger                |
-| `src/app/api/generate-code/route.ts`     | API route, OpenRouter integration                  |
-| `src/components/canvas/SketchCanvas.tsx` | Drawing canvas component                           |
-| `src/hooks/useProjectSave.ts`            | Save project to DB (schema broken — Maarij fixing) |
-| `src/hooks/useVersionHistory.ts`         | Version management (schema broken — Maarij fixing) |
-| `backend/main.py`                        | FastAPI server, main endpoints                     |
-| `backend/app/models/inference.py`        | Detection + generation logic                       |
-| `backend/code_generator.py`              | Gemini code generation (to be created)             |
+| `src/app/api/generate-code/route.ts`     | Proxy to FastAPI; OpenRouter routing               |
+| `src/hooks/useProjectSave.ts`            | Project CRUD (canonical schema)                    |
+| `src/hooks/useVersionHistory.ts`         | Iterations table queries                           |
+
+### Backend
+
+| File                                     | Purpose                                            |
+| ---------------------------------------- | -------------------------------------------------- |
+| `backend/main.py`                        | FastAPI server, `/api/predict`, text-attachment + synthesis helpers |
+| `backend/app/models/inference.py`        | `SketchDetector`, `CodeGenerator`, `_build_gemini_prompt`, `generate_with_gemini` — Roboflow + Gemini both live here |
+| `backend/debug/last_sketch.png`          | Runtime debug dump when `DEBUG_AI_PROMPT=on` (gitignored) |
 
 ---
 
@@ -335,29 +378,31 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 
 ### Hassan (Lead) — DO THESE ONLY
 
-- **H4:** Integrate Roboflow detection + Gemini code generation
-  - Update inference.py with Roboflow SDK
-  - Create code_generator.py with Gemini
-  - Update main.py endpoint
-  - Test end-to-end pipeline
-- **Final:** Integrate everything when all parts ready
+- ✅ **H4 (done):** Roboflow detection + Gemini code generation wired
+  end-to-end (commits 2bb44ed, d42f2aa). Gemini lives in `inference.py`
+  rather than a separate `code_generator.py`.
+- ✅ **Canvas redesign + matching reliability (done):** chrome
+  refactor, text-attachment + container-synthesis heuristics
+  (commit d42f2aa).
+- **Final:** Integrate everything when all parts ready / final QA
 
 ### Maarij (Frontend) — DO NOT REASSIGN
 
-- M1: Fix useProjectSave.ts column names
-- M2: Fix useVersionHistory.ts → iterations
-- M3: Implement project rename handler
+- ✅ M1: Fix useProjectSave.ts column names — done
+- ✅ M2: Fix useVersionHistory.ts → iterations — done
+- ✅ M3: Implement project rename handler — done (`updateProjectTitle`)
 - M4: Polish project card actions
-- M5: Add empty states
+- M5: Add empty states (canvas has one — extend to dashboard)
 - M6: Build onboarding flow
-- M7: Settings/profile page
+- ✅ M7: Settings/profile page — landed
 - M8: Error boundaries
 - M9: Loading skeletons
-- M10: Toast notifications
+- ✅ M10: Toast notifications — done (`src/components/ui/Toast.tsx`)
 - M11: Dark mode
 - M12: Mobile responsiveness
-- M13: Animations
-- M14: Keyboard shortcuts
+- M13: Animations (canvas chrome already animated — rest of app pending)
+- ✅ M14: Keyboard shortcuts (canvas) — done (`useCanvasShortcuts`).
+  Global shortcuts (Cmd+K palette etc.) already exist in CommandPalette.
 - M15: Docs cleanup
 
 ### Bilal (Backend) — DO NOT REASSIGN
@@ -406,6 +451,39 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 7. **GitHub Projects** used for task tracking
 8. **No collaboration features** — cut from scope (too complex for timeline)
 9. **No offline mode** — cut from scope (overkill)
+10. **Gemini lives in `inference.py`** — we collapsed the planned
+    `backend/code_generator.py` into `inference.py` to keep the
+    detection + generation pipeline in one module. Don't recreate
+    `code_generator.py`.
+11. **Container synthesis is conservative** — top/bottom-band navbar
+    /footer fabrication fires ONLY on stray text annotations, never on
+    detected `card` clusters. Reason: a row of dialog buttons
+    (Yes / No) was being relabelled as a footer. If you extend this,
+    keep cards as content, not container hints.
+12. **Oversized containers list children positionally** — any
+    container >= 55% of canvas area gets its text annotations listed
+    by position rather than joined, so giant page-level rectangles
+    don't swallow labels.
+13. **Canvas types are centralised** in `src/types/canvas.ts` —
+    `Tool`, `ToolGroup`, `Mode`, `RightPanel`, `CodeViewMode`,
+    `ZOOM_*` constants, `TOOL_KEY_MAP`. Don't redefine these locally.
+14. **Runtime debug artifacts** (`backend/debug/`) are gitignored —
+    don't check them in.
+
+---
+
+## Recent Work (most recent first)
+
+- **d42f2aa — Canvas redesign + matching reliability** (May 2026):
+  Extracted canvas chrome into focused components, centralised types,
+  added Toast + keyboard-shortcut hook. Backend: text-to-element
+  matching now handles canvas-extent inference, oversized containers,
+  and top/bottom-band navbar/footer recovery without the previous
+  card-cluster mis-fires.
+- **2bb44ed — H4** (April 2026): Roboflow + Gemini sketch-to-code
+  pipeline wired end-to-end.
+- **989dbb0 / 6dafba1 — Maarij tasks 2-5**: dashboard + auth polish.
+- **56526bc**: sketch-first AI refinement, dashboard nav upgrades.
 
 ---
 
@@ -429,7 +507,7 @@ When I ask for help:
 Frontend URL:  http://localhost:3000
 Backend URL:   http://localhost:8000
 Database:      Supabase (see .env)
-Roboflow:      https://serverless.roboflow.com
+Roboflow:      https://detect.roboflow.com   (NOT serverless.roboflow.com — see Operational notes #1)
 Gemini:        https://aistudio.google.com
 OpenRouter:    https://openrouter.ai
 ```
