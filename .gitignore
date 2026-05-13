@@ -14,6 +14,7 @@
 
 # backend runtime debug artifacts
 backend/debug/
+backend/synthetic_data/_smoketest/
 
 # testing
 /coverage
