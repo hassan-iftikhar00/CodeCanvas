@@ -14,7 +14,14 @@
 
 # backend runtime debug artifacts
 backend/debug/
+
+# Synthetic dataset generation outputs (large, regenerable, do not commit)
 backend/synthetic_data/_smoketest/
+backend/synthetic_data/_verify/
+backend/synthetic_data/_primitives_test.jpg
+synthetic_dataset/
+verify/
+**/_stats.json
 
 # testing
 /coverage
