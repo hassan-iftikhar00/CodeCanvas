@@ -32,8 +32,8 @@ type DateFilter = "all" | "7d" | "30d";
 interface DeleteSnapshot {
   project: DashboardProject;
   index: number;
-  wasStarred: boolean;
-  recentEntries: RecentProjectActivity[];
+  previousStarredIds: string[];
+  previousRecentActivity: RecentProjectActivity[];
 }
 
 type ProjectCardProject = {
@@ -44,6 +44,11 @@ type ProjectCardProject = {
   thumbnailUrl?: string | null;
   updated_at: string;
 };
+
+const ONBOARDING_STORAGE_PREFIX = "codecanvas:onboarding:seen";
+const ONBOARDING_PENDING_PREFIX = "codecanvas:onboarding:pending";
+const ONBOARDING_LOCAL_PREFIX = "codecanvas:onboarding:local";
+const ONBOARDING_DEBUG_KEY = "codecanvas:onboarding:debug";
 
 export default function DashboardPage() {
   const [projects, setProjects] = useState<DashboardProject[]>([]);
@@ -62,6 +67,12 @@ export default function DashboardPage() {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(
     null
   );
+  const [showOnboardingPrompt, setShowOnboardingPrompt] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<Record<string, unknown> | null>(
+    null
+  );
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const supabase = createClient();
   const router = useRouter();
   const deleteDialogRef = useRef<HTMLDivElement | null>(null);
@@ -69,6 +80,7 @@ export default function DashboardPage() {
   const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
   const newProjectButtonRef = useRef<HTMLButtonElement | null>(null);
   const deleteSnapshotRef = useRef<DeleteSnapshot | null>(null);
+  const DELETE_TIMEOUT_MS = 10000;
 
   const restoreDeleteFocus = useCallback(() => {
     window.setTimeout(() => {
@@ -113,6 +125,92 @@ export default function DashboardPage() {
     setStarredProjectIds(readStarredProjectIds());
     setRecentActivity(readRecentProjectActivity());
   }, [fetchProjects]);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        setUserId(user?.id ?? null);
+        if (user?.id) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("onboarding_completed")
+            .eq("id", user.id)
+            .single();
+          if (profile) setUserProfile(profile as Record<string, unknown>);
+        } else {
+          setUserProfile(null);
+        }
+      } catch {
+        setUserId(null);
+        setUserProfile(null);
+      } finally {
+        setProfileLoaded(true);
+      }
+    };
+    loadUser();
+  }, [supabase]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!profileLoaded) return;
+    if (!userId) {
+      setShowOnboardingPrompt(false);
+      return;
+    }
+    const seenKey = `${ONBOARDING_STORAGE_PREFIX}:${userId}`;
+    const pendingKey = `${ONBOARDING_PENDING_PREFIX}:${userId}`;
+    const localKey = `${ONBOARDING_LOCAL_PREFIX}:${userId}`;
+    const hasSeen = window.localStorage.getItem(seenKey);
+    const pending = window.localStorage.getItem(pendingKey);
+    const localSeen = window.localStorage.getItem(localKey);
+    const profileCompleted = Boolean(
+      userProfile &&
+        (userProfile as { onboarding_completed?: boolean })
+          .onboarding_completed
+    );
+
+    if (window.localStorage.getItem(ONBOARDING_DEBUG_KEY) === "true") {
+      console.debug("[onboarding]", "dashboard-check", {
+        userId,
+        seenKey,
+        pendingKey,
+        localKey,
+        hasSeen,
+        pending,
+        localSeen,
+        profileCompleted,
+      });
+    }
+
+    if (!profileCompleted && !hasSeen && !localSeen && !pending) {
+      setShowOnboardingPrompt(true);
+      return;
+    }
+
+    setShowOnboardingPrompt(false);
+  }, [profileLoaded, userId, userProfile]);
+
+  const persistOnboardingCompletion = useCallback(async () => {
+    if (!userId) return;
+    try {
+      await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: userId,
+            onboarding_completed: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        );
+      setUserProfile({ onboarding_completed: true });
+    } catch (error) {
+      console.error("Failed to persist onboarding completion:", error);
+    }
+  }, [supabase, userId]);
 
   const handleCreateProject = async () => {
     const {
@@ -169,6 +267,30 @@ export default function DashboardPage() {
     }
   };
 
+  const handleStartOnboarding = () => {
+    if (typeof window !== "undefined") {
+      if (!userId) return;
+      const pendingKey = `${ONBOARDING_PENDING_PREFIX}:${userId}`;
+      window.localStorage.setItem(pendingKey, "true");
+    }
+    setShowOnboardingPrompt(false);
+    router.push("/canvas");
+  };
+
+  const handleSkipOnboarding = () => {
+    if (typeof window !== "undefined") {
+      if (!userId) return;
+      const seenKey = `${ONBOARDING_STORAGE_PREFIX}:${userId}`;
+      const pendingKey = `${ONBOARDING_PENDING_PREFIX}:${userId}`;
+      const localKey = `${ONBOARDING_LOCAL_PREFIX}:${userId}`;
+      window.localStorage.setItem(seenKey, "true");
+      window.localStorage.setItem(localKey, "true");
+      window.localStorage.removeItem(pendingKey);
+    }
+    void persistOnboardingCompletion();
+    setShowOnboardingPrompt(false);
+  };
+
   const closeDeleteDialog = useCallback(() => {
     setDeleteDialogProject(null);
     setDeleteError(null);
@@ -191,10 +313,8 @@ export default function DashboardPage() {
       deleteSnapshotRef.current = {
         project: projectToDelete,
         index: projects.findIndex((item) => item.id === projectToDelete.id),
-        wasStarred: starredProjectIds.includes(projectToDelete.id),
-        recentEntries: recentActivity.filter(
-          (entry) => entry.projectId === projectToDelete.id
-        ),
+        previousStarredIds: [...starredProjectIds],
+        previousRecentActivity: [...recentActivity],
       };
 
       setDeleteError(null);
@@ -221,43 +341,64 @@ export default function DashboardPage() {
 
     const projectId = deleteDialogProject.id;
     setDeletingProjectId(projectId);
+    setDeleteError(null);
+
+    console.debug("[delete-project] optimistic remove", {
+      projectId,
+      projectTitle: deleteDialogProject.title,
+    });
 
     setProjects((current) =>
       current.filter((project) => project.id !== projectId)
     );
-    setStarredProjectIds((current) =>
-      current.filter((projectIdToKeep) => projectIdToKeep !== projectId)
-    );
-    setRecentActivity((current) =>
-      current.filter((entry) => entry.projectId !== projectId)
-    );
+    setStarredProjectIds((current) => {
+      const next = current.filter((projectIdToKeep) => projectIdToKeep !== projectId);
+      writeStarredProjectIds(next);
+      return next;
+    });
+    setRecentActivity((current) => {
+      const next = current.filter((entry) => entry.projectId !== projectId);
+      writeRecentProjectActivity(next);
+      return next;
+    });
 
+    let timeoutId: number | null = null;
     try {
-      const { error } = await supabase
+      const controller = new AbortController();
+      timeoutId = window.setTimeout(() => {
+        controller.abort();
+      }, DELETE_TIMEOUT_MS);
+
+      const deleteRequest = supabase
         .from("projects")
         .delete()
-        .eq("id", projectId);
+        .eq("id", projectId)
+        .select("id")
+        .abortSignal(controller.signal);
+
+      const { data, error } = await deleteRequest;
 
       if (error) {
         throw error;
       }
 
-      setStarredProjectIds((current) => {
-        const next = current.filter(
-          (projectIdToKeep) => projectIdToKeep !== projectId
-        );
-        writeStarredProjectIds(next);
-        return next;
-      });
+      if (!data || data.length === 0) {
+        throw new Error("Delete did not remove any records.");
+      }
 
-      setRecentActivity((current) => {
-        const next = current.filter((entry) => entry.projectId !== projectId);
-        writeRecentProjectActivity(next);
-        return next;
+      console.debug("[delete-project] backend delete succeeded", {
+        projectId,
+        deletedCount: data.length,
       });
     } catch (error) {
+      const isAbortError =
+        error instanceof DOMException && error.name === "AbortError";
       console.error("Error deleting project:", error);
-      setDeleteError("Could not delete the project. Please try again.");
+      setDeleteError(
+        isAbortError
+          ? "Delete request timed out. Please try again."
+          : "Could not delete the project. Please try again."
+      );
 
       setProjects((current) => {
         if (current.some((project) => project.id === snapshot.project.id)) {
@@ -272,31 +413,19 @@ export default function DashboardPage() {
         ];
       });
 
-      setStarredProjectIds((current) => {
-        if (snapshot.wasStarred && !current.includes(snapshot.project.id)) {
-          return [snapshot.project.id, ...current];
-        }
-
-        return current;
+      setStarredProjectIds(() => {
+        writeStarredProjectIds(snapshot.previousStarredIds);
+        return snapshot.previousStarredIds;
       });
 
-      setRecentActivity((current) => {
-        const withoutDeletedProject = current.filter(
-          (entry) => entry.projectId !== snapshot.project.id
-        );
-        const restoredEntries = snapshot.recentEntries.filter(
-          (entry) =>
-            !withoutDeletedProject.some(
-              (currentEntry) =>
-                currentEntry.projectId === entry.projectId &&
-                currentEntry.type === entry.type &&
-                currentEntry.timestamp === entry.timestamp
-            )
-        );
-
-        return [...restoredEntries, ...withoutDeletedProject];
+      setRecentActivity(() => {
+        writeRecentProjectActivity(snapshot.previousRecentActivity);
+        return snapshot.previousRecentActivity;
       });
     } finally {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
       setDeletingProjectId(null);
       deleteSnapshotRef.current = null;
       setDeleteDialogProject(null);
@@ -797,6 +926,79 @@ export default function DashboardPage() {
                     ) : (
                       "Delete"
                     )}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showOnboardingPrompt && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-[4px]"
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.98, y: 8 }}
+                transition={{ duration: 0.2, ease: [0.22, 1.1, 0.32, 1] }}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="onboarding-title"
+                aria-describedby="onboarding-description"
+                className="w-full max-w-md rounded-[16px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-5 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.8)]"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[var(--cc-radius-button)] bg-[rgba(255,107,0,0.14)] text-[var(--cc-accent)]">
+                    <svg
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2
+                      id="onboarding-title"
+                      className="text-[16px] font-semibold text-[var(--cc-text-primary)]"
+                    >
+                      Start the guided walkthrough?
+                    </h2>
+                    <p
+                      id="onboarding-description"
+                      className="mt-1 text-[12px] text-[var(--cc-text-secondary)]"
+                    >
+                      We will walk you through Draw, Generate, and Export in the
+                      canvas so you can get productive fast.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSkipOnboarding}
+                    className="rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-3.5 py-2 text-[13px] font-semibold text-[var(--cc-text-primary)] transition-colors hover:border-[var(--cc-border-emphasis)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+                  >
+                    Skip
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStartOnboarding}
+                    className="inline-flex items-center justify-center gap-2 rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+                  >
+                    Start walkthrough
                   </button>
                 </div>
               </motion.div>
