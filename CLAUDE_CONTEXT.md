@@ -90,7 +90,7 @@ Step 8: User can refine code via chat
 | **Hassan (Lead)** | Architecture, integration, reviews | Active                       |
 | **Maarij**        | Frontend / UI / Dashboard          | Assigned tasks               |
 | **Bilal**         | Backend / Database / API / Testing | Assigned tasks               |
-| **Shahwaiz**      | AI Model training                  | Model ready via Roboflow API |
+| **Shahwaiz**      | AI Model training                  | v2 live; v3 training pending (synthetic data handoff done) |
 
 ### Important Rule
 
@@ -137,17 +137,37 @@ The model intentionally collapses all content subtypes into `card`. Disambiguati
 - **Image size range:** 0.20 – 3.21 MP (avg 0.46 MP)
 - **Training distribution:** mixed — hand-drawn pen sketches AND real digital UI screenshots
 
+**YOLO class IDs (alphabetical order — confirmed):**
+
+| ID | class     |
+| -- | --------- |
+| 0  | `card`    |
+| 1  | `footer`  |
+| 2  | `navbar`  |
+| 3  | `section` |
+
+**Real dataset visual style distribution (discovered May 2026):**
+- Clean digital wireframes (~40%) — thin crisp strokes, resembles Konva.js output; hardest inference target
+- Dense hand-drawn sketches (~40%) — zigzag squiggles for text, X-cross marks for image placeholders
+- Sparse wireframes (~20%) — few elements, minimal detail, lowest density
+
+Synthetic generation weights mirror this 40/40/20 distribution.
+
 ### Preprocessing & augmentations (v2)
 
 - **Resize:** Stretch to 640×640 (so input aspect ratio is altered before inference — extreme aspect ratios like wide-thin strips lose vertical detail)
 - **Auto-orient:** applied
 - **Augmentations:** flip horizontal, ±5° rotation, ±10% brightness, 2 outputs per training example — **no noise / no blur / no contrast variation**, so the model is brittle to inputs that don't match training contrast / lighting
 
-### Performance (mAP@50, validation set)
+### Performance (v2 model)
 
-| class     | precision |
+**Test set overall:** mAP@50 80.2% · Precision 83.1% · Recall 79.5% · F1 80.3%
+
+**Per-class mAP@50 (validation set):**
+
+| class     | mAP@50    |
 | --------- | --------- |
-| all       | 72.0%     |
+| all       | ~72.0%    |
 | `card`    | 58.0% ⚠️  |
 | `footer`  | 68.0%     |
 | `navbar`  | 82.0%     |
@@ -263,6 +283,15 @@ iterations (
   generated_code,
   created_at
 )
+
+-- Profiles table (Supabase auth extension)
+profiles (
+  id,             -- matches auth.users.id
+  onboarding_completed  -- boolean, default false; set true after tour
+)
+
+-- DB function (migration 20260515000001)
+delete_project(project_id uuid)  -- cascades: deletes iterations then project
 ```
 
 ### CRITICAL: Wrong names that must NOT be used
@@ -317,6 +346,9 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 - Canvas keyboard shortcuts — `useCanvasShortcuts` hook (M14 done
   for canvas; rest of app may still need bindings)
 - Profile page rework (M7 — landed alongside auth polish)
+- Dashboard project card actions + delete (M4 done)
+- Empty states — dashboard + canvas (M5 done)
+- Onboarding tour (M6 done — `OnboardingTour.tsx`)
 
 ### ⚠️ Partially Done
 
@@ -324,13 +356,18 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 - Sketch detection accuracy — Roboflow integrated, but `card`
   precision is structurally low (58% — see Shahwaiz section);
   synthesis heuristics compensate but don't replace better training
+- **v3 model training** — 2,500 synthetic images generated (May 2026),
+  handoff doc sent to Shahwaiz; training `object-detection-4affw/3`
+  pending. Once Shahwaiz reports v3 mAP, update `ROBOFLOW_MODEL_ID`
+  in `.env` if v3 outperforms v2.
 
 ### ❌ Not Started / In Progress
 
 - B1: DB schema unification (Bilal — most critical)
 - B5/B6: Framework selector + Export as ZIP (Bilal)
 - B9: CI/CD pipeline (Bilal)
-- M6: Onboarding flow (Maarij)
+- M8: Error boundaries (Maarij)
+- M9: Loading skeletons (Maarij)
 - M11: Dark mode (Maarij)
 - M12: Mobile responsiveness (Maarij)
 - M13: Animations beyond canvas chrome (Maarij)
@@ -355,6 +392,7 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 | `src/types/canvas.ts`                         | Canonical `Tool`, `Mode`, zoom constants, `TOOL_KEY_MAP` |
 | `src/hooks/useCanvasShortcuts.ts`             | Keyboard shortcut handler for canvas page               |
 | `src/components/ui/Toast.tsx`                 | App-wide toast provider                                 |
+| `src/components/onboarding/OnboardingTour.tsx`| Step-by-step onboarding overlay with spotlight highlight |
 
 ### Frontend — data + routes
 
@@ -371,6 +409,20 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 | `backend/main.py`                        | FastAPI server, `/api/predict`, text-attachment + synthesis helpers |
 | `backend/app/models/inference.py`        | `SketchDetector`, `CodeGenerator`, `_build_gemini_prompt`, `generate_with_gemini` — Roboflow + Gemini both live here |
 | `backend/debug/last_sketch.png`          | Runtime debug dump when `DEBUG_AI_PROMPT=on` (gitignored) |
+
+### Synthetic data pipeline (`backend/synthetic_data/`)
+
+Entry point: `python -m backend.synthetic_data.generate --count 2500 --out synthetic_dataset`
+
+| File                                          | Purpose                                            |
+| --------------------------------------------- | -------------------------------------------------- |
+| `backend/synthetic_data/generate.py`          | CLI orchestrator — renders images, writes YOLO labels |
+| `backend/synthetic_data/layouts.py`           | Layout templates (standard / sidebar / minimal) + `Element` dataclass |
+| `backend/synthetic_data/style.py`             | `SketchStyle`, `Hotspot`, style-type sampling (`random_style()`) |
+| `backend/synthetic_data/rough.py`             | PIL drawing primitives: wobble lines, zigzag text fill, image placeholder X |
+| `backend/synthetic_data/validate.py`          | YOLO label validation, bbox jitter, annotator miss-rate simulation |
+
+Output is **gitignored** (`synthetic_dataset/`). All 2,500 images go to `train/` only — real 17 valid + 18 test stay as the evaluation split (sim-to-real protocol).
 
 ---
 
@@ -391,9 +443,9 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 - ✅ M1: Fix useProjectSave.ts column names — done
 - ✅ M2: Fix useVersionHistory.ts → iterations — done
 - ✅ M3: Implement project rename handler — done (`updateProjectTitle`)
-- M4: Polish project card actions
-- M5: Add empty states (canvas has one — extend to dashboard)
-- M6: Build onboarding flow
+- ✅ M4: Polish project card actions — done (delete project + cascade iterations via `delete_project()` DB function)
+- ✅ M5: Add empty states — done (dashboard + canvas)
+- ✅ M6: Build onboarding flow — done (`OnboardingTour.tsx`, `onboarding_completed` on profiles)
 - ✅ M7: Settings/profile page — landed
 - M8: Error boundaries
 - M9: Loading skeletons
@@ -469,11 +521,26 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
     `ZOOM_*` constants, `TOOL_KEY_MAP`. Don't redefine these locally.
 14. **Runtime debug artifacts** (`backend/debug/`) are gitignored —
     don't check them in.
+15. **Synthetic images go to `train/` only; real splits are evaluation-only** — mixing
+    synthetic into `val/` or `test/` corrupts the mAP signal. Shahwaiz's 17 valid + 18
+    test images are the only honest measure of real-world performance. Never move them to train.
+16. **v3 Roboflow augmentation config is identical to v2** — same stretch, flip, rotation,
+    brightness, and 2-outputs setting. This isolates the dataset as the only variable so
+    v2 vs v3 mAP is a clean A/B comparison. Do NOT change augmentations when training v3.
 
 ---
 
 ## Recent Work (most recent first)
 
+- **13d94e8 — M4, M5, M6 (Maarij)** (May 2026): Dashboard project card actions
+  polished (delete with cascade via `delete_project()` DB function), empty states
+  added to dashboard, onboarding tour built (`OnboardingTour.tsx` with spotlight
+  highlight). Also bumped `inference-sdk` 0.22.1 → 0.64.8 and `numpy` 1.26.4 → 2.2.6
+  in backend requirements — test detection after `pip install -r requirements.txt`.
+- **60ad65e — Dataset Generation** (May 2026): Added `backend/synthetic_data/`
+  — PIL-based synthetic sketch generator producing 2,500 YOLO-format training images
+  in three style types (clean 40% / dense_hand 40% / sparse_sketch 20%) matching
+  the real dataset's visual distribution. All synthetic images go to `train/` only.
 - **d42f2aa — Canvas redesign + matching reliability** (May 2026):
   Extracted canvas chrome into focused components, centralised types,
   added Toast + keyboard-shortcut hook. Backend: text-to-element
@@ -484,6 +551,33 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
   pipeline wired end-to-end.
 - **989dbb0 / 6dafba1 — Maarij tasks 2-5**: dashboard + auth polish.
 - **56526bc**: sketch-first AI refinement, dashboard nav upgrades.
+
+---
+
+## Current Bottleneck
+
+The primary bottleneck is **Roboflow detection quality, not Gemini generation quality**.
+Most downstream code generation issues trace back to incorrect or incomplete component
+detection — especially weak `card` classification and poor handling of sparse layouts.
+Gemini produces good code when given accurate detections. Improving detection accuracy
+(more training data, better card examples) has higher leverage than tuning the Gemini prompt.
+
+---
+
+## Known Failure Modes
+
+These are real failure patterns seen in production or testing. Read before debugging detection issues.
+
+| Failure | Root cause |
+| ------- | ---------- |
+| Detection returns 0 predictions on a clearly valid sketch | Transparent canvas background composited to black — sketch lines invisible on dark background. Fixed in `inference.py` (alpha→white). If it regresses, check `backend/debug/last_sketch.png`. |
+| Single isolated rectangle detected as `section` not `card` | Model learned sections as large-rectangle regions; a lone card drawn without context triggers the wrong class |
+| Wide/thin or tall/narrow layouts lose detail | Stretch to 640×640 preprocessing alters aspect ratio — extreme proportions lose spatial relationships |
+| `card` confidence structurally lower than containers | Cards are diverse (button/input/heading/image all map to one class) — a single global confidence threshold can't fit both. Use per-class thresholds (`card=0.03`, others `=0.20`). |
+| Oversized `section` prediction engulfs everything | A section covering >85% of canvas is the model confusing the canvas boundary with a section. Oversize-card guard handles this for cards; similar behavior can affect sections. |
+| Sparse sketches underperform dense ones | Model trained on data skewed toward dense hand-drawn layouts (~40%) — sparse wireframe style (~20%) is underrepresented and harder to generalise |
+| Roboflow default threshold silently hides card predictions | Default Roboflow confidence floor is ~0.4 — most card predictions are below this. Always set `InferenceConfiguration(confidence_threshold=0.05)` explicitly. |
+| Footer mislabelled as `card` | Confusion matrix shows ~1 footer per validation run lands on card. Low-confidence footers look like wide cards to the model. |
 
 ---
 
