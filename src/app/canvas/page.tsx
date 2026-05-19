@@ -24,6 +24,9 @@ import FloatingToolbar from "@/components/canvas/FloatingToolbar";
 import CanvasSurface from "@/components/canvas/CanvasSurface";
 import StyleRibbon from "@/components/canvas/StyleRibbon";
 import Navbar from "@/components/Navbar";
+import OnboardingTour, {
+  type OnboardingStep,
+} from "@/components/onboarding/OnboardingTour";
 import {
   useProjectSave,
   useAutoSave,
@@ -65,6 +68,10 @@ const SketchCanvas = dynamic(
 );
 
 const GENERATE_CODE_ENDPOINT = "/api/generate-code";
+const ONBOARDING_STORAGE_PREFIX = "codecanvas:onboarding:seen";
+const ONBOARDING_PENDING_PREFIX = "codecanvas:onboarding:pending";
+const ONBOARDING_LOCAL_PREFIX = "codecanvas:onboarding:local";
+const ONBOARDING_DEBUG_KEY = "codecanvas:onboarding:debug";
 
 // Canvas types are imported from @/types/canvas for cross-component use.
 
@@ -120,6 +127,9 @@ function CanvasPageInner() {
   const [showExport, setShowExport] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showComponents, setShowComponents] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const exportOpenedByTourRef = useRef(false);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ Layers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [layers, setLayers] = useState<Layer[]>([
@@ -196,10 +206,41 @@ function CanvasPageInner() {
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ User Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
-  const [userProfile, setUserProfile] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
+  const [userProfile, setUserProfile] = useState<Record<string, unknown> | null>(
+    null
+  );
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const lastOnboardingUserIdRef = useRef<string | null>(null);
+
+  const onboardingSteps = useMemo<OnboardingStep[]>(
+    () => [
+      {
+        id: "draw",
+        title: "Draw Your UI",
+        description:
+          "Use the drawing tools to create wireframes, layouts, or UI sketches.",
+        targetSelector: "[data-onboarding='draw-tools']",
+        placement: "right",
+      },
+      {
+        id: "generate",
+        title: "Generate Frontend Code",
+        description:
+          "Click Generate to convert your sketch into frontend code using AI.",
+        targetSelector: "[data-onboarding='generate-action']",
+        placement: "bottom",
+      },
+      {
+        id: "export",
+        title: "Export Your Code",
+        description:
+          "Preview, copy, or export your generated frontend code.",
+        targetSelector: "[data-onboarding='export-dialog']",
+        placement: "bottom",
+      },
+    ],
+    []
+  );
 
   // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
   // Effects
@@ -216,17 +257,96 @@ function CanvasPageInner() {
           setUser({ id: u.id, email: u.email ?? undefined });
           const { data: profile } = await supabase
             .from("profiles")
-            .select("*")
+            .select("onboarding_completed")
             .eq("id", u.id)
             .single();
           if (profile) setUserProfile(profile as Record<string, unknown>);
+        } else {
+          setUserProfile(null);
         }
       } catch {
         setUser(null);
+        setUserProfile(null);
+      } finally {
+        setProfileLoaded(true);
       }
     };
     getUser();
   }, [supabase]);
+
+  const getOnboardingSeenKey = (userId: string | null) =>
+    `${ONBOARDING_STORAGE_PREFIX}:${userId ?? "anon"}`;
+  const getOnboardingPendingKey = (userId: string | null) =>
+    `${ONBOARDING_PENDING_PREFIX}:${userId ?? "anon"}`;
+  const getOnboardingLocalKey = (userId: string | null) =>
+    `${ONBOARDING_LOCAL_PREFIX}:${userId ?? "anon"}`;
+
+  // First-time onboarding (user-scoped)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!profileLoaded) return;
+    const resolvedUserId = user?.id ?? null;
+    if (!resolvedUserId) return;
+    if (lastOnboardingUserIdRef.current === resolvedUserId) {
+      return;
+    }
+    lastOnboardingUserIdRef.current = resolvedUserId;
+
+    const seenKey = getOnboardingSeenKey(resolvedUserId);
+    const pendingKey = getOnboardingPendingKey(resolvedUserId);
+    const localKey = getOnboardingLocalKey(resolvedUserId);
+    const hasSeen = window.localStorage.getItem(seenKey);
+    const pending = window.localStorage.getItem(pendingKey);
+    const localSeen = window.localStorage.getItem(localKey);
+    const profileCompleted = Boolean(
+      userProfile &&
+        (userProfile as { onboarding_completed?: boolean })
+          .onboarding_completed
+    );
+
+    if (window.localStorage.getItem(ONBOARDING_DEBUG_KEY) === "true") {
+      console.debug("[onboarding]", "init", {
+        userId: resolvedUserId,
+        seenKey,
+        pendingKey,
+        localKey,
+        hasSeen,
+        pending,
+        localSeen,
+        profileCompleted,
+      });
+    }
+
+    if (pending) {
+      window.localStorage.removeItem(pendingKey);
+    }
+
+    if (!profileCompleted && !hasSeen && !localSeen) {
+      setShowOnboarding(true);
+      setOnboardingStep(0);
+    }
+  }, [profileLoaded, user?.id, userProfile]);
+
+  useEffect(() => {
+    if (!showOnboarding) {
+      if (exportOpenedByTourRef.current) {
+        setShowExport(false);
+        exportOpenedByTourRef.current = false;
+      }
+      return;
+    }
+
+    if (onboardingStep === 2 && !showExport) {
+      exportOpenedByTourRef.current = true;
+      setShowExport(true);
+      return;
+    }
+
+    if (onboardingStep !== 2 && exportOpenedByTourRef.current) {
+      setShowExport(false);
+      exportOpenedByTourRef.current = false;
+    }
+  }, [onboardingStep, showExport, showOnboarding]);
 
   // Import mini-canvas design
   useEffect(() => {
@@ -507,6 +627,63 @@ function CanvasPageInner() {
   const handleDeleteVersion = async (versionId: string) => {
     await versionHistory.deleteVersion(versionId);
   };
+
+  const persistOnboardingCompletion = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: user.id,
+            onboarding_completed: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        );
+      setUserProfile({ onboarding_completed: true });
+    } catch (error) {
+      console.error("Failed to persist onboarding completion:", error);
+    }
+  }, [supabase, user?.id]);
+
+  const handleOnboardingSkip = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const seenKey = getOnboardingSeenKey(user?.id ?? null);
+      const pendingKey = getOnboardingPendingKey(user?.id ?? null);
+      const localKey = getOnboardingLocalKey(user?.id ?? null);
+      window.localStorage.setItem(seenKey, "true");
+      window.localStorage.setItem(localKey, "true");
+      window.localStorage.removeItem(pendingKey);
+    }
+    void persistOnboardingCompletion();
+    setShowOnboarding(false);
+    setOnboardingStep(0);
+  }, [persistOnboardingCompletion, user?.id]);
+
+  const handleOnboardingFinish = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const seenKey = getOnboardingSeenKey(user?.id ?? null);
+      const pendingKey = getOnboardingPendingKey(user?.id ?? null);
+      const localKey = getOnboardingLocalKey(user?.id ?? null);
+      window.localStorage.setItem(seenKey, "true");
+      window.localStorage.setItem(localKey, "true");
+      window.localStorage.removeItem(pendingKey);
+    }
+    void persistOnboardingCompletion();
+    setShowOnboarding(false);
+    setOnboardingStep(0);
+  }, [persistOnboardingCompletion, user?.id]);
+
+  const handleOnboardingNext = useCallback(() => {
+    setOnboardingStep((step) =>
+      Math.min(step + 1, onboardingSteps.length - 1)
+    );
+  }, [onboardingSteps.length]);
+
+  const handleOnboardingBack = useCallback(() => {
+    setOnboardingStep((step) => Math.max(step - 1, 0));
+  }, []);
 
   // Layers
   const handleSelectLayer = (id: string) => setSelectedLayerId(id);
@@ -990,6 +1167,7 @@ function CanvasPageInner() {
           {/* Ã¢â€â‚¬Ã¢â€â‚¬ Code panel (collapsible, resizable) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
           {showCodePanel && (
             <div
+              data-onboarding="code-panel"
               className="border-t border-[#1E1E1E] bg-[#111111]"
               style={{ height: codePanelHeight }}
             >
@@ -1456,6 +1634,16 @@ function CanvasPageInner() {
           </div>
         </div>
       )}
+
+      <OnboardingTour
+        isOpen={showOnboarding}
+        steps={onboardingSteps}
+        stepIndex={onboardingStep}
+        onNext={handleOnboardingNext}
+        onBack={handleOnboardingBack}
+        onSkip={handleOnboardingSkip}
+        onFinish={handleOnboardingFinish}
+      />
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Modals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <ShortcutsPanel

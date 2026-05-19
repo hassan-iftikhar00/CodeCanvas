@@ -351,7 +351,12 @@ export default function Navbar({
         ) : null}
 
         {onExport ? (
-          <HeaderButton onClick={onExport} label="Export" hideLabelBelow="xl">
+          <HeaderButton
+            onClick={onExport}
+            label="Export"
+            hideLabelBelow="xl"
+            dataOnboardingId="export-action"
+          >
             <ExportIcon />
           </HeaderButton>
         ) : null}
@@ -382,6 +387,7 @@ export default function Navbar({
           <button
             onClick={onRunDetection}
             disabled={isGenerating}
+            data-onboarding="generate-action"
             className="group ml-1 flex h-8 items-center gap-1.5 rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-3 text-[12px] font-medium text-white transition-all duration-150 hover:shadow-[0_0_18px_var(--cc-accent-glow-strong)] active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cc-bg-surface)] focus-visible:ring-[var(--cc-accent)]"
             title="Run detection (generate code)"
           >
@@ -483,6 +489,7 @@ interface HeaderButtonProps {
   disabled?: boolean;
   hideLabelBelow?: "lg" | "xl";
   onClick: () => void;
+  dataOnboardingId?: string;
 }
 
 function HeaderButton({
@@ -493,6 +500,7 @@ function HeaderButton({
   disabled,
   hideLabelBelow = "lg",
   onClick,
+  dataOnboardingId,
 }: HeaderButtonProps) {
   const labelHide = hideLabelBelow === "xl" ? "xl:inline" : "lg:inline";
   return (
@@ -501,6 +509,7 @@ function HeaderButton({
       onClick={onClick}
       disabled={disabled}
       title={shortcut ? `${label} (${shortcut})` : label}
+      data-onboarding={dataOnboardingId}
       className={`flex h-8 items-center gap-1.5 rounded-[var(--cc-radius-button)] px-2.5 text-[12px] font-medium transition-all duration-150 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] ${
         active
           ? "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-primary)]"
