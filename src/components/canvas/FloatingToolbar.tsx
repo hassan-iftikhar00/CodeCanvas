@@ -113,6 +113,7 @@ export default function FloatingToolbar({
       role="toolbar"
       aria-label="Drawing tools"
       aria-orientation="vertical"
+      data-onboarding="draw-tools"
       className="absolute left-4 top-1/2 z-30 -translate-y-1/2 flex flex-col items-center gap-1 rounded-[12px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)]/95 p-1.5 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] backdrop-blur-md"
     >
       {GROUP_ORDER.map((group, gi) => (
