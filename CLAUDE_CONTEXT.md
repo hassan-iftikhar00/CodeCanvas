@@ -1,4 +1,4 @@
-# CodeCanvas — Claude Context File
+  # CodeCanvas — Claude Context File
 
 > Read this file before helping with any task.
 > This is a FYP (Final Year Project) at a university.
