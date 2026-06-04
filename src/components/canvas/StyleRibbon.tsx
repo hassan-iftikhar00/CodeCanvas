@@ -73,11 +73,11 @@ export default function StyleRibbon({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
-          className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 flex items-center gap-3 rounded-[10px] cc-frost px-3 py-2 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]"
+          className="absolute bottom-16 left-1/2 z-30 w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] -translate-x-1/2 flex flex-wrap items-center justify-center gap-2 rounded-[10px] cc-frost px-2 py-2 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] sm:bottom-4 sm:w-auto sm:max-w-none sm:gap-3 sm:px-3"
         >
           {/* Color swatches */}
           <RibbonSection label="Color">
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               {COLOR_PRESETS.map((c) => (
                 <Swatch
                   key={c}
@@ -93,11 +93,11 @@ export default function StyleRibbon({
             </div>
           </RibbonSection>
 
-          <Divider />
+          <Divider className="hidden sm:block" />
 
           {/* Stroke width */}
           <RibbonSection label="Width">
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
               {WIDTHS.map((w) => {
                 const active = strokeWidth === w.value;
                 return (
@@ -132,7 +132,7 @@ export default function StyleRibbon({
           {/* Fill (only for shapes) */}
           {showFill ? (
             <>
-              <Divider />
+              <Divider className="hidden sm:block" />
               <RibbonSection label="Fill">
                 <div className="flex items-center gap-1.5">
                   <button
@@ -167,7 +167,7 @@ export default function StyleRibbon({
           {/* Opacity */}
           {onOpacityChange ? (
             <>
-              <Divider />
+              <Divider className="hidden sm:block" />
               <RibbonSection label="Opacity">
                 <input
                   type="range"
@@ -206,7 +206,7 @@ function RibbonSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <span className="text-[10px] uppercase tracking-[0.16em] text-[var(--cc-text-muted)]">
         {label}
       </span>
@@ -215,11 +215,11 @@ function RibbonSection({
   );
 }
 
-function Divider() {
+function Divider({ className = "" }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className="h-5 w-px bg-[var(--cc-border-subtle)]"
+      className={`h-5 w-px bg-[var(--cc-border-subtle)] ${className}`}
     />
   );
 }

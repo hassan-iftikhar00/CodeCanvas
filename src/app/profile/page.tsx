@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import ProfileSkeleton from "@/components/profile/ProfileSkeleton";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 interface Profile {
   id: string;
@@ -31,6 +34,7 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+ 
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -191,19 +195,6 @@ export default function ProfilePage() {
     router.push("/");
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[var(--cc-bg-canvas)]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--cc-border-subtle)] border-t-[var(--cc-accent)]" />
-          <p className="text-[12px] text-[var(--cc-text-secondary)]">
-            Loading profile...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[var(--cc-bg-canvas)]">
       {/* Header */}
@@ -228,23 +219,34 @@ export default function ProfilePage() {
             </svg>
             Dashboard
           </Link>
-          <Link href="/dashboard" className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="" className="h-6 w-6" />
-            <span className="text-[14px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
-              CodeCanvas
-            </span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard" className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="" className="h-6 w-6" />
+              <span className="text-[14px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
+                CodeCanvas
+              </span>
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
       {/* Main */}
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
-        >
+        {loading ? (
+          <ProfileSkeleton />
+        ) : (
+          <ErrorBoundary
+            variant="panel"
+            title="Profile unavailable"
+            message="We could not load this page. Try again in a moment."
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
+            >
           <div className="mb-6">
             <h1 className="text-[24px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
               Profile settings
@@ -515,7 +517,9 @@ export default function ProfilePage() {
               </motion.button>
             </section>
           </div>
-        </motion.div>
+            </motion.div>
+          </ErrorBoundary>
+        )}
       </main>
     </div>
   );
