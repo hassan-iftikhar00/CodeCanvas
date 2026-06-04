@@ -34,7 +34,7 @@ export default function ZoomPill({
   return (
     <div
       ref={ref}
-      className="absolute bottom-4 left-4 z-30 flex items-center gap-0.5 rounded-[10px] cc-frost px-1 py-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)]"
+      className="absolute top-3 left-3 bottom-auto z-30 flex items-center gap-0.5 rounded-[10px] cc-frost px-1 py-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] sm:top-auto sm:bottom-4 sm:left-4"
     >
       <PillButton
         label="Zoom out"

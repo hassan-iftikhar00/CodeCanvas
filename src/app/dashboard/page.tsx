@@ -14,6 +14,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import ProjectCard from "@/components/dashboard/ProjectCard";
+import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 import {
   normalizeProject,
   readRecentProjectActivity,
@@ -595,8 +596,11 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 p-6 lg:p-8">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      {loading ? (
+        <DashboardSkeleton />
+      ) : (
+        <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-[24px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
               Projects
@@ -613,7 +617,7 @@ export default function DashboardPage() {
               whileTap={{ scale: 0.96 }}
               ref={newProjectButtonRef}
               onClick={handleCreateProject}
-              className="flex items-center gap-1.5 rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-3.5 py-2 text-[13px] font-semibold text-white transition-all hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cc-bg-canvas)]"
+              className="flex w-full items-center justify-center gap-1.5 rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-3.5 py-2 text-[13px] font-semibold text-white transition-all hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cc-bg-canvas)] sm:w-auto"
             >
               <svg
                 className="h-4 w-4"
@@ -692,7 +696,7 @@ export default function DashboardPage() {
         </section>
 
         <section className="rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-4">
-          <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.6fr))]">
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.6fr))]">
             <label className="flex items-center gap-2.5 rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2.5 transition-colors focus-within:border-[var(--cc-accent)] focus-within:shadow-[0_0_0_3px_var(--cc-accent-glow)]">
               <svg
                 className="h-4 w-4 flex-none text-[var(--cc-text-muted)]"
@@ -764,11 +768,7 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
-        {loading ? (
-          <div className="flex h-64 items-center justify-center">
-            <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--cc-border-subtle)] border-t-[var(--cc-accent)]" />
-          </div>
-        ) : filteredProjects.length === 0 ? (
+        {filteredProjects.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-[var(--cc-radius-card)] border border-dashed border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)]/50 py-20 text-center">
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-muted)]">
               <svg
@@ -916,7 +916,7 @@ export default function DashboardPage() {
                     onClick={handleConfirmDelete}
                     disabled={Boolean(deletingProjectId)}
                     aria-busy={Boolean(deletingProjectId)}
-                    className="cc-danger inline-flex items-center justify-center gap-2 rounded-[var(--cc-radius-button)] bg-[var(--cc-error)] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#dc2626] disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-error)]"
+                    className="cc-danger inline-flex items-center justify-center gap-2 rounded-[var(--cc-radius-button)] bg-[var(--cc-error)] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--cc-error)] disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-error)]"
                   >
                     {deletingProjectId ? (
                       <>
@@ -1006,6 +1006,7 @@ export default function DashboardPage() {
           )}
         </AnimatePresence>
       </div>
+      )}
     </DashboardLayout>
   );
 }

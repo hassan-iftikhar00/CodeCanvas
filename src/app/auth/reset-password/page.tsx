@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
+import AuthLoadingSkeleton from "@/components/auth/AuthLoadingSkeleton";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -268,37 +270,13 @@ export default function ResetPasswordPage() {
 
   // Show loading while checking token
   if (tokenValid === null) {
-    return (
-      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--cc-bg-canvas)]">
-        <div className="animate-spin">
-          <svg
-            className="w-8 h-8 text-[var(--cc-accent)]"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-        </div>
-      </div>
-    );
+    return <AuthLoadingSkeleton />;
   }
 
   // Show error if no valid token
   if (tokenValid === false) {
     return (
-      <div className="relative flex min-h-screen overflow-hidden bg-[var(--cc-bg-canvas)]">
+      <div className="relative flex min-h-[100svh] overflow-x-hidden overflow-y-auto bg-[var(--cc-bg-canvas)]">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-[#FF6B00]/20 to-transparent rounded-full blur-3xl animate-pulse" />
           <div
@@ -307,7 +285,7 @@ export default function ResetPasswordPage() {
           />
         </div>
 
-        <div className="flex flex-1 items-center justify-center p-6 sm:p-12">
+        <div className="flex flex-1 items-start justify-center px-4 py-10 sm:items-center sm:p-12">
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -366,14 +344,17 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-[var(--cc-bg-canvas)]">
+    <div className="relative flex min-h-[100svh] overflow-x-hidden overflow-y-auto bg-[var(--cc-bg-canvas)]">
+      <div className="absolute right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-[var(--cc-accent-glow)] blur-[100px]" />
         <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-[var(--cc-accent-glow)] blur-[100px]" />
       </div>
 
       {/* Centered Form */}
-      <div className="flex flex-1 items-center justify-center p-6 sm:p-12">
+      <div className="flex flex-1 items-start justify-center px-4 py-10 sm:items-center sm:p-12">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

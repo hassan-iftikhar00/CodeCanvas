@@ -192,7 +192,7 @@ export default function ChatInterface({
                 className={`max-w-[88%] whitespace-pre-wrap break-words rounded-[8px] px-3 py-2 text-[13px] leading-relaxed ${
                   message.role === "user"
                     ? "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-primary)]"
-                    : "bg-[#0d0d0d] text-[#cccccc] border border-[var(--cc-border-subtle)]"
+                    : "bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] border border-[var(--cc-border-subtle)]"
                 }`}
               >
                 {message.content}
@@ -203,7 +203,7 @@ export default function ChatInterface({
 
         {isProcessing ? (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-[8px] border border-[var(--cc-border-subtle)] bg-[#0d0d0d] px-3 py-2">
+            <div className="flex items-center gap-2 rounded-[8px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2">
               <span className="text-[12px] text-[var(--cc-text-secondary)]">
                 Refining
               </span>
