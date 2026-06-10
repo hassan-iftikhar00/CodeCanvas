@@ -219,7 +219,7 @@ export default function Navbar({
       className="flex min-h-[3rem] flex-wrap items-center justify-between gap-2 border-b border-[#1e1e1e] bg-[var(--cc-bg-surface)] px-2 sm:px-3"
       role="banner"
     >
-      {/* Left cluster — back, logo, project name + save dot */}
+      {/* Left cluster - back, logo, project name + save dot */}
       <div className="flex min-w-0 items-center gap-2">
         {showBackButton && (
           <Link
@@ -266,7 +266,7 @@ export default function Navbar({
           />
         ) : null}
 
-        {/* Project name — double-click to edit */}
+        {/* Project name - double-click to edit */}
         {projectName !== undefined && onProjectNameChange ? (
           <div className="flex min-w-0 items-center gap-2">
             {editingName ? (
@@ -327,7 +327,7 @@ export default function Navbar({
         ) : null}
       </div>
 
-      {/* Right cluster — actions */}
+      {/* Right cluster - actions */}
       <div className="flex flex-wrap items-center justify-end gap-1.5">
         <ThemeToggle />
         {onTemplatesToggle ? (
@@ -345,7 +345,7 @@ export default function Navbar({
             onClick={onSave}
             disabled={isSaving}
             label="Save"
-            shortcut="Ctrl/⌘S"
+            shortcut="Ctrl+S"
             hideLabelBelow="lg"
           >
             <SaveIcon />
@@ -384,7 +384,7 @@ export default function Navbar({
           </HeaderButton>
         ) : null}
 
-        {/* Run Detection — primary accent */}
+        {/* Run Detection - primary accent */}
         {onRunDetection ? (
           <button
             onClick={onRunDetection}

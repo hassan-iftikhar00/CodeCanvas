@@ -34,9 +34,19 @@ interface CanvasLineData {
   id?: string;
 }
 
+interface CanvasComponentGroup {
+  id?: string;
+  name?: string;
+  x?: number;
+  y?: number;
+  shapes?: CanvasShapeData[];
+  selected?: boolean;
+}
+
 interface CanvasTemplateData {
   lines?: CanvasLineData[];
   shapes?: CanvasShapeData[];
+  componentGroups?: CanvasComponentGroup[];
 }
 
 interface SketchCanvasWithHistoryProps {
@@ -102,18 +112,21 @@ const SketchCanvasWithHistory = forwardRef<
         if (canvasRef.current) {
           canvasRef.current.clearCanvas();
         }
-        onStateChange({ lines: [], shapes: [] });
+        onStateChange({ lines: [], shapes: [], componentGroups: [] });
       },
       insertTemplate: (data: CanvasTemplateData, templateName?: string) => {
         if (canvasRef.current) {
           canvasRef.current.insertTemplate(data, templateName);
-          // After inserting template, get updated state
+          // After inserting template, push the updated state (including
+          // componentGroups - omitting them here made the restore effect
+          // see a mismatch 100ms later and wipe the just-inserted template).
           setTimeout(() => {
             const updatedData = canvasRef.current?.getCanvasData();
             if (updatedData) {
               onStateChange({
                 lines: updatedData.lines,
                 shapes: updatedData.shapes,
+                componentGroups: updatedData.componentGroups,
               });
             }
           }, 100);
@@ -131,12 +144,24 @@ const SketchCanvasWithHistory = forwardRef<
         }
         return "";
       },
+      replaceCanvasState: (data) => {
+        if (canvasRef.current) {
+          canvasRef.current.replaceCanvasState(data);
+        }
+        onStateChange({
+          lines: (data.lines ?? []) as CanvasLineData[],
+          shapes: (data.shapes ?? []) as CanvasShapeData[],
+          componentGroups: (data.componentGroups ?? []) as CanvasComponentGroup[],
+        });
+      },
     }));
 
     // Track if we're applying history state to prevent circular updates
     const isApplyingHistoryRef = useRef(false);
 
-    // Apply history state to canvas (for undo/redo)
+    // Apply history state to canvas (for undo/redo + project load).
+    // Uses replaceCanvasState so componentGroups (templates) survive the round-trip;
+    // the previous clearCanvas + insertTemplate path silently dropped them.
     useEffect(() => {
       if (!canvasState || !canvasRef.current || isApplyingHistoryRef.current) return;
 
@@ -144,20 +169,14 @@ const SketchCanvasWithHistory = forwardRef<
       const currentCanvasState = {
         lines: currentData.lines,
         shapes: currentData.shapes,
+        componentGroups: currentData.componentGroups,
       };
 
-      // Only update canvas if history state is different from canvas state
       if (JSON.stringify(currentCanvasState) !== JSON.stringify(canvasState)) {
         isApplyingHistoryRef.current = true;
-        // Clear and restore canvas from history
-        canvasRef.current.clearCanvas();
-        if (
-          (canvasState.lines?.length ?? 0) > 0 ||
-          (canvasState.shapes?.length ?? 0) > 0
-        ) {
-          canvasRef.current.insertTemplate(canvasState);
-        }
-        // Reset flag after a brief delay
+        canvasRef.current.replaceCanvasState(
+          canvasState as Parameters<SketchCanvasRef["replaceCanvasState"]>[0]
+        );
         setTimeout(() => {
           isApplyingHistoryRef.current = false;
         }, 100);
@@ -166,7 +185,7 @@ const SketchCanvasWithHistory = forwardRef<
 
     // Sync canvas state changes with parent (for capturing new changes)
     useEffect(() => {
-      if (!canvasState) return; // Don't bail on isApplyingHistoryRef here — the interval tick re-checks it. Bailing out at this level skips creating the interval after undo, which leaves the parent's history.state stale and breaks the empty-state placeholder.
+      if (!canvasState) return; // Don't bail on isApplyingHistoryRef here - the interval tick re-checks it. Bailing out at this level skips creating the interval after undo, which leaves the parent's history.state stale and breaks the empty-state placeholder.
 
       // Poll for canvas changes every 500ms
       const interval = setInterval(() => {
@@ -175,9 +194,9 @@ const SketchCanvasWithHistory = forwardRef<
           const currentState = {
             lines: currentData.lines,
             shapes: currentData.shapes,
+            componentGroups: currentData.componentGroups,
           };
 
-          // Check if state has changed
           if (JSON.stringify(currentState) !== JSON.stringify(canvasState)) {
             onStateChange(currentState);
           }

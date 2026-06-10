@@ -2,7 +2,7 @@
 
 > Read this file before helping with any task.
 > This is a FYP (Final Year Project) at a university.
-> Last updated: May 2026
+> Last updated: 2026-06-10
 
 ---
 
@@ -62,9 +62,11 @@ Step 4: FastAPI calls Roboflow API
 
 Step 5: Backend attaches text annotations to detected elements
         File: backend/main.py (_attach_text_annotations,
-        _synthesize_missing_containers, _infer_canvas_extents)
-        Handles oversized containers and top/bottom-band navbar/footer
-        recovery when the model misses them.
+        _synthesize_missing_containers,
+        _synthesize_inputs_for_orphan_labels, _infer_canvas_extents)
+        Handles oversized containers, top/bottom-band navbar/footer
+        recovery, and stop-gap input/button synthesis around orphan
+        label text when v2 misses inner shapes.
 
 Step 6: Gemini generates React + Tailwind code
         File: backend/app/models/inference.py
@@ -327,7 +329,8 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 
 ### ✅ Fully Done
 
-- Canvas drawing interface (Konva.js)
+- Canvas drawing interface (Konva.js) — core drawing works; state-bridge
+  bugs uncovered June 2026, see "Partially Done" below
 - **Redesigned canvas workspace** (commit d42f2aa) — extracted
   `CanvasSurface`, `FloatingToolbar`, `StyleRibbon`, `ZoomPill`;
   shared types in `src/types/canvas.ts`
@@ -351,9 +354,45 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 - Dashboard project card actions + delete (M4 done)
 - Empty states — dashboard + canvas (M5 done)
 - Onboarding tour (M6 done — `OnboardingTour.tsx`)
+- **M8: Error boundaries** — `src/components/ErrorBoundary.tsx`
+  (page/panel/inline variants, `resetKeys` support). Wrapped around
+  root layout, command palette, canvas + each chrome component
+  (SketchCanvas, FloatingToolbar, StyleRibbon, ZoomPill), both
+  Monaco editor instances, both LivePreview instances, dashboard,
+  profile. Landed via PR #8 (Maarij) + Hassan integration on
+  canvas/Monaco wraps.
+- **M9: Loading skeletons** — `src/components/ui/Skeleton.tsx` +
+  `auth/AuthLoadingSkeleton`, `canvas/CodePanelSkeleton`,
+  `dashboard/DashboardSkeleton`, `profile/ProfileSkeleton`. Used
+  on auth pages, dashboard, profile. Canvas code panel uses
+  Hassan's `GenerationProgress` (richer than skeleton).
+- **M11: Dark mode** — full light/dark CSS-var system in `globals.css`
+  under `html[data-theme="light|dark"]`. `ThemeProvider` (localStorage
+  + system pref), `ThemeToggle` button in Navbar + Dashboard header.
+  FOUC-prevention inline script in `layout.tsx` sets `data-theme`
+  before paint. `.theme-transition` class on root for 180ms swap.
+- Account deletion flow — `DeleteAccountModal` + `/api/account/delete`
+  route (Hassan) using `lib/supabase/admin.ts`. Wired into profile page.
 
 ### ⚠️ Partially Done
 
+- **Canvas state-bridge / persistence** — `canvas/page.tsx` uses
+  `SketchCanvasWithHistory` (dynamic-imported, aliased as `SketchCanvas`)
+  which polls Konva state into `useHistory` every 500ms. Series of
+  regressions from the d42f2aa redesign, all fixed 2026-06-10:
+  empty-state hint stuck after drawing or template insert; saved
+  projects failed to restore on reload; undo wiped the original
+  template along with the latest action because `componentGroups` was
+  never tracked in history; template-only projects never auto-saved.
+  Fix added `SketchCanvasRef.replaceCanvasState` for atomic three-bucket
+  swap, propagated `componentGroups` through `CanvasTemplateData` /
+  `CanvasData` / wrapper poll / restore path, and added
+  `hasUserInteracted` in the page so the hint is responsive regardless
+  of poll lag. **Remaining wart:** the 500ms poll is still the primary
+  sync mechanism. Replacing it with an explicit onChange callback
+  inside `SketchCanvas` (fired from setLines/setShapes/setComponentGroups
+  callsites) would eliminate both the polling latency and the
+  bidirectional-effect dance. Reasonable M-task candidate for Maarij.
 - Dashboard project management — card actions present, polish ongoing
 - Sketch detection accuracy — Roboflow integrated, but `card`
   precision is structurally low (58% — see Shahwaiz section);
@@ -362,17 +401,22 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
   handoff doc sent to Shahwaiz; training `object-detection-4affw/3`
   pending. Once Shahwaiz reports v3 mAP, update `ROBOFLOW_MODEL_ID`
   in `.env` if v3 outperforms v2.
+- **M12: Mobile responsiveness** — auth pages use `min-h-[100svh]`,
+  Dashboard has slide-in sidebar with backdrop + hamburger,
+  canvas shows dismissible mobile warning + auto-hides right panel
+  on `< lg`, SketchCanvas wraps Konva Stage with touch handlers +
+  `overscroll-none touch-none`. Broader pass on canvas chrome and
+  code panel still pending.
+- **M13: Animations** — canvas chrome animated (existing).
+  Theme transition (180ms) + Dashboard sidebar slide added in PR #8.
+  Rest of app still uses default transitions.
 
 ### ❌ Not Started / In Progress
 
 - B1: DB schema unification (Bilal — most critical)
 - B5/B6: Framework selector + Export as ZIP (Bilal)
 - B9: CI/CD pipeline (Bilal)
-- M8: Error boundaries (Maarij)
-- M9: Loading skeletons (Maarij)
-- M11: Dark mode (Maarij)
-- M12: Mobile responsiveness (Maarij)
-- M13: Animations beyond canvas chrome (Maarij)
+- M15: Docs cleanup (Maarij)
 
 ---
 
@@ -394,6 +438,17 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 | `src/types/canvas.ts`                               | Canonical `Tool`, `Mode`, zoom constants, `TOOL_KEY_MAP` |
 | `src/hooks/useCanvasShortcuts.ts`                   | Keyboard shortcut handler for canvas page                |
 | `src/components/ui/Toast.tsx`                       | App-wide toast provider                                  |
+| `src/components/ui/Skeleton.tsx`                    | Base skeleton primitive                                  |
+| `src/components/ErrorBoundary.tsx`                  | Class-based boundary, `page`/`panel`/`inline` variants   |
+| `src/components/theme/ThemeProvider.tsx`            | localStorage + system-pref theme context                 |
+| `src/components/theme/ThemeToggle.tsx`              | Sun/moon button used in Navbar + Dashboard header        |
+| `src/components/canvas/StatusBar.tsx`               | Persistent dims/mode/grid/zoom bar below canvas          |
+| `src/components/canvas/GenerationProgress.tsx`      | Code-generation progress indicator (used by code panel)  |
+| `src/components/canvas/CodePanelSkeleton.tsx`       | Skeleton placeholder for code panel (unused on canvas)   |
+| `src/components/auth/AuthLoadingSkeleton.tsx`       | Skeleton placeholder for auth pages                      |
+| `src/components/dashboard/DashboardSkeleton.tsx`    | Skeleton placeholder for dashboard                       |
+| `src/components/profile/ProfileSkeleton.tsx`        | Skeleton placeholder for profile page                    |
+| `src/components/profile/DeleteAccountModal.tsx`     | Account deletion confirmation modal                      |
 | `src/components/onboarding/OnboardingTour.tsx`      | Step-by-step onboarding overlay with spotlight highlight |
 
 ### Frontend — data + routes
@@ -401,8 +456,10 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 | File                                 | Purpose                              |
 | ------------------------------------ | ------------------------------------ |
 | `src/app/api/generate-code/route.ts` | Proxy to FastAPI; OpenRouter routing |
+| `src/app/api/account/delete/route.ts`| Delete current user (auth.users) via service-role admin client |
 | `src/hooks/useProjectSave.ts`        | Project CRUD (canonical schema)      |
 | `src/hooks/useVersionHistory.ts`     | Iterations table queries             |
+| `src/lib/supabase/admin.ts`          | Service-role Supabase client (server-only; DO NOT import in frontend) |
 
 ### Backend
 
@@ -449,12 +506,15 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
 - ✅ M5: Add empty states — done (dashboard + canvas)
 - ✅ M6: Build onboarding flow — done (`OnboardingTour.tsx`, `onboarding_completed` on profiles)
 - ✅ M7: Settings/profile page — landed
-- M8: Error boundaries
-- M9: Loading skeletons
+- ✅ M8: Error boundaries — done (PR #8, integration commit June 2026)
+- ✅ M9: Loading skeletons — done (PR #8). Canvas code-panel uses
+  Hassan's `GenerationProgress` instead of static skeleton.
 - ✅ M10: Toast notifications — done (`src/components/ui/Toast.tsx`)
-- M11: Dark mode
-- M12: Mobile responsiveness
-- M13: Animations (canvas chrome already animated — rest of app pending)
+- ✅ M11: Dark mode — done (PR #8, full theme system + FOUC fix)
+- ⚠️ M12: Mobile responsiveness — partial (auth + dashboard + canvas
+  done; broader pass on chrome and code panel pending)
+- ⚠️ M13: Animations — canvas chrome animated; theme transition +
+  sidebar slide added; rest of app pending
 - ✅ M14: Keyboard shortcuts (canvas) — done (`useCanvasShortcuts`).
   Global shortcuts (Cmd+K palette etc.) already exist in CommandPalette.
 - M15: Docs cleanup
@@ -532,7 +592,23 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
 16. **v3 Roboflow augmentation config is identical to v2** — same stretch, flip, rotation,
     brightness, and 2-outputs setting. This isolates the dataset as the only variable so
     v2 vs v3 mAP is a clean A/B comparison. Do NOT change augmentations when training v3.
-17. **Strict fidelity — Gemini does not invent elements** — the LLM
+17. **Theme system uses `data-theme` attribute on `<html>`** — light
+    and dark CSS-var sets live under `html[data-theme="light|dark"]`
+    in `globals.css`. `ThemeProvider` writes the attribute; an
+    inline script in `layout.tsx` <head> sets it BEFORE first
+    paint to prevent FOUC. Reason: SSR can't know the user's
+    preferred theme — without the inline script you get a dark→light
+    (or vice versa) flash on first load. Don't rely on the React
+    context for the initial paint; the inline script is load-bearing.
+    Do NOT switch to `class="dark"`-based Tailwind theming — that
+    would force re-writing every CSS-var set.
+18. **Avatar `<img>` from Google OAuth needs `referrerPolicy="no-referrer"`**
+    — without it, Google rate-limits the avatar URL based on
+    referrer and returns 429s, causing broken avatar images.
+    Always set `referrerPolicy="no-referrer"` and an `onError`
+    fallback to initials on any avatar `<img>`. Currently applied
+    in Navbar and DashboardLayout's `Avatar` component.
+19. **Strict fidelity — Gemini does not invent elements** — the LLM
     renders ONLY the detected components plus user-annotated text.
     It must not add headings, subtitles, footers, branding,
     copyright, taglines, or "would look better with X" elements
@@ -545,11 +621,119 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
     via a top-of-rules STRICT FIDELITY directive; the matcher
     enforces it by listing multi-label hits positionally instead
     of concatenating them.
+20. **Orphan-label input/button synthesis is a v2 stop-gap** — when
+    a text annotation reads as a form-field label (Email, Password,
+    Username, ...) or action verb (Sign In, Submit, ...) AND its
+    only enclosing detected element is a large container (>10% of
+    canvas area), `_synthesize_inputs_for_orphan_labels` in
+    `backend/main.py` synthesizes a virtual `card` of input/button
+    shape around the label so the matcher binds the label to a
+    real-sized element. The prompt builder tags these
+    `[SYNTHESIZED INPUT]` / `[SYNTHESIZED BUTTON]` so Gemini renders
+    them as real `<input>` / `<button>` rather than placeholders.
+    Reason: Roboflow v2 frequently misclassifies wide-thin inner
+    input rectangles as `section` / `footer` (similar aspect ratio)
+    and rejects them via per-class thresholds; strict fidelity then
+    leaves the label floating in space with no input box. Mirrors a
+    detected sibling input's x/width/height when available so the
+    synthesized input lines up with the real ones visually.
+    Auto-dormant when v3 ships (small-enclosing-element short-circuit
+    fires). Delete the helper, the `_INPUT_LABEL_WORDS` /
+    `_BUTTON_TEXT_WORDS` constants, and the role-aware `[SYNTHESIZED
+    INPUT|BUTTON]` prompt branch once v3 mAP confirms inner inputs
+    are reliably detected.
 
 ---
 
 ## Recent Work (most recent first)
 
+- **Canvas UX bug batch (Hassan)** (2026-06-10): Five fixes.
+  (1) Spaces unusable in chat box — `SketchCanvas`'s global Space/pan
+  handler only excluded `INPUT`, swallowing spaces in any TEXTAREA
+  (chat, Monaco). New module-level `isTypingTarget()` covers
+  input/textarea/contenteditable; also applied to the Delete/Backspace
+  shape-delete handler (Backspace while chatting deleted selected
+  shapes). (2) Text tool now multiline — modal input → textarea,
+  Enter saves, Shift+Enter inserts newline (Konva Text renders \n
+  natively). (3) Text hover delete button unreachable — it sits above
+  the text with a hit-area gap, so mouseleave killed it mid-travel;
+  hide is now delayed 300ms via timeout, cancelled on re-enter.
+  (4) Text editing added — double-click (or double-tap) a text shape
+  opens the same modal pre-filled; submit updates in place
+  (`editingTextId` state). (5) Preview unscrollable — injected
+  `html,body { height:auto !important; overflow-y:auto !important; }`
+  into both LivePreview iframe document builders (generated hero
+  layouts often set overflow:hidden), and the Fit-mode card now always
+  uses `overflow-auto` instead of hiding overflow when zoomed out.
+
+- **Orphan-label input/button synthesis (Hassan)** (2026-06-10):
+  Stop-gap for the strict-fidelity + v2-detector-recall gap. Roboflow
+  v2 often misclassifies inner input rectangles as `section` /
+  `footer` and rejects them below threshold — the user's label
+  (Email, Password) then has nowhere to bind, and the new STRICT
+  FIDELITY rule prevents Gemini from inventing the missing input,
+  so the preview renders a floating label with no input box. Added
+  `_INPUT_LABEL_WORDS`, `_BUTTON_TEXT_WORDS`, helpers
+  (`_looks_like_input_label`, `_looks_like_button_text`,
+  `_find_enclosing_element`), and `_synthesize_inputs_for_orphan_labels`
+  in `backend/main.py`. Wired into `resolve_external_model_output`
+  between container synthesis and text-attach. `_build_gemini_prompt`
+  now emits role-aware `[SYNTHESIZED INPUT]` / `[SYNTHESIZED BUTTON]`
+  / `[SYNTHESIZED CONTAINER]` suffixes and the training-rules block
+  tells Gemini each synthetic role is a real `<input>` / `<button>` /
+  navbar/footer/section — not a placeholder. Auto-dormant once v3
+  ships; remove the helper + constants then. See Decision #20.
+- **Canvas state-bridge + undo fix + project-load loop (Hassan)** (2026-06-10):
+  Root cause of "templates flash and vanish" and "saved canvas vanishes
+  after some time" was `useProjectSave` calling `createClient()` on every
+  render (not memoized), making `loadProject` an unstable reference.
+  `canvas/page.tsx`'s project-load `useEffect([searchParams, loadProject])`
+  therefore re-ran on every parent render, reloading the DB snapshot and
+  overwriting local canvas edits via `history.setState` ~once per render.
+  Fix: `const supabase = useMemo(() => createClient(), [])` in
+  `useProjectSave.ts` (mirrors what `useVersionHistory` already did
+  correctly). Alongside this, fixed four regressions in the
+  `SketchCanvas` ⇄ `useHistory` bridge from the d42f2aa redesign:
+  (1) empty-state hint stuck after drawing — fixed via `hasUserInteracted`
+  flag wired to `CanvasSurface.onUserInteract`, plus the same flag is
+  set in `handleInsertTemplate` / `handleInsertComponent` so the hint
+  also vanishes when a template is dropped;
+  (2) saved projects did not restore on reload — load handler now
+  pushes `project.canvas_data` into `history.setState` (wrapper's effect
+  renders it into Konva), dropping the `lines`-only guard and the 500ms
+  setTimeout race;
+  (3) undo removed both the latest action AND the original template —
+  root cause: the wrapper's poll captured only `lines`/`shapes` and its
+  restore path used `clearCanvas + insertTemplate` which wiped
+  `componentGroups`. Added a `replaceCanvasState` method on
+  `SketchCanvasRef` that swaps all three buckets atomically, and the
+  wrapper now tracks `componentGroups` in both the poll and the restore;
+  (4) template-only projects never auto-saved — `useAutoSave` hasContent
+  check now considers `componentGroups`. `CanvasData` type gained a
+  `componentGroups` field. Initial history state seeded with
+  `componentGroups: []` to avoid a spurious first-poll diff;
+  (5) **template flashed for ~100ms then vanished** — the wrapper's
+  imperative `insertTemplate` had a `setTimeout(100)` that pushed
+  `{lines, shapes}` into history WITHOUT `componentGroups`; the restore
+  effect then saw a mismatch and wiped the just-inserted group. All
+  three `onStateChange` callsites in `SketchCanvasWithHistory`
+  (clearCanvas / insertTemplate / poll) now pass the full three-bucket
+  payload, and the page's load handler normalizes `canvas_data` to
+  exactly those three keys (raw DB data also carries width/height which
+  broke the JSON comparison). Rule of thumb: any `onStateChange` /
+  `history.setState` payload MUST contain exactly
+  `{lines, shapes, componentGroups}` — nothing more, nothing less.
+  Not assigned in the task board — fixed as integration work.
+- **PR #8 + integration (Maarij + Hassan)** (June 2026): M8 (error
+  boundaries), M9 (loading skeletons), M11 (dark mode) closed out;
+  M12 mobile responsiveness landed for auth + dashboard + canvas
+  (partial). Theme system uses `html[data-theme=...]` with FOUC
+  inline script in `layout.tsx`. Integration was a 7-file
+  surgical merge against Hassan's local WIP — preserved
+  `referrerPolicy="no-referrer"` avatar fix, account-delete flow,
+  `StatusBar`, `GenerationProgress`, line-tool, and gradient pill
+  re-skin while layering in Maarij's `ErrorBoundary` wraps + mobile
+  responsiveness. WIP safety branch: `wip/hassan-local-2026-06-10`.
 - **13d94e8 — M4, M5, M6 (Maarij)** (May 2026): Dashboard project card actions
   polished (delete with cascade via `delete_project()` DB function), empty states
   added to dashboard, onboarding tour built (`OnboardingTour.tsx` with spotlight

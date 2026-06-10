@@ -40,9 +40,6 @@ const VISIBLE_TOOLS: Tool[] = [
   "pen",
   "line",
   "rectangle",
-  "circle",
-  "ellipse",
-  "triangle",
   "arrow",
   "erase",
 ];
@@ -59,9 +56,7 @@ export default function StyleRibbon({
   onOpacityChange,
 }: StyleRibbonProps) {
   const visible = VISIBLE_TOOLS.includes(currentTool);
-  const showFill = ["rectangle", "circle", "ellipse", "triangle"].includes(
-    currentTool
-  );
+  const showFill = currentTool === "rectangle";
 
   return (
     <AnimatePresence>

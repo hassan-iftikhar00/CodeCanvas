@@ -206,7 +206,7 @@ export default function ProfilePage() {
       );
     }
 
-    // Server has deleted auth.users — clear the local session and navigate away.
+    // Server has deleted auth.users - clear the local session and navigate away.
     // Use window.location for a full reload so all in-memory auth state is gone.
     await supabase.auth.signOut();
     window.location.href = "/auth/login";

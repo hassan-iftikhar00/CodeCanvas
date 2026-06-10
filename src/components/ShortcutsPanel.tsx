@@ -97,7 +97,7 @@ export default function ShortcutsPanel({
   );
 
   const formatKey = (key: string) => {
-    if (key === "Ctrl") return "Ctrl/⌘";
+    if (key === "Ctrl") return "Ctrl";
     if (key === "Shift") return "Shift";
     if (key === "Alt") return "Alt";
     return key;

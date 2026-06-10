@@ -17,7 +17,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 // ============================================================
-// TOKENS — Warm Studio v0.1
+// TOKENS - Warm Studio v0.1
 // ============================================================
 const T = {
   light: {
@@ -59,7 +59,7 @@ const T = {
 };
 
 // ============================================================
-// LOGO — Architype Stedelijk style C, recoloured
+// LOGO - Architype Stedelijk style C, recoloured
 // ============================================================
 function Logo({ size = 48, color }: { size?: number; color: string }) {
   return (
@@ -213,7 +213,7 @@ function ModePanel({
 }
 
 // ============================================================
-// MOTION CSS — single source of truth
+// MOTION CSS - single source of truth
 // ============================================================
 const motionCSS = `
 @keyframes ds-shimmer {
@@ -435,7 +435,7 @@ function Hero() {
 }
 
 // ============================================================
-// 01 — BRAND
+// 01 - BRAND
 // ============================================================
 function BrandSection() {
   return (
@@ -443,7 +443,7 @@ function BrandSection() {
       num="01"
       name="Brand"
       id="brand"
-      desc="The C-mark is kept. The orange is swapped to Terracotta. A serif wordmark gives the geometric mark contrast — the same trick Pentagram uses for tech brands that want to feel made, not generated."
+      desc="The C-mark is kept. The orange is swapped to Terracotta. A serif wordmark gives the geometric mark contrast - the same trick Pentagram uses for tech brands that want to feel made, not generated."
     >
       <div className="grid grid-cols-12 gap-6">
         {/* Mark on light */}
@@ -466,7 +466,7 @@ function BrandSection() {
             }}
           >
             <span>terracotta · #BD5B3D</span>
-            <span>was: #FF6B00 ✗</span>
+            <span>was: #FF6B00</span>
           </div>
         </div>
         {/* Mark on dark */}
@@ -571,7 +571,7 @@ function BrandSection() {
 }
 
 // ============================================================
-// 02 — TOKENS
+// 02 - TOKENS
 // ============================================================
 function TokensSection() {
   const semantic = [
@@ -595,7 +595,7 @@ function TokensSection() {
       num="02"
       name="Color tokens"
       id="tokens"
-      desc="Two modes, one set of semantic names. Every component reads from these tokens — never from raw hex codes — so dark mode is one variable swap, not a rewrite."
+      desc="Two modes, one set of semantic names. Every component reads from these tokens - never from raw hex codes - so dark mode is one variable swap, not a rewrite."
     >
       <div
         className="overflow-hidden rounded-2xl border"
@@ -711,7 +711,7 @@ function TokensSection() {
 }
 
 // ============================================================
-// 03 — TYPOGRAPHY
+// 03 - TYPOGRAPHY
 // ============================================================
 function TypographySection() {
   const scale: [string, string, string, string][] = [
@@ -719,9 +719,9 @@ function TypographySection() {
     ["h1", "44px", "A canvas with warmth built in.", "fraunces 600 / -0.02em"],
     ["h2", "30px", "Section heading", "fraunces 600 / -0.015em"],
     ["h3", "22px", "Subheading", "fraunces 500"],
-    ["body-lg", "16px", "Body large — generous reading copy.", "inter 400 / 1.65"],
-    ["body", "14px", "Body — default UI text.", "inter 400 / 1.6"],
-    ["body-sm", "13px", "Body small — secondary copy.", "inter 400 / 1.55"],
+    ["body-lg", "16px", "Body large - generous reading copy.", "inter 400 / 1.65"],
+    ["body", "14px", "Body - default UI text.", "inter 400 / 1.6"],
+    ["body-sm", "13px", "Body small - secondary copy.", "inter 400 / 1.55"],
     ["caption", "11px", "CAPTION · UPPERCASE · +0.20em", "fraunces 500 / smcp"],
     ["mono-sm", "11px", "~/path/to/file.tsx", "jetbrains 400 / 1.5"],
   ];
@@ -815,7 +815,7 @@ function TypographySection() {
 }
 
 // ============================================================
-// 04 — RADIUS
+// 04 - RADIUS
 // ============================================================
 function RadiusSection() {
   const radii = [
@@ -831,7 +831,7 @@ function RadiusSection() {
       num="04"
       name="Radius scale"
       id="radius"
-      desc="Roundness stays — but it's tuned by component, not uniform. Buttons hit medium-large. Workspace shells go big. Status pills go full. The mix of radii reads as designed, not lazy."
+      desc="Roundness stays - but it's tuned by component, not uniform. Buttons hit medium-large. Workspace shells go big. Status pills go full. The mix of radii reads as designed, not lazy."
     >
       <div className="grid grid-cols-6 gap-4">
         {radii.map((r) => (
@@ -880,7 +880,7 @@ function RadiusSection() {
 }
 
 // ============================================================
-// 05 — BUTTONS (all states, both modes)
+// 05 - BUTTONS (all states, both modes)
 // ============================================================
 function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
   const t = T[mode];
@@ -966,7 +966,7 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
           Disabled
         </button>
         <span className="text-[10px]" style={{ color: t.muted }}>
-          —
+          -
         </span>
       </BtnDemo>
 
@@ -1001,7 +1001,7 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
           Disabled
         </button>
         <span className="text-[10px]" style={{ color: t.muted }}>
-          —
+          -
         </span>
       </BtnDemo>
 
@@ -1044,7 +1044,7 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
           Disabled
         </button>
         <span className="text-[10px]" style={{ color: t.muted }}>
-          —
+          -
         </span>
       </BtnDemo>
 
@@ -1087,7 +1087,7 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
           <PlayIcon />
         </button>
         <span className="text-[10px]" style={{ color: t.muted }}>
-          —
+          -
         </span>
       </BtnDemo>
 
@@ -1106,13 +1106,13 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
           <DownloadIcon /> Export
         </button>
         <span className="text-[10px]" style={{ color: t.muted }}>
-          —
+          -
         </span>
         <span className="text-[10px]" style={{ color: t.muted }}>
-          —
+          -
         </span>
         <span className="text-[10px]" style={{ color: t.muted }}>
-          —
+          -
         </span>
       </BtnDemo>
     </div>
@@ -1150,7 +1150,7 @@ function ButtonsSection() {
       num="05"
       name="Buttons"
       id="buttons"
-      desc="Five variants. Every state explicit. Default, hover, focus (visible 3px terracotta-soft ring), disabled, loading. Pressed scales to 0.97 — defined globally on .ds-btn."
+      desc="Five variants. Every state explicit. Default, hover, focus (visible 3px terracotta-soft ring), disabled, loading. Pressed scales to 0.97 - defined globally on .ds-btn."
     >
       <div className="space-y-6">
         <ModePanel mode="light">
@@ -1302,7 +1302,7 @@ function Spinner({
 }
 
 // ============================================================
-// 06 — FORMS
+// 06 - FORMS
 // ============================================================
 function FormsSection() {
   return (
@@ -1310,7 +1310,7 @@ function FormsSection() {
       num="06"
       name="Forms"
       id="forms"
-      desc="Inputs use rounded-md (10px) — slightly less playful than buttons, more focused on legibility. Focus ring is the same 3px terracotta-soft as buttons. Error state replaces hairline with danger and shows a single-line message below."
+      desc="Inputs use rounded-md (10px) - slightly less playful than buttons, more focused on legibility. Focus ring is the same 3px terracotta-soft as buttons. Error state replaces hairline with danger and shows a single-line message below."
     >
       <div className="grid grid-cols-2 gap-6">
         <ModePanel mode="light">
@@ -1412,7 +1412,7 @@ function FormPrimitives({ mode }: { mode: "light" | "dark" }) {
                 fontFamily: "var(--font-jetbrains)",
               }}
             >
-              ⌘K
+              Ctrl+K
             </span>
           </div>
         </div>
@@ -1542,7 +1542,7 @@ function FormPrimitives({ mode }: { mode: "light" | "dark" }) {
 }
 
 // ============================================================
-// 07 — SURFACES (modal, dropdown, tooltip)
+// 07 - SURFACES (modal, dropdown, tooltip)
 // ============================================================
 function SurfacesSection() {
   return (
@@ -1550,7 +1550,7 @@ function SurfacesSection() {
       num="07"
       name="Surfaces"
       id="surfaces"
-      desc="Modals get a soft ink scrim (not opaque black). Dropdowns inherit surface tokens. Tooltips are ink-on-linen — the only place ink touches the foreground without being a container."
+      desc="Modals get a soft ink scrim (not opaque black). Dropdowns inherit surface tokens. Tooltips are ink-on-linen - the only place ink touches the foreground without being a container."
     >
       <div className="grid grid-cols-12 gap-6">
         {/* Modal */}
@@ -1654,9 +1654,9 @@ function SurfacesSection() {
               >
                 {[
                   ["Open in canvas", "⏎"],
-                  ["Duplicate", "⌘D"],
-                  ["Rename", "⌘R"],
-                  ["Export ZIP", "⌘E"],
+                  ["Duplicate", "Ctrl+D"],
+                  ["Rename", "Ctrl+R"],
+                  ["Export ZIP", "Ctrl+E"],
                 ].map(([label, key]) => (
                   <div
                     key={label}
@@ -1749,7 +1749,7 @@ function SurfacesSection() {
 }
 
 // ============================================================
-// 08 — FEEDBACK (toast, skeleton, spinner, progress)
+// 08 - FEEDBACK (toast, skeleton, spinner, progress)
 // ============================================================
 function FeedbackSection() {
   const toasts = [
@@ -1796,7 +1796,7 @@ function FeedbackSection() {
       num="08"
       name="Feedback"
       id="feedback"
-      desc="Toasts use tinted versions of the semantic colors — never the saturated form. Skeletons shimmer with a terracotta wash, not grey. Progress bars use the accent. Always."
+      desc="Toasts use tinted versions of the semantic colors - never the saturated form. Skeletons shimmer with a terracotta wash, not grey. Progress bars use the accent. Always."
     >
       {/* Toasts */}
       <div className="grid grid-cols-4 gap-4">
@@ -1949,7 +1949,7 @@ function FeedbackSection() {
 }
 
 // ============================================================
-// 09 — STATES (empty, error)
+// 09 - STATES (empty, error)
 // ============================================================
 function StatesSection() {
   return (
@@ -1957,7 +1957,7 @@ function StatesSection() {
       num="09"
       name="States"
       id="states"
-      desc="Empty isn't blank — it's invitational. Error isn't apologetic — it's actionable. Both use illustration sparingly: a single SVG mark, not a stock illustration."
+      desc="Empty isn't blank - it's invitational. Error isn't apologetic - it's actionable. Both use illustration sparingly: a single SVG mark, not a stock illustration."
     >
       <div className="grid grid-cols-2 gap-6">
         {/* Empty */}
@@ -2021,7 +2021,7 @@ function StatesSection() {
             style={{ color: T.light.muted }}
           >
             Roboflow returned 0 predictions. Your sketch might be on a
-            transparent background — composite to white and try again.
+            transparent background - composite to white and try again.
           </p>
           <div className="mt-5 flex justify-center gap-2">
             <button
@@ -2044,7 +2044,7 @@ function StatesSection() {
 }
 
 // ============================================================
-// 10 — MOTION
+// 10 - MOTION
 // ============================================================
 function MotionSection() {
   const timings = [
@@ -2058,7 +2058,7 @@ function MotionSection() {
     {
       name: "out",
       curve: "cubic-bezier(0.16, 1, 0.3, 1)",
-      use: "most things — settles softly",
+      use: "most things - settles softly",
     },
     {
       name: "soft",
@@ -2081,7 +2081,7 @@ function MotionSection() {
       num="10"
       name="Motion language"
       id="motion"
-      desc="Five timings, four easings, six signature motions. Every animation in CodeCanvas reads from this list — never improvised. The point of a motion language is that the brand feels coherent in motion the way it feels coherent in colour."
+      desc="Five timings, four easings, six signature motions. Every animation in CodeCanvas reads from this list - never improvised. The point of a motion language is that the brand feels coherent in motion the way it feels coherent in colour."
     >
       {/* Timing + easing tokens */}
       <div className="grid grid-cols-2 gap-6">
@@ -2329,7 +2329,7 @@ function MotionSection() {
               code panel rises from the bottom (t-slow · e-out · 80ms delay).
               Each detected element gets a terracotta bounding ring that pulses
               once (t-base · e-spring) before settling. The whole choreography
-              is 1.2 seconds — long enough to feel like a moment, short enough
+              is 1.2 seconds - long enough to feel like a moment, short enough
               to not annoy.
             </p>
           </div>
@@ -2363,7 +2363,7 @@ function MotionSection() {
                 <li>120ms · bounding rings stagger in</li>
                 <li>320ms · ring pulse (once)</li>
                 <li>500ms · code-rain begins</li>
-                <li>1200ms · ⌘ done · idle</li>
+                <li>1200ms · done · idle</li>
               </ol>
             </div>
           </div>
@@ -2421,7 +2421,7 @@ function MotionTile({
 }
 
 // ============================================================
-// 11 — ICONS
+// 11 - ICONS
 // ============================================================
 function IconsSection() {
   return (
@@ -2429,7 +2429,7 @@ function IconsSection() {
       num="11"
       name="Iconography"
       id="icons"
-      desc="lucide-react at 1.6px stroke, 16/20/24px sizes. Sharp enough to feel precise, thin enough to sit beside Fraunces without competing. Custom icons (canvas tools) match this exact stroke weight — no exceptions."
+      desc="lucide-react at 1.6px stroke, 16/20/24px sizes. Sharp enough to feel precise, thin enough to sit beside Fraunces without competing. Custom icons (canvas tools) match this exact stroke weight - no exceptions."
     >
       <div
         className="rounded-2xl border p-6"
@@ -2508,7 +2508,7 @@ function DSFooter() {
               className="mt-4 max-w-sm text-[13px]"
               style={{ color: T.dark.muted }}
             >
-              Warm Studio v0.1 — the system that powers CodeCanvas. Implement
+              Warm Studio v0.1 - the system that powers CodeCanvas. Implement
               once. Re-skin never.
             </p>
           </div>

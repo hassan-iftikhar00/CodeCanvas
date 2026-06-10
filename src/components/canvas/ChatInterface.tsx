@@ -44,7 +44,7 @@ const loadStoredMessages = (projectId?: string): Message[] => {
       if (Array.isArray(parsed)) return parsed;
     }
   } catch {
-    // swallow — chat history is best-effort
+    // swallow - chat history is best-effort
   }
   return [];
 };
@@ -89,7 +89,7 @@ export default function ChatInterface({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isProcessing]);
 
-  // Auto-grow textarea (1–4 lines)
+  // Auto-grow textarea (1-4 lines)
   useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;

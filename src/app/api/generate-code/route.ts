@@ -11,7 +11,7 @@ if (!FASTAPI_URL) {
     );
   } else {
     console.warn(
-      "[CodeCanvas] FASTAPI_URL is not set — falling back to http://localhost:8000/api/predict. " +
+      "[CodeCanvas] FASTAPI_URL is not set - falling back to http://localhost:8000/api/predict. " +
         "Set FASTAPI_URL in .env.local to suppress this warning."
     );
   }
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       clearTimeout(timeoutId);
       if (fetchError instanceof Error && fetchError.name === "AbortError") {
         return NextResponse.json(
-          { error: "Detection timed out — the AI took too long. Please try again." },
+          { error: "Detection timed out - the AI took too long. Please try again." },
           { status: 504 }
         );
       }

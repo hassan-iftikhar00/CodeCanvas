@@ -190,7 +190,11 @@ function CanvasPageInner() {
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ History & versions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const history = useHistory({
-    initialState: { lines: [], shapes: [] } as CanvasData,
+    initialState: {
+      lines: [],
+      shapes: [],
+      componentGroups: [],
+    } as CanvasData,
     maxHistory: 50,
   });
   const { isSaving: isAutoSaving } = useAutoSave(
@@ -199,6 +203,7 @@ function CanvasPageInner() {
   );
   const isSaving = isManualSaving || isAutoSaving;
   const versionHistory = useVersionHistory();
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ Refs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const canvasRef = useRef<SketchCanvasRef>(null);
@@ -378,16 +383,26 @@ function CanvasPageInner() {
           setProjectName(project.title);
           setOriginalProjectName(project.title);
           if (project.canvas_data) {
-            setTimeout(() => {
-              if (canvasRef.current && project.canvas_data.lines) {
-                canvasRef.current.clearCanvas();
-                canvasRef.current.insertTemplate(
-                  project.canvas_data as Parameters<
-                    SketchCanvasRef["insertTemplate"]
-                  >[0]
-                );
-              }
-            }, 500);
+            const cd = project.canvas_data as CanvasData;
+            const hasContent =
+              (cd.lines?.length ?? 0) > 0 ||
+              (cd.shapes?.length ?? 0) > 0 ||
+              (cd.componentGroups?.length ?? 0) > 0;
+            if (hasContent) {
+              // Normalize to exactly the three keys the wrapper's JSON
+              // comparison tracks. Raw canvas_data also carries width/height,
+              // which would otherwise make every comparison report a diff.
+              history.setState({
+                lines: cd.lines ?? [],
+                shapes: cd.shapes ?? [],
+                componentGroups: cd.componentGroups ?? [],
+              });
+              setHasUserInteracted(true);
+            }
+          }
+          if (project.generated_code) {
+            setGeneratedCode(project.generated_code);
+            setEditedCode(project.generated_code);
           }
         }
       };
@@ -408,15 +423,19 @@ function CanvasPageInner() {
     const canvasData = canvasRef.current?.getCanvasData();
     if (!canvasData) return;
 
+    const codeToSave = editedCode || generatedCode || undefined;
+
     if (currentProject?.id && !currentProject.id.startsWith("temp-")) {
-      const success = await updateProject(currentProject.id, canvasData);
+      const success = await updateProject(currentProject.id, canvasData, undefined, codeToSave);
       if (success) {
         console.log("Project saved successfully");
       }
     } else {
       const newId = await saveProject(
         projectName || "Untitled Project",
-        canvasData
+        canvasData,
+        undefined,
+        codeToSave
       );
       if (newId) {
         setCurrentProject({
@@ -426,7 +445,7 @@ function CanvasPageInner() {
         window.history.replaceState({}, "", `/canvas?id=${newId}`);
       }
     }
-  }, [currentProject, projectName, saveProject, updateProject]);
+  }, [currentProject, projectName, saveProject, updateProject, editedCode, generatedCode]);
 
   const ensureGenerationProject = useCallback(
     async (canvasData: CanvasData): Promise<string | null> => {
@@ -467,9 +486,6 @@ function CanvasPageInner() {
           p: "pen",
           n: "line",
           r: "rectangle",
-          o: "circle",
-          l: "ellipse",
-          g: "triangle",
           a: "arrow",
           t: "text",
           e: "erase",
@@ -609,6 +625,13 @@ function CanvasPageInner() {
       setEditedCode(result.code);
       // Ensure code panel is visible so user sees the update
       setShowCodePanel(true);
+      // Persist updated code immediately so it survives a reload.
+      if (currentProject?.id && !currentProject.id.startsWith("temp-")) {
+        const currentCanvasData = canvasRef.current?.getCanvasData();
+        if (currentCanvasData) {
+          void updateProject(currentProject.id, currentCanvasData, undefined, result.code);
+        }
+      }
       return (
         result.message ||
         "Done! I've updated the code. Check the code panel below."
@@ -761,14 +784,17 @@ function CanvasPageInner() {
 
   // Templates & components
   const handleInsertTemplate = (template: Template) => {
-    if (canvasRef.current)
+    if (canvasRef.current) {
       canvasRef.current.insertTemplate(template.canvasData);
+      setHasUserInteracted(true);
+    }
   };
   const handleInsertComponent = (component: { canvasData: unknown }) => {
     if (canvasRef.current) {
       canvasRef.current.insertTemplate(
         component.canvasData as Parameters<SketchCanvasRef["insertTemplate"]>[0]
       );
+      setHasUserInteracted(true);
     }
   };
 
@@ -807,7 +833,7 @@ function CanvasPageInner() {
       // The exported PNG is a tight crop of the canvas at pixelRatio=2, so
       // canvas (cx, cy) lands at image ((cx - offsetX) * scale, (cy - offsetY) * scale).
       // Pre-applying this here means the backend gets text annotations in
-      // the same coord space Roboflow returns bboxes in — no scaling needed
+      // the same coord space Roboflow returns bboxes in - no scaling needed
       // server-side, which previously broke when the export crop ≠ canvas size.
       const exportTransform = exportResult?.transform ?? {
         offsetX: 0,
@@ -887,6 +913,11 @@ function CanvasPageInner() {
       setFallbackMessage(result.message ?? null);
       setCurrentMode("preview");
       setShowCodePanel(true);
+      // Persist generated code immediately so it survives a reload without
+      // requiring a manual Ctrl+S.
+      if (projectId) {
+        void updateProject(projectId, canvasData, undefined, result.code);
+      }
     } catch (err) {
       const message =
         err instanceof Error
@@ -903,7 +934,7 @@ function CanvasPageInner() {
     codePanelHeightRef.current = codePanelHeight;
   }, [codePanelHeight]);
 
-  // Code panel resize via drag — imperative for smoothness.
+  // Code panel resize via drag - imperative for smoothness.
   // The drag writes height directly to the DOM inside a single rAF tick so we
   // don't churn React state (and thus avoid restarting Konva's ResizeObserver
   // on every mousemove, which was the source of the flicker).
@@ -914,7 +945,7 @@ function CanvasPageInner() {
     const startH = codePanelHeightRef.current;
     // Bound max by viewport so the canvas can't be squeezed to nothing on
     // short screens, but otherwise let the preview panel grow large enough to
-    // actually be usable (BUG 1 — the previous cap of 600 was too tight on
+    // actually be usable (BUG 1 - the previous cap of 600 was too tight on
     // 1080p+ displays, leaving the preview thumbnail-sized).
     // Floor: leave ~180px for the canvas area + status bar.
     const CANVAS_MIN_HEIGHT = 180;
@@ -993,7 +1024,7 @@ function CanvasPageInner() {
         title: "Save project",
         subtitle: "Persist the current canvas to your library",
         keywords: "save persist project",
-        shortcut: "Ctrl/⌘S",
+        shortcut: "Ctrl+S",
         group: "Canvas",
         onSelect: () => saveProjectRef.current(),
       },
@@ -1002,7 +1033,7 @@ function CanvasPageInner() {
         title: "Toggle code panel",
         subtitle: "Show or hide the generated code editor",
         keywords: "code panel editor monaco",
-        shortcut: "Ctrl/⌘`",
+        shortcut: "Ctrl+`",
         group: "View",
         onSelect: () => setShowCodePanel((p) => !p),
       },
@@ -1011,7 +1042,7 @@ function CanvasPageInner() {
         title: "Toggle right panel",
         subtitle: "Switch between properties, layers, and chat",
         keywords: "panel sidebar properties layers chat",
-        shortcut: "Ctrl/⌘\\",
+        shortcut: "Ctrl+\\",
         group: "View",
         onSelect: () => setRightPanel((p) => (p ? null : "chat")),
       },
@@ -1044,7 +1075,7 @@ function CanvasPageInner() {
         title: "Reset zoom to 100%",
         subtitle: "Return the canvas to its default scale",
         keywords: "zoom reset 100 fit",
-        shortcut: "Ctrl/⌘0",
+        shortcut: "Ctrl+0",
         group: "View",
         onSelect: () => setZoom(ZOOM_DEFAULT),
       },
@@ -1102,9 +1133,7 @@ function CanvasPageInner() {
   // Map expanded tool Ã¢â€ â€™ what SketchCanvas understands
   const toolForCanvas = (): string => {
     if (
-      ["rectangle", "circle", "ellipse", "triangle", "arrow"].includes(
-        currentTool
-      )
+      ["rectangle", "arrow"].includes(currentTool)
     )
       return currentTool;
     if (currentTool === "hand") return "hand";
@@ -1156,21 +1185,25 @@ function CanvasPageInner() {
             className="relative flex-1 min-h-0 overflow-hidden bg-[var(--cc-bg-canvas)]"
           >
             <CanvasSurface
-              isEmpty={(() => {
-                const s = history.state as
-                  | {
-                      lines?: unknown[];
-                      shapes?: unknown[];
-                      componentGroups?: unknown[];
-                    }
-                  | undefined;
-                if (!s) return true;
-                return (
-                  (s.lines?.length ?? 0) === 0 &&
-                  (s.shapes?.length ?? 0) === 0 &&
-                  (s.componentGroups?.length ?? 0) === 0
-                );
-              })()}
+              isEmpty={
+                !hasUserInteracted &&
+                (() => {
+                  const s = history.state as
+                    | {
+                        lines?: unknown[];
+                        shapes?: unknown[];
+                        componentGroups?: unknown[];
+                      }
+                    | undefined;
+                  if (!s) return true;
+                  return (
+                    (s.lines?.length ?? 0) === 0 &&
+                    (s.shapes?.length ?? 0) === 0 &&
+                    (s.componentGroups?.length ?? 0) === 0
+                  );
+                })()
+              }
+              onUserInteract={() => setHasUserInteracted(true)}
             >
               <div className="flex h-full items-center justify-center p-2 sm:p-4 md:p-6">
                 <ErrorBoundary
@@ -1196,7 +1229,7 @@ function CanvasPageInner() {
               </div>
             </CanvasSurface>
 
-            {/* Floating left toolbar — drawing tools */}
+            {/* Floating left toolbar - drawing tools */}
             <ErrorBoundary
               variant="panel"
               title="Toolbar unavailable"
@@ -1208,7 +1241,7 @@ function CanvasPageInner() {
               />
             </ErrorBoundary>
 
-            {/* Floating bottom style ribbon — slides in/out per tool */}
+            {/* Floating bottom style ribbon - slides in/out per tool */}
             <ErrorBoundary
               variant="panel"
               title="Style controls unavailable"
@@ -1258,7 +1291,7 @@ function CanvasPageInner() {
             )}
           </main>
 
-          {/* Persistent status bar — owns dimensions / mode / grid / zoom.
+          {/* Persistent status bar - owns dimensions / mode / grid / zoom.
               Lives in the page chrome (not the Konva white box) so it can
               never be overlapped by the floating toolbar (BUG 6). */}
           <StatusBar
@@ -1281,7 +1314,7 @@ function CanvasPageInner() {
               className="flex flex-col flex-shrink-0 border-t border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] will-change-[height]"
               style={{ height: codePanelHeight }}
             >
-              {/* Drag handle — tactile, hover reveals an accented grip pill. */}
+              {/* Drag handle - tactile, hover reveals an accented grip pill. */}
               <div
                 onMouseDown={handleCodePanelDrag}
                 onDoubleClick={() => {
@@ -1295,7 +1328,7 @@ function CanvasPageInner() {
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col">
-                {/* Tab bar — VS Code-style segmented control on the left,
+                {/* Tab bar - VS Code-style segmented control on the left,
                     actions on the right. */}
                 <div className="flex items-center justify-between border-b border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)]/40 px-2 py-1.5">
                   <div className="flex items-center gap-0.5 rounded-[8px] bg-[var(--cc-bg-canvas)] p-0.5">
@@ -1700,7 +1733,7 @@ function CanvasPageInner() {
               </div>
             )}
 
-            {/* Chat panel — sketch-first workflow: hasCode gates chat input */}
+            {/* Chat panel - sketch-first workflow: hasCode gates chat input */}
             {rightPanel === "chat" && (
               <ChatInterface
                 key={currentProject?.id ?? "no-project"}
@@ -1818,7 +1851,7 @@ function CanvasPageInner() {
         onClose={() => setShowComponents(false)}
         onInsertComponent={handleInsertComponent}
       />
-      {/* Duplicate floating save indicator removed (BUG 3) — the header's
+      {/* Duplicate floating save indicator removed (BUG 3) - the header's
           single save-dot in <Navbar /> is now the only save-status surface. */}
     </div>
   );

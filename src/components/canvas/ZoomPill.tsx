@@ -38,7 +38,7 @@ export default function ZoomPill({
     >
       <PillButton
         label="Zoom out"
-        shortcut="Ctrl/⌘-"
+        shortcut="Ctrl+-"
         disabled={zoom <= ZOOM_MIN}
         onClick={() => onZoomChange(Math.max(zoom - 10, ZOOM_MIN))}
       >
@@ -66,7 +66,7 @@ export default function ZoomPill({
 
       <PillButton
         label="Zoom in"
-        shortcut="Ctrl/⌘+"
+        shortcut="Ctrl++"
         disabled={zoom >= ZOOM_MAX}
         onClick={() => onZoomChange(Math.min(zoom + 10, ZOOM_MAX))}
       >
@@ -89,7 +89,7 @@ export default function ZoomPill({
 
       <PillButton
         label="Fit to screen"
-        shortcut="Ctrl/⌘0"
+        shortcut="Ctrl+0"
         onClick={onFitToScreen}
       >
         <svg
@@ -134,7 +134,7 @@ export default function ZoomPill({
                 <span>{p}%</span>
                 {p === ZOOM_DEFAULT ? (
                   <kbd className="rounded-[var(--cc-radius-tag)] bg-[var(--cc-bg-canvas)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--cc-text-muted)]">
-                    Ctrl/⌘0
+                    Ctrl+0
                   </kbd>
                 ) : null}
               </button>

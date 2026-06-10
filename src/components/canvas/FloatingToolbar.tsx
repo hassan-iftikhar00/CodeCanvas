@@ -48,27 +48,6 @@ const TOOLS: ToolItem[] = [
     icon: <RectIcon />,
   },
   {
-    id: "circle",
-    label: "Circle",
-    shortcut: "O",
-    group: "shape",
-    icon: <CircleIcon />,
-  },
-  {
-    id: "ellipse",
-    label: "Ellipse",
-    shortcut: "L",
-    group: "shape",
-    icon: <EllipseIcon />,
-  },
-  {
-    id: "triangle",
-    label: "Triangle",
-    shortcut: "G",
-    group: "shape",
-    icon: <TriangleIcon />,
-  },
-  {
     id: "arrow",
     label: "Arrow",
     shortcut: "A",
@@ -242,7 +221,7 @@ function PenIcon() {
 function LineIcon() {
   return (
     <svg {..._icon}>
-      {/* Point-to-point straight line with end dots — Excalidraw style */}
+      {/* Point-to-point straight line with end dots - Excalidraw style */}
       <circle cx="5" cy="19" r="1.6" fill="currentColor" stroke="none" />
       <circle cx="19" cy="5" r="1.6" fill="currentColor" stroke="none" />
       <line x1="5" y1="19" x2="19" y2="5" />
@@ -253,27 +232,6 @@ function RectIcon() {
   return (
     <svg {..._icon}>
       <rect x="3" y="3" width="18" height="18" rx="2" />
-    </svg>
-  );
-}
-function CircleIcon() {
-  return (
-    <svg {..._icon}>
-      <circle cx="12" cy="12" r="10" />
-    </svg>
-  );
-}
-function EllipseIcon() {
-  return (
-    <svg {..._icon}>
-      <ellipse cx="12" cy="12" rx="10" ry="6" />
-    </svg>
-  );
-}
-function TriangleIcon() {
-  return (
-    <svg {..._icon}>
-      <path d="M12 2L2 22h20L12 2z" />
     </svg>
   );
 }
