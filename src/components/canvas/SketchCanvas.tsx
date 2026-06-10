@@ -1148,13 +1148,27 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       }
     };
 
+    const handleTouchStart = (e: Konva.KonvaEventObject<TouchEvent>) => {
+      e.evt.preventDefault();
+      handleMouseDown(e as unknown as Konva.KonvaEventObject<MouseEvent>);
+    };
+
+    const handleTouchMove = (e: Konva.KonvaEventObject<TouchEvent>) => {
+      e.evt.preventDefault();
+      handleMouseMove(e as unknown as Konva.KonvaEventObject<MouseEvent>);
+    };
+
+    const handleTouchEnd = () => {
+      handleMouseUp();
+    };
+
     // Calculate scaled dimensions for proper zoom behavior
     const scale = zoom / 100;
 
     return (
       <div
         ref={containerRef}
-        className="relative h-full w-full rounded-xl border-2 border-[#2E2E2E] shadow-panel overflow-hidden"
+        className="relative h-full w-full rounded-xl border-2 border-[#2E2E2E] shadow-panel overflow-hidden overscroll-none touch-none"
         style={{ background: "#ffffff" }}
       >
         <Stage
@@ -1163,6 +1177,9 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           ref={stageRef}
           className="rounded-xl"
           draggable={spacePressed || tool === "hand"}

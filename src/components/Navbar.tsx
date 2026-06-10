@@ -11,6 +11,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 interface NavbarProps {
   projectName?: string;
@@ -215,7 +216,7 @@ export default function Navbar({
 
   return (
     <header
-      className="flex h-12 items-center justify-between border-b border-[#1e1e1e] bg-[var(--cc-bg-surface)] px-3"
+      className="flex min-h-[3rem] flex-wrap items-center justify-between gap-2 border-b border-[#1e1e1e] bg-[var(--cc-bg-surface)] px-2 sm:px-3"
       role="banner"
     >
       {/* Left cluster — back, logo, project name + save dot */}
@@ -277,7 +278,7 @@ export default function Navbar({
                 onBlur={commitNameEdit}
                 onKeyDown={onNameKey}
                 aria-label="Project name"
-                className="h-7 min-w-[140px] max-w-[280px] rounded-[var(--cc-radius-button)] border border-[var(--cc-accent)] bg-[var(--cc-bg-elevated)] px-2 text-[13px] font-medium text-[var(--cc-text-primary)] outline-none ring-2 ring-[var(--cc-accent-glow)]"
+                className="h-7 min-w-[120px] max-w-[200px] rounded-[var(--cc-radius-button)] border border-[var(--cc-accent)] bg-[var(--cc-bg-elevated)] px-2 text-[12px] font-medium text-[var(--cc-text-primary)] outline-none ring-2 ring-[var(--cc-accent-glow)] sm:min-w-[140px] sm:max-w-[280px] sm:text-[13px]"
               />
             ) : (
               <button
@@ -285,7 +286,7 @@ export default function Navbar({
                 onDoubleClick={() => setEditingName(true)}
                 onClick={() => setEditingName(true)}
                 title="Double-click to rename"
-                className="group flex h-7 max-w-[280px] items-center gap-1 truncate rounded-[var(--cc-radius-button)] px-2 text-[13px] font-medium text-[var(--cc-text-primary)] transition-colors hover:bg-[var(--cc-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+                className="group flex h-7 max-w-[200px] items-center gap-1 truncate rounded-[var(--cc-radius-button)] px-2 text-[12px] font-medium text-[var(--cc-text-primary)] transition-colors hover:bg-[var(--cc-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] sm:max-w-[280px] sm:text-[13px]"
               >
                 <span className="truncate">{projectName || "Untitled"}</span>
                 <svg
@@ -327,7 +328,8 @@ export default function Navbar({
       </div>
 
       {/* Right cluster — actions */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
+        <ThemeToggle />
         {onTemplatesToggle ? (
           <HeaderButton
             onClick={onTemplatesToggle}

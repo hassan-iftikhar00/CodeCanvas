@@ -12,6 +12,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
+import AuthLoadingSkeleton from "@/components/auth/AuthLoadingSkeleton";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 const REMEMBER_ME_KEY = "codecanvas_remember_me";
 const SAVED_EMAIL_KEY = "codecanvas_saved_email";
@@ -35,9 +37,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-screen items-center justify-center bg-[var(--cc-bg-canvas)]">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
-        </div>
+        <AuthLoadingSkeleton />
       }
     >
       <LoginPageInner />
@@ -303,14 +303,17 @@ function LoginPageInner() {
   const isAnyLoading = loading || isGoogleLoading || isGitHubLoading;
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-[var(--cc-bg-canvas)]">
+    <div className="relative flex min-h-[100svh] overflow-x-hidden overflow-y-auto bg-[var(--cc-bg-canvas)]">
+      <div className="absolute right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-[var(--cc-accent-glow)] blur-[100px]" />
         <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-[var(--cc-accent-glow)] blur-[100px]" />
       </div>
 
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative items-center justify-center p-12 bg-gradient-to-br from-[#0A0A0A] via-[#1A1A1A] to-[#0A0A0A]">
+      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative items-center justify-center p-12 bg-gradient-to-br from-[var(--cc-auth-hero-from)] via-[var(--cc-auth-hero-via)] to-[var(--cc-auth-hero-to)]">
         <div className="relative z-10 max-w-lg text-center">
           {/* Logo Icon */}
           <div className="mb-7 inline-flex h-16 w-16 items-center justify-center rounded-[12px] bg-[var(--cc-accent)] shadow-[0_0_40px_var(--cc-accent-glow-strong)]">
@@ -364,7 +367,7 @@ function LoginPageInner() {
 
           {/* Canvas Preview Mockup */}
           <div className="mt-12 relative">
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-transparent z-10" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--cc-auth-hero-overlay)] via-transparent to-transparent z-10" />
             <div className="rounded-xl border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] p-4 shadow-2xl">
               <div className="flex gap-2 mb-3">
                 <div className="w-3 h-3 rounded-full bg-[#FF5F57]" />
@@ -373,7 +376,7 @@ function LoginPageInner() {
               </div>
               <div className="flex h-32 items-center justify-center rounded-[8px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] cc-dot-grid">
                 <div className="flex gap-4">
-                  <div className="w-16 h-16 rounded-lg border-2 border-dashed border-[#FF6B00]/50 flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-lg border-2 border-dashed border-[var(--cc-accent-border-soft)] flex items-center justify-center">
                     <svg
                       className="h-5 w-5 text-[var(--cc-accent)]/60"
                       fill="none"
@@ -388,8 +391,8 @@ function LoginPageInner() {
                       />
                     </svg>
                   </div>
-                  <div className="w-24 h-16 rounded-lg border-2 border-[#FF6B00] bg-[#FF6B00]/10" />
-                  <div className="w-12 h-12 rounded-full border-2 border-[#FF6B00]/30" />
+                  <div className="w-24 h-16 rounded-lg border-2 border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)]" />
+                  <div className="w-12 h-12 rounded-full border-2 border-[var(--cc-accent-border-weak)]" />
                 </div>
               </div>
             </div>
@@ -398,7 +401,7 @@ function LoginPageInner() {
       </div>
 
       {/* Right Panel - Login Form */}
-      <div className="flex flex-1 items-center justify-center p-4 sm:p-6 md:p-8">
+      <div className="flex flex-1 items-start justify-center px-4 py-10 sm:items-center sm:p-6 md:p-8">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}

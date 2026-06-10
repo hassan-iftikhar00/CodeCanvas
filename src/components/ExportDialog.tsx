@@ -82,21 +82,21 @@ export default function ExportDialog({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-2xl border border-[#2E2E2E] bg-[#1A1A1A] shadow-2xl animate-scale-in"
+        className="w-full max-w-2xl rounded-2xl border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] shadow-2xl animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="border-b border-[#2E2E2E] px-6 py-4">
+        <div className="border-b border-[var(--cc-border-subtle)] px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-white">Export Project</h2>
-              <p className="mt-1 text-sm text-[#A0A0A0]">
+              <h2 className="text-2xl font-bold text-[var(--cc-text-primary)]">Export Project</h2>
+              <p className="mt-1 text-sm text-[var(--cc-text-secondary)]">
                 Choose your export format and options
               </p>
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-2 text-[#A0A0A0] transition-all hover:bg-[#2E2E2E] hover:text-white"
+              className="rounded-lg p-2 text-[var(--cc-text-secondary)] transition-all hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
               aria-label="Close"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -108,13 +108,13 @@ export default function ExportDialog({
 
         {/* Export Type Toggle */}
         <div className="px-6 pt-6">
-          <div className="flex gap-2 rounded-xl bg-[#0A0A0A] border border-[#2E2E2E] p-1">
+          <div className="flex gap-2 rounded-xl bg-[var(--cc-bg-canvas)] border border-[var(--cc-border-subtle)] p-1">
             <button
               onClick={() => setExportType("code")}
               className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
                 exportType === "code"
-                  ? "bg-white text-[#0A0A0A] shadow-sm"
-                  : "text-[#A0A0A0] hover:text-white"
+                  ? "bg-[var(--cc-toggle-active-bg)] text-[var(--cc-toggle-active-text)] shadow-sm"
+                  : "text-[var(--cc-text-secondary)] hover:text-[var(--cc-text-primary)]"
               }`}
             >
               <div className="flex items-center justify-center gap-2">
@@ -128,8 +128,8 @@ export default function ExportDialog({
               onClick={() => setExportType("image")}
               className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
                 exportType === "image"
-                  ? "bg-white text-[#0A0A0A] shadow-sm"
-                  : "text-[#A0A0A0] hover:text-white"
+                  ? "bg-[var(--cc-toggle-active-bg)] text-[var(--cc-toggle-active-text)] shadow-sm"
+                  : "text-[var(--cc-text-secondary)] hover:text-[var(--cc-text-primary)]"
               }`}
             >
               <div className="flex items-center justify-center gap-2">
@@ -148,7 +148,7 @@ export default function ExportDialog({
             <div className="space-y-4">
               {/* Code Format */}
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
+                <label className="mb-2 block text-sm font-semibold text-[var(--cc-text-primary)]">
                   Export Method
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -156,8 +156,8 @@ export default function ExportDialog({
                     onClick={() => setCodeFormat("copy")}
                     className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
                       codeFormat === "copy"
-                        ? "border-[#FF6B00] bg-[#FF6B00]/20 text-white"
-                        : "border-[#2E2E2E] bg-[#0A0A0A] text-[#A0A0A0] hover:border-[#4A4A4A] hover:text-white"
+                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
+                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
                     }`}
                   >
                     <div className="flex flex-col items-center gap-1">
@@ -171,8 +171,8 @@ export default function ExportDialog({
                     onClick={() => setCodeFormat("zip")}
                     className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
                       codeFormat === "zip"
-                        ? "border-[#FF6B00] bg-[#FF6B00]/20 text-white"
-                        : "border-[#2E2E2E] bg-[#0A0A0A] text-[#A0A0A0] hover:border-[#4A4A4A] hover:text-white"
+                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
+                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
                     }`}
                   >
                     <div className="flex flex-col items-center gap-1">
@@ -186,8 +186,8 @@ export default function ExportDialog({
                     onClick={() => setCodeFormat("json")}
                     className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
                       codeFormat === "json"
-                        ? "border-[#FF6B00] bg-[#FF6B00]/20 text-white"
-                        : "border-[#2E2E2E] bg-[#0A0A0A] text-[#A0A0A0] hover:border-[#4A4A4A] hover:text-white"
+                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
+                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
                     }`}
                   >
                     <div className="flex flex-col items-center gap-1">
@@ -202,12 +202,12 @@ export default function ExportDialog({
 
               {/* Preview Code Snippet */}
               {generatedCode && codeFormat === "copy" && (
-                <div className="rounded-lg border border-[#2E2E2E] bg-[#0A0A0A] p-4">
+                <div className="rounded-lg border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] p-4">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#A0A0A0]">Code Preview</span>
-                    <span className="text-xs text-[#666666]">{generatedCode.length} chars</span>
+                    <span className="text-xs font-semibold text-[var(--cc-text-secondary)]">Code Preview</span>
+                    <span className="text-xs text-[var(--cc-text-muted)]">{generatedCode.length} chars</span>
                   </div>
-                  <pre className="max-h-32 overflow-auto rounded border border-[#2E2E2E] bg-black p-2 text-xs text-[#E0E0E0]">
+                  <pre className="max-h-32 overflow-auto rounded border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] p-2 text-xs text-[var(--cc-text-primary)]">
                     {generatedCode.substring(0, 500)}...
                   </pre>
                 </div>
@@ -217,7 +217,7 @@ export default function ExportDialog({
             <div className="space-y-4">
               {/* Image Format */}
               <div>
-                <label className="mb-2 block text-sm font-semibold text-white">
+                <label className="mb-2 block text-sm font-semibold text-[var(--cc-text-primary)]">
                   Image Format
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -225,8 +225,8 @@ export default function ExportDialog({
                     onClick={() => setImageFormat("png")}
                     className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
                       imageFormat === "png"
-                        ? "border-[#FF6B00] bg-[#FF6B00]/20 text-white"
-                        : "border-[#2E2E2E] bg-[#0A0A0A] text-[#A0A0A0] hover:border-[#4A4A4A] hover:text-white"
+                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
+                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
                     }`}
                   >
                     PNG
@@ -235,8 +235,8 @@ export default function ExportDialog({
                     onClick={() => setImageFormat("svg")}
                     className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
                       imageFormat === "svg"
-                        ? "border-[#FF6B00] bg-[#FF6B00]/20 text-white"
-                        : "border-[#2E2E2E] bg-[#0A0A0A] text-[#A0A0A0] hover:border-[#4A4A4A] hover:text-white"
+                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
+                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
                     }`}
                   >
                     SVG
@@ -247,9 +247,9 @@ export default function ExportDialog({
               {/* Quality Slider (only for PNG) */}
               {imageFormat === "png" && (
                 <div>
-                  <label className="mb-2 flex items-center justify-between text-sm font-semibold text-white">
+                  <label className="mb-2 flex items-center justify-between text-sm font-semibold text-[var(--cc-text-primary)]">
                     <span>Quality</span>
-                    <span className="text-[#FF6B00]">{quality}%</span>
+                    <span className="text-[var(--cc-accent)]">{quality}%</span>
                   </label>
                   <input
                     type="range"
@@ -257,9 +257,9 @@ export default function ExportDialog({
                     max="100"
                     value={quality}
                     onChange={(e) => setQuality(Number(e.target.value))}
-                    className="w-full accent-[#FF6B00]"
+                    className="w-full accent-[var(--cc-accent)]"
                   />
-                  <div className="mt-1 flex justify-between text-xs text-[#A0A0A0]">
+                  <div className="mt-1 flex justify-between text-xs text-[var(--cc-text-secondary)]">
                     <span>Low</span>
                     <span>High</span>
                   </div>
@@ -270,16 +270,16 @@ export default function ExportDialog({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-[#2E2E2E] px-6 py-4">
+        <div className="flex items-center justify-between border-t border-[var(--cc-border-subtle)] px-6 py-4">
           <button
             onClick={onClose}
-            className="rounded-lg border border-[#2E2E2E] bg-transparent px-6 py-2.5 text-sm font-semibold text-[#A0A0A0] transition-all hover:border-[#4A4A4A] hover:text-white"
+            className="rounded-lg border border-[var(--cc-border-subtle)] bg-transparent px-6 py-2.5 text-sm font-semibold text-[var(--cc-text-secondary)] transition-all hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
           >
             Cancel
           </button>
           <button
             onClick={handleExport}
-            className="rounded-lg bg-[#FF6B00] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(255,107,0,0.3)] transition-all hover:bg-[#E66000] hover:shadow-[0_0_30px_rgba(255,107,0,0.5)]"
+            className="rounded-lg bg-[var(--cc-accent)] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_var(--cc-accent-glow-strong)] transition-all hover:shadow-[0_0_30px_var(--cc-accent-glow-strong)]"
           >
             <div className="flex items-center gap-2">
               {copied ? (

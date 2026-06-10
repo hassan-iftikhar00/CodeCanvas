@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 export default function AuthCodeErrorPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--cc-bg-canvas)] px-4">
+    <div className="flex min-h-[100svh] items-start justify-center bg-[var(--cc-bg-canvas)] px-4 py-10 sm:items-center">
+      <div className="absolute right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
