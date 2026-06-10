@@ -12,11 +12,16 @@ from typing import Any, Dict, List, Literal, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+from pydantic import BaseModel, Field
 
 from app.models.inference import (
     CodeGenerator,
     ExternalModelOutput,
+    GeminiQuotaExhausted,
+    GeminiRateLimited,
     SketchDetector,
     _build_gemini_prompt,
     create_mock_external_model_output,
@@ -40,11 +45,24 @@ FREE_MODELS = [
     "openai/gpt-oss-20b:free",
 ]
 
+_MAX_BODY_BYTES = 20 * 1024 * 1024  # 20 MB
+
+
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > _MAX_BODY_BYTES:
+            return Response("Request body too large (max 20 MB)", status_code=413)
+        return await call_next(request)
+
+
 app = FastAPI(
     title="CodeCanvas AI Backend",
     description="Custom AI models for sketch-to-code generation",
     version="1.0.0",
 )
+
+app.add_middleware(BodySizeLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -54,7 +72,7 @@ app.add_middleware(
         os.getenv("FRONTEND_URL", "http://localhost:3000"),
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -62,8 +80,8 @@ app.add_middleware(
 class CanvasData(BaseModel):
     strokes: Optional[List[List[Dict[str, float]]]] = None
     lines: Optional[List[Dict[str, Any]]] = None
-    width: int = 1000
-    height: int = 600
+    width: int = Field(default=1000, gt=0, le=8000)
+    height: int = Field(default=600, gt=0, le=8000)
 
 
 class ChatMessage(BaseModel):
@@ -286,10 +304,6 @@ def load_project_or_403(supabase, project_id: str, user_id: str):
 
 _TEXT_MATCH_OVERLAP = 0.5  # at least 50% of the text shape must lie inside the element
 
-# A container whose bbox area is at least this fraction of the canvas is "oversized"
-# — text annotations attaching to it should be listed positionally, not joined.
-_OVERSIZED_CONTAINER_RATIO = 0.55
-
 # Synthesis bands: top/bottom 12% of the canvas height by default.
 _TOP_BAND_RATIO = 0.12
 _BOTTOM_BAND_RATIO = 0.12
@@ -509,20 +523,23 @@ def _synthesize_missing_containers(
 def _attach_text_annotations(
     elements: List[Any],
     annotations: List[TextAnnotation],
-    canvas_size: Optional[tuple] = None,
     *,
     debug: bool = False,
 ) -> List[str]:
     """
     Mutate `elements` to attach matching annotation text into element.attributes.
 
-    Two attach modes per element:
-      1. `label_text` (joined string) — used when an element is a normal-sized
-         component and gets one or two text labels. This is the historical mode.
-      2. `positioned_texts` (list of {text, x, y, width, height}) — used when the
-         only matching container is OVERSIZED (>= _OVERSIZED_CONTAINER_RATIO of
-         the canvas) AND multiple texts land in it. In that case we keep their
-         spatial info so Gemini can lay them out instead of seeing one blob.
+    Attach modes per element (decided purely by match count):
+      1. `label_text` (single string) — exactly one annotation matched.
+      2. `positioned_texts` (list of {text, x, y, width, height}) — two or more
+         annotations matched. Each label is kept as a discrete addressable item
+         with its x/y/w/h so the LLM can render them as separate elements.
+
+    Concatenating multiple labels with " / " was previously the non-oversized
+    multi-match path. It corrupted the data — e.g. "Password" plus "Sign In"
+    became the literal string "Password / Sign In", which Gemini then rendered
+    as a single heading. Strict fidelity requires multi-match to always go
+    positional, regardless of container size.
 
     Match rule (unchanged):
       - text with area: smallest element whose bbox contains ≥ _TEXT_MATCH_OVERLAP
@@ -535,15 +552,8 @@ def _attach_text_annotations(
     if not annotations:
         return unmatched
 
-    # Pre-compute canvas area for the oversized check.
-    if canvas_size:
-        canvas_area = float(canvas_size[0]) * float(canvas_size[1])
-    else:
-        x_min, y_min, x_max, y_max = _infer_canvas_extents(elements, annotations, None)
-        canvas_area = max((x_max - x_min) * (y_max - y_min), 1.0)
-
     # First pass: figure out which element each annotation matches to (so we can
-    # decide per-element whether to use joined or positioned mode based on count).
+    # switch to positioned mode for any element that catches 2+ labels).
     matches: List[tuple] = []  # (annotation, best_elem_or_None, best_overlap, best_area)
     for ann in annotations:
         text = (ann.text or "").strip()
@@ -588,15 +598,12 @@ def _attach_text_annotations(
 
         matches.append((ann, text, best, best_overlap, best_area))
 
-    # Second pass: count per-element matches so we know which elements are
-    # "oversized + crowded" → switch to positioned mode for those.
+    # Second pass: count per-element matches so we know which elements catch
+    # 2+ labels → switch to positioned mode for those.
     counts: Dict[int, int] = {}
     for _, _, best, _, _ in matches:
         if best is not None:
             counts[id(best)] = counts.get(id(best), 0) + 1
-
-    def _is_oversized(elem: Any, area: float) -> bool:
-        return canvas_area > 0 and (area / canvas_area) >= _OVERSIZED_CONTAINER_RATIO
 
     # Third pass: actually attach.
     for ann, text, best, best_overlap, best_area in matches:
@@ -607,7 +614,7 @@ def _attach_text_annotations(
             continue
 
         attrs = dict(getattr(best, "attributes", None) or {})
-        use_positioned = _is_oversized(best, best_area) and counts.get(id(best), 0) >= 2
+        use_positioned = counts.get(id(best), 0) >= 2
 
         if use_positioned:
             positioned = list(attrs.get("positioned_texts") or [])
@@ -622,11 +629,10 @@ def _attach_text_annotations(
             if debug:
                 print(
                     f"[debug] annotation '{text}' → {best.type} "
-                    f"(overlap={best_overlap:.0%}, oversized container → positioned mode)"
+                    f"(overlap={best_overlap:.0%}, multi-label → positioned mode)"
                 )
         else:
-            existing = attrs.get("label_text")
-            attrs["label_text"] = f"{existing} / {text}" if existing else text
+            attrs["label_text"] = text
             if debug:
                 print(
                     f"[debug] annotation '{text}' → {best.type} "
@@ -680,10 +686,19 @@ async def resolve_external_model_output(
     )
 
     try:
-        roboflow_output = await asyncio.to_thread(
-            detect_with_roboflow,
-            request.sketchImage,
-            canvas_size,
+        roboflow_output = await asyncio.wait_for(
+            asyncio.to_thread(
+                detect_with_roboflow,
+                request.sketchImage,
+                canvas_size,
+            ),
+            timeout=30.0,
+        )
+    except asyncio.TimeoutError:
+        print("[error] Roboflow call timed out after 30s")
+        raise HTTPException(
+            status_code=504,
+            detail="Sketch detection timed out — the Roboflow API did not respond in time. Please try again.",
         )
     except Exception as error:
         print(f"Roboflow call raised: {error}")
@@ -745,7 +760,6 @@ async def resolve_external_model_output(
     extra_text = _attach_text_annotations(
         roboflow_output.elements,
         annotations,
-        canvas_size=inferred_canvas_size,
         debug=debug,
     )
 
@@ -762,37 +776,72 @@ async def resolve_external_model_output(
         print(prompt_preview)
         print("-" * 70)
 
-    if os.getenv("GEMINI_API_KEY"):
-        try:
-            generated_code = await asyncio.to_thread(
+    try:
+        generated_code = await asyncio.wait_for(
+            asyncio.to_thread(
                 generate_with_gemini,
                 roboflow_output.elements,
                 request.framework,
                 request.styling,
                 request.description,
                 extra_text=extra_text or None,
-            )
-        except Exception as error:
-            print(f"Gemini call raised: {error}")
-            generated_code = None
+            ),
+            timeout=60.0,
+        )
+    except asyncio.TimeoutError:
+        print("[error] Gemini call timed out after 60s")
+        raise HTTPException(
+            status_code=504,
+            detail="Code generation timed out — Gemini did not respond in time. Please try again.",
+        )
+    except GeminiRateLimited as error:
+        print(f"[error] {error}")
+        raise HTTPException(
+            status_code=429,
+            detail="Gemini rate limit hit (too many requests per minute). Wait about 60 seconds and try again.",
+        )
+    except GeminiQuotaExhausted as error:
+        print(f"[error] {error}")
+        raise HTTPException(
+            status_code=503,
+            detail="All Gemini API keys have hit their daily quota. Try again tomorrow or add more API keys.",
+        )
+    except Exception as error:
+        print(f"[error] Gemini call raised unexpected error: {error}")
+        raise HTTPException(
+            status_code=504,
+            detail="Code generation failed unexpectedly. Please try again.",
+        )
 
-        if debug:
-            if generated_code:
-                preview = generated_code[:500] + ("..." if len(generated_code) > 500 else "")
-                print(f"[debug] Gemini returned {len(generated_code)} chars:")
-                print(preview)
-            else:
-                print("[debug] Gemini returned no code (will fall back to template)")
-            print("=" * 70)
+    if debug:
+        preview = generated_code[:500] + ("..." if len(generated_code) > 500 else "")
+        print(f"[debug] Gemini returned {len(generated_code)} chars:")
+        print(preview)
+        print("=" * 70)
 
-        if generated_code:
-            roboflow_output.generated_code = generated_code
-            roboflow_output.metadata = {
-                **(roboflow_output.metadata or {}),
-                "code_generator": "gemini",
-            }
+    roboflow_output.generated_code = generated_code
+    roboflow_output.metadata = {
+        **(roboflow_output.metadata or {}),
+        "code_generator": "gemini",
+    }
 
     return roboflow_output
+
+
+@app.on_event("startup")
+async def validate_env():
+    required = {
+        "ROBOFLOW_API_KEY": "Roboflow sketch detection",
+        "GEMINI_API_KEY": "Gemini code generation",
+        "SUPABASE_URL": "Supabase database",
+        "SUPABASE_SERVICE_ROLE_KEY": "Supabase database",
+    }
+    missing = [k for k, _ in required.items() if not os.getenv(k)]
+    if missing:
+        raise RuntimeError(
+            f"[CodeCanvas] Missing required environment variables: {', '.join(missing)}. "
+            f"Check backend/.env before starting the server."
+        )
 
 
 @app.on_event("startup")
@@ -945,11 +994,24 @@ async def predict(request: GenerateCodeRequest):
             generation_description,
         )
 
-        response_message = None
-        used_fallback = None
-        if external_model_output is not None:
-            response_message = f"Generated from {external_model_output.source} model output."
-            used_fallback = external_model_output.source == "mock"
+        if external_model_output is None:
+            used_fallback = True
+            response_message = (
+                "Sketch detection was unavailable — code was generated from basic shape analysis. "
+                "Results may be generic."
+            )
+        elif getattr(external_model_output, "source", None) == "mock":
+            used_fallback = True
+            response_message = "Running in demo mode — using mock detection."
+        elif not getattr(external_model_output, "generated_code", None):
+            used_fallback = True
+            response_message = (
+                "AI code generation hit a quota limit — showing a template-based result instead. "
+                "Try again in a few minutes."
+            )
+        else:
+            used_fallback = False
+            response_message = None
 
         return GenerateCodeResponse(
             code=generated_code,

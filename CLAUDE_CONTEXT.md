@@ -1,4 +1,4 @@
-  # CodeCanvas — Claude Context File
+# CodeCanvas — Claude Context File
 
 > Read this file before helping with any task.
 > This is a FYP (Final Year Project) at a university.
@@ -85,11 +85,11 @@ Step 8: User can refine code via chat
 
 ## Team Structure
 
-| Person            | Role                               | Status                       |
-| ----------------- | ---------------------------------- | ---------------------------- |
-| **Hassan (Lead)** | Architecture, integration, reviews | Active                       |
-| **Maarij**        | Frontend / UI / Dashboard          | Assigned tasks               |
-| **Bilal**         | Backend / Database / API / Testing | Assigned tasks               |
+| Person            | Role                               | Status                                                     |
+| ----------------- | ---------------------------------- | ---------------------------------------------------------- |
+| **Hassan (Lead)** | Architecture, integration, reviews | Active                                                     |
+| **Maarij**        | Frontend / UI / Dashboard          | Assigned tasks                                             |
+| **Bilal**         | Backend / Database / API / Testing | Assigned tasks                                             |
 | **Shahwaiz**      | AI Model training                  | v2 live; v3 training pending (synthetic data handoff done) |
 
 ### Important Rule
@@ -115,12 +115,12 @@ Step 8: User can refine code via chat
 
 ### Class semantics (confirmed with Shahwaiz)
 
-| class    | meaning                                                                           |
-| -------- | --------------------------------------------------------------------------------- |
-| `navbar` | top horizontal bar region (CONTAINER, not content)                                |
-| `footer` | bottom horizontal bar region (CONTAINER, not content)                             |
-| `section`| middle page body **excluding** header/footer (CONTAINER, not content)             |
-| `card`   | catch-all for EVERY content unit inside a section: button, text label, heading, paragraph, input, image, icon, link |
+| class     | meaning                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------- |
+| `navbar`  | top horizontal bar region (CONTAINER, not content)                                                                  |
+| `footer`  | bottom horizontal bar region (CONTAINER, not content)                                                               |
+| `section` | middle page body **excluding** header/footer (CONTAINER, not content)                                               |
+| `card`    | catch-all for EVERY content unit inside a section: button, text label, heading, paragraph, input, image, icon, link |
 
 The model intentionally collapses all content subtypes into `card`. Disambiguation (button vs input vs heading vs ...) happens downstream from each card's bbox aspect ratio + attached text annotation. Cards are expected to live INSIDE sections — that's the trained hierarchy.
 
@@ -139,14 +139,15 @@ The model intentionally collapses all content subtypes into `card`. Disambiguati
 
 **YOLO class IDs (alphabetical order — confirmed):**
 
-| ID | class     |
-| -- | --------- |
-| 0  | `card`    |
-| 1  | `footer`  |
-| 2  | `navbar`  |
-| 3  | `section` |
+| ID  | class     |
+| --- | --------- |
+| 0   | `card`    |
+| 1   | `footer`  |
+| 2   | `navbar`  |
+| 3   | `section` |
 
 **Real dataset visual style distribution (discovered May 2026):**
+
 - Clean digital wireframes (~40%) — thin crisp strokes, resembles Konva.js output; hardest inference target
 - Dense hand-drawn sketches (~40%) — zigzag squiggles for text, X-cross marks for image placeholders
 - Sparse wireframes (~20%) — few elements, minimal detail, lowest density
@@ -165,27 +166,28 @@ Synthetic generation weights mirror this 40/40/20 distribution.
 
 **Per-class mAP@50 (validation set):**
 
-| class     | mAP@50    |
-| --------- | --------- |
-| all       | ~72.0%    |
-| `card`    | 58.0% ⚠️  |
-| `footer`  | 68.0%     |
-| `navbar`  | 82.0%     |
-| `section` | 78.0%     |
+| class     | mAP@50   |
+| --------- | -------- |
+| all       | ~72.0%   |
+| `card`    | 58.0% ⚠️ |
+| `footer`  | 68.0%    |
+| `navbar`  | 82.0%    |
+| `section` | 78.0%    |
 
 Card is the weakest class — it's also the class with most variance (every content subtype lives under it).
 
 ### Confusion matrix (validation set)
 
-|             | predicted card | predicted footer | predicted navbar | predicted section | false neg |
-| ----------- | -------------- | ---------------- | ---------------- | ----------------- | --------- |
-| true card   | 106            | 0                | 0                | 0                 | 17        |
-| true footer | 1              | 11               | 0                | 0                 | 6         |
-| true navbar | 1              | 0                | 12               | 0                 | 4         |
-| true section| 0              | 0                | 0                | 18                | 0         |
-| false pos   | 46             | 5                | 0                | 1                 | —         |
+|              | predicted card | predicted footer | predicted navbar | predicted section | false neg |
+| ------------ | -------------- | ---------------- | ---------------- | ----------------- | --------- |
+| true card    | 106            | 0                | 0                | 0                 | 17        |
+| true footer  | 1              | 11               | 0                | 0                 | 6         |
+| true navbar  | 1              | 0                | 12               | 0                 | 4         |
+| true section | 0              | 0                | 0                | 18                | 0         |
+| false pos    | 46             | 5                | 0                | 1                 | —         |
 
 Key takeaways:
+
 - `section` is essentially perfect (no false negatives, 1 false positive)
 - `card` has 46 false positives and 17 false negatives → the model BOTH hallucinates cards AND misses real ones
 - `footer` is sometimes mislabelled as `card`
@@ -244,11 +246,11 @@ Key takeaways:
 
 ## LLM Usage — Who Does What
 
-| LLM                | Purpose                                          | Status                        |
-| ------------------ | ------------------------------------------------ | ----------------------------- |
+| LLM                | Purpose                                          | Status                         |
+| ------------------ | ------------------------------------------------ | ------------------------------ |
 | **Gemini 2.5 Pro** | Initial code generation from detected components | ✅ Integrated (commit 2bb44ed) |
-| **Gemini Flash**   | Fallback if 2.5 Pro is slow                      | ✅ Available as fallback      |
-| **OpenRouter**     | Chat-based code refinement ONLY                  | ✅ Already working            |
+| **Gemini Flash**   | Fallback if 2.5 Pro is slow                      | ✅ Available as fallback       |
+| **OpenRouter**     | Chat-based code refinement ONLY                  | ✅ Already working             |
 
 ### Why Two LLMs?
 
@@ -356,7 +358,7 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 - Sketch detection accuracy — Roboflow integrated, but `card`
   precision is structurally low (58% — see Shahwaiz section);
   synthesis heuristics compensate but don't replace better training
-- **v3 model training** — 2,500 synthetic images generated (May 2026),
+- **v3 model training** — 2,700 synthetic images generated (May 2026),
   handoff doc sent to Shahwaiz; training `object-detection-4affw/3`
   pending. Once Shahwaiz reports v3 mAP, update `ROBOFLOW_MODEL_ID`
   in `.env` if v3 outperforms v2.
@@ -378,51 +380,51 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 
 ### Frontend — canvas chrome (post-redesign)
 
-| File                                          | Purpose                                                 |
-| --------------------------------------------- | ------------------------------------------------------- |
-| `src/app/canvas/page.tsx`                     | Orchestrator: composes chrome, owns detection trigger   |
-| `src/components/canvas/SketchCanvas.tsx`      | Konva drawing surface                                   |
-| `src/components/canvas/SketchCanvasWithHistory.tsx` | Drawing surface + undo/redo wiring                |
-| `src/components/canvas/CanvasSurface.tsx`     | Dot-grid workspace + empty-state hint                   |
-| `src/components/canvas/FloatingToolbar.tsx`   | Tool picker (select/pen/shapes/erase) w/ shortcuts      |
-| `src/components/canvas/StyleRibbon.tsx`       | Stroke / fill / width / opacity controls                |
-| `src/components/canvas/ZoomPill.tsx`          | Zoom presets + fit-to-screen                            |
-| `src/components/canvas/ChatInterface.tsx`     | OpenRouter chat refinement panel                        |
-| `src/components/canvas/LivePreview.tsx`       | Code → live preview iframe                              |
-| `src/types/canvas.ts`                         | Canonical `Tool`, `Mode`, zoom constants, `TOOL_KEY_MAP` |
-| `src/hooks/useCanvasShortcuts.ts`             | Keyboard shortcut handler for canvas page               |
-| `src/components/ui/Toast.tsx`                 | App-wide toast provider                                 |
-| `src/components/onboarding/OnboardingTour.tsx`| Step-by-step onboarding overlay with spotlight highlight |
+| File                                                | Purpose                                                  |
+| --------------------------------------------------- | -------------------------------------------------------- |
+| `src/app/canvas/page.tsx`                           | Orchestrator: composes chrome, owns detection trigger    |
+| `src/components/canvas/SketchCanvas.tsx`            | Konva drawing surface                                    |
+| `src/components/canvas/SketchCanvasWithHistory.tsx` | Drawing surface + undo/redo wiring                       |
+| `src/components/canvas/CanvasSurface.tsx`           | Dot-grid workspace + empty-state hint                    |
+| `src/components/canvas/FloatingToolbar.tsx`         | Tool picker (select/pen/shapes/erase) w/ shortcuts       |
+| `src/components/canvas/StyleRibbon.tsx`             | Stroke / fill / width / opacity controls                 |
+| `src/components/canvas/ZoomPill.tsx`                | Zoom presets + fit-to-screen                             |
+| `src/components/canvas/ChatInterface.tsx`           | OpenRouter chat refinement panel                         |
+| `src/components/canvas/LivePreview.tsx`             | Code → live preview iframe                               |
+| `src/types/canvas.ts`                               | Canonical `Tool`, `Mode`, zoom constants, `TOOL_KEY_MAP` |
+| `src/hooks/useCanvasShortcuts.ts`                   | Keyboard shortcut handler for canvas page                |
+| `src/components/ui/Toast.tsx`                       | App-wide toast provider                                  |
+| `src/components/onboarding/OnboardingTour.tsx`      | Step-by-step onboarding overlay with spotlight highlight |
 
 ### Frontend — data + routes
 
-| File                                     | Purpose                                            |
-| ---------------------------------------- | -------------------------------------------------- |
-| `src/app/api/generate-code/route.ts`     | Proxy to FastAPI; OpenRouter routing               |
-| `src/hooks/useProjectSave.ts`            | Project CRUD (canonical schema)                    |
-| `src/hooks/useVersionHistory.ts`         | Iterations table queries                           |
+| File                                 | Purpose                              |
+| ------------------------------------ | ------------------------------------ |
+| `src/app/api/generate-code/route.ts` | Proxy to FastAPI; OpenRouter routing |
+| `src/hooks/useProjectSave.ts`        | Project CRUD (canonical schema)      |
+| `src/hooks/useVersionHistory.ts`     | Iterations table queries             |
 
 ### Backend
 
-| File                                     | Purpose                                            |
-| ---------------------------------------- | -------------------------------------------------- |
-| `backend/main.py`                        | FastAPI server, `/api/predict`, text-attachment + synthesis helpers |
-| `backend/app/models/inference.py`        | `SketchDetector`, `CodeGenerator`, `_build_gemini_prompt`, `generate_with_gemini` — Roboflow + Gemini both live here |
-| `backend/debug/last_sketch.png`          | Runtime debug dump when `DEBUG_AI_PROMPT=on` (gitignored) |
+| File                              | Purpose                                                                                                              |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `backend/main.py`                 | FastAPI server, `/api/predict`, text-attachment + synthesis helpers                                                  |
+| `backend/app/models/inference.py` | `SketchDetector`, `CodeGenerator`, `_build_gemini_prompt`, `generate_with_gemini` — Roboflow + Gemini both live here |
+| `backend/debug/last_sketch.png`   | Runtime debug dump when `DEBUG_AI_PROMPT=on` (gitignored)                                                            |
 
 ### Synthetic data pipeline (`backend/synthetic_data/`)
 
-Entry point: `python -m backend.synthetic_data.generate --count 2500 --out synthetic_dataset`
+Entry point: `python -m backend.synthetic_data.generate --count 2700 --out synthetic_dataset`
 
-| File                                          | Purpose                                            |
-| --------------------------------------------- | -------------------------------------------------- |
-| `backend/synthetic_data/generate.py`          | CLI orchestrator — renders images, writes YOLO labels |
-| `backend/synthetic_data/layouts.py`           | Layout templates (standard / sidebar / minimal) + `Element` dataclass |
-| `backend/synthetic_data/style.py`             | `SketchStyle`, `Hotspot`, style-type sampling (`random_style()`) |
-| `backend/synthetic_data/rough.py`             | PIL drawing primitives: wobble lines, zigzag text fill, image placeholder X |
-| `backend/synthetic_data/validate.py`          | YOLO label validation, bbox jitter, annotator miss-rate simulation |
+| File                                 | Purpose                                                                     |
+| ------------------------------------ | --------------------------------------------------------------------------- |
+| `backend/synthetic_data/generate.py` | CLI orchestrator — renders images, writes YOLO labels                       |
+| `backend/synthetic_data/layouts.py`  | Layout templates (standard / sidebar / minimal) + `Element` dataclass       |
+| `backend/synthetic_data/style.py`    | `SketchStyle`, `Hotspot`, style-type sampling (`random_style()`)            |
+| `backend/synthetic_data/rough.py`    | PIL drawing primitives: wobble lines, zigzag text fill, image placeholder X |
+| `backend/synthetic_data/validate.py` | YOLO label validation, bbox jitter, annotator miss-rate simulation          |
 
-Output is **gitignored** (`synthetic_dataset/`). All 2,500 images go to `train/` only — real 17 valid + 18 test stay as the evaluation split (sim-to-real protocol).
+Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/` only — real 17 valid + 18 test stay as the evaluation split (sim-to-real protocol).
 
 ---
 
@@ -512,10 +514,13 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,500 images go to `train/`
     detected `card` clusters. Reason: a row of dialog buttons
     (Yes / No) was being relabelled as a footer. If you extend this,
     keep cards as content, not container hints.
-12. **Oversized containers list children positionally** — any
-    container >= 55% of canvas area gets its text annotations listed
-    by position rather than joined, so giant page-level rectangles
-    don't swallow labels.
+12. **Multi-label elements list children positionally** — when 2+
+    text annotations match the same element, each label is kept
+    with its position (no concatenation). Reason: the previous
+    " / " join produced strings like "Password / Sign In" that
+    Gemini rendered as a single heading. Concatenation is lossy
+    and breaks strict fidelity. Always position when multiple
+    labels match, regardless of container size.
 13. **Canvas types are centralised** in `src/types/canvas.ts` —
     `Tool`, `ToolGroup`, `Mode`, `RightPanel`, `CodeViewMode`,
     `ZOOM_*` constants, `TOOL_KEY_MAP`. Don't redefine these locally.
@@ -527,6 +532,19 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,500 images go to `train/`
 16. **v3 Roboflow augmentation config is identical to v2** — same stretch, flip, rotation,
     brightness, and 2-outputs setting. This isolates the dataset as the only variable so
     v2 vs v3 mAP is a clean A/B comparison. Do NOT change augmentations when training v3.
+17. **Strict fidelity — Gemini does not invent elements** — the LLM
+    renders ONLY the detected components plus user-annotated text.
+    It must not add headings, subtitles, footers, branding,
+    copyright, taglines, or "would look better with X" elements
+    that are not in the detection list. Reason: the FYP thesis is
+    sketch-to-code accuracy. Any LLM-side augmentation invalidates
+    the detection-quality measurement, breaks reproducibility, and
+    gives viva evaluators an obvious attack surface ("why are
+    there 5 elements when I drew 3?"). If a sketch needs a "Sign
+    In" heading, the user must draw it. The prompt enforces this
+    via a top-of-rules STRICT FIDELITY directive; the matcher
+    enforces it by listing multi-label hits positionally instead
+    of concatenating them.
 
 ---
 
@@ -538,7 +556,7 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,500 images go to `train/`
   highlight). Also bumped `inference-sdk` 0.22.1 → 0.64.8 and `numpy` 1.26.4 → 2.2.6
   in backend requirements — test detection after `pip install -r requirements.txt`.
 - **60ad65e — Dataset Generation** (May 2026): Added `backend/synthetic_data/`
-  — PIL-based synthetic sketch generator producing 2,500 YOLO-format training images
+  — PIL-based synthetic sketch generator producing 2,700 YOLO-format training images
   in three style types (clean 40% / dense_hand 40% / sparse_sketch 20%) matching
   the real dataset's visual distribution. All synthetic images go to `train/` only.
 - **d42f2aa — Canvas redesign + matching reliability** (May 2026):
@@ -568,16 +586,16 @@ Gemini produces good code when given accurate detections. Improving detection ac
 
 These are real failure patterns seen in production or testing. Read before debugging detection issues.
 
-| Failure | Root cause |
-| ------- | ---------- |
-| Detection returns 0 predictions on a clearly valid sketch | Transparent canvas background composited to black — sketch lines invisible on dark background. Fixed in `inference.py` (alpha→white). If it regresses, check `backend/debug/last_sketch.png`. |
-| Single isolated rectangle detected as `section` not `card` | Model learned sections as large-rectangle regions; a lone card drawn without context triggers the wrong class |
-| Wide/thin or tall/narrow layouts lose detail | Stretch to 640×640 preprocessing alters aspect ratio — extreme proportions lose spatial relationships |
-| `card` confidence structurally lower than containers | Cards are diverse (button/input/heading/image all map to one class) — a single global confidence threshold can't fit both. Use per-class thresholds (`card=0.03`, others `=0.20`). |
-| Oversized `section` prediction engulfs everything | A section covering >85% of canvas is the model confusing the canvas boundary with a section. Oversize-card guard handles this for cards; similar behavior can affect sections. |
-| Sparse sketches underperform dense ones | Model trained on data skewed toward dense hand-drawn layouts (~40%) — sparse wireframe style (~20%) is underrepresented and harder to generalise |
-| Roboflow default threshold silently hides card predictions | Default Roboflow confidence floor is ~0.4 — most card predictions are below this. Always set `InferenceConfiguration(confidence_threshold=0.05)` explicitly. |
-| Footer mislabelled as `card` | Confusion matrix shows ~1 footer per validation run lands on card. Low-confidence footers look like wide cards to the model. |
+| Failure                                                    | Root cause                                                                                                                                                                                    |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Detection returns 0 predictions on a clearly valid sketch  | Transparent canvas background composited to black — sketch lines invisible on dark background. Fixed in `inference.py` (alpha→white). If it regresses, check `backend/debug/last_sketch.png`. |
+| Single isolated rectangle detected as `section` not `card` | Model learned sections as large-rectangle regions; a lone card drawn without context triggers the wrong class                                                                                 |
+| Wide/thin or tall/narrow layouts lose detail               | Stretch to 640×640 preprocessing alters aspect ratio — extreme proportions lose spatial relationships                                                                                         |
+| `card` confidence structurally lower than containers       | Cards are diverse (button/input/heading/image all map to one class) — a single global confidence threshold can't fit both. Use per-class thresholds (`card=0.03`, others `=0.20`).            |
+| Oversized `section` prediction engulfs everything          | A section covering >85% of canvas is the model confusing the canvas boundary with a section. Oversize-card guard handles this for cards; similar behavior can affect sections.                |
+| Sparse sketches underperform dense ones                    | Model trained on data skewed toward dense hand-drawn layouts (~40%) — sparse wireframe style (~20%) is underrepresented and harder to generalise                                              |
+| Roboflow default threshold silently hides card predictions | Default Roboflow confidence floor is ~0.4 — most card predictions are below this. Always set `InferenceConfiguration(confidence_threshold=0.05)` explicitly.                                  |
+| Footer mislabelled as `card`                               | Confusion matrix shows ~1 footer per validation run lands on card. Low-confidence footers look like wide cards to the model.                                                                  |
 
 ---
 

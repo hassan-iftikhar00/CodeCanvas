@@ -51,7 +51,8 @@ interface ShapeData {
     | "image"
     | "ellipse"
     | "triangle"
-    | "arrow";
+    | "arrow"
+    | "line";
   x: number;
   y: number;
   width?: number;
@@ -86,6 +87,7 @@ interface ComponentGroup {
 interface TemplateShapeData {
   id?: string;
   type?: ShapeData["type"];
+  // line tool reuses width/height as displacement (dx, dy) from x,y.
   x?: number;
   y?: number;
   width?: number;
@@ -230,6 +232,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const [isTransforming, setIsTransforming] = useState(false);
     const transformerRef = useRef<Konva.Transformer>(null);
     const selectedShapeRef = useRef<Konva.Shape | Konva.Group | null>(null);
+    const gridGroupRef = useRef<Konva.Group>(null);
 
     // Text input modal state
     const [showTextInput, setShowTextInput] = useState(false);
@@ -349,21 +352,23 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         // aspect would improve detection accuracy.
         const stage = stageRef.current;
         const layers = stage.getLayers();
-        if (layers.length < 2) {
+        if (layers.length < 1) {
           return {
             dataURL: stage.toDataURL({ pixelRatio: PIXEL_RATIO }),
             transform: { offsetX: 0, offsetY: 0, scale: PIXEL_RATIO },
           };
         }
-        const gridLayer = layers[0];
-        const contentLayer = layers[1];
+        // Grid now lives inside the content layer as a Group (see render)
+        // so we toggle the Group's visibility rather than a whole layer.
+        const contentLayer = layers[0];
+        const gridGroup = gridGroupRef.current;
 
         const savedStagePos = { x: stage.x(), y: stage.y() };
         const savedStageScale = stage.scaleX();
         const savedContentScale = contentLayer.scaleX();
-        const gridWasVisible = gridLayer.visible();
+        const gridWasVisible = gridGroup ? gridGroup.visible() : false;
 
-        gridLayer.hide();
+        if (gridGroup) gridGroup.hide();
         stage.position({ x: 0, y: 0 });
         stage.scale({ x: 1, y: 1 });
         contentLayer.scale({ x: 1, y: 1 });
@@ -392,7 +397,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           stage.position(savedStagePos);
           stage.scale({ x: savedStageScale, y: savedStageScale });
           contentLayer.scale({ x: savedContentScale, y: savedContentScale });
-          if (gridWasVisible) gridLayer.show();
+          if (gridWasVisible && gridGroup) gridGroup.show();
           stage.batchDraw();
         }
 
@@ -748,10 +753,44 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       const pos = getTransformedPointerPosition(e.target.getStage());
       if (!pos) return;
 
+      // Point-to-segment distance — used by line/pen hit-tests.
+      const distToSegment = (
+        px: number,
+        py: number,
+        x1: number,
+        y1: number,
+        x2: number,
+        y2: number
+      ) => {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const len2 = dx * dx + dy * dy;
+        if (len2 === 0) return Math.hypot(px - x1, py - y1);
+        const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2));
+        const projX = x1 + t * dx;
+        const projY = y1 + t * dy;
+        return Math.hypot(px - projX, py - projY);
+      };
+
       if (toolRef.current === "bin") {
         // Check for hit on shapes first (reverse for topmost first)
         for (let i = shapes.length - 1; i >= 0; i--) {
           const shape = shapes[i];
+          if (shape.type === "line") {
+            const dist = distToSegment(
+              pos.x,
+              pos.y,
+              shape.x,
+              shape.y,
+              shape.x + (shape.width || 0),
+              shape.y + (shape.height || 0)
+            );
+            if (dist <= 10 + (shape.strokeWidth || 2) / 2) {
+              setShapes((shapes) => shapes.filter((_, idx) => idx !== i));
+              return;
+            }
+            continue;
+          }
           if (
             shape.type === "rectangle" ||
             shape.type === "triangle" ||
@@ -857,7 +896,8 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         toolRef.current === "circle" ||
         toolRef.current === "ellipse" ||
         toolRef.current === "triangle" ||
-        toolRef.current === "arrow"
+        toolRef.current === "arrow" ||
+        toolRef.current === "line"
       ) {
         // Handle Shape Tools
         let shapeType: ShapeData["type"] = "rectangle";
@@ -865,6 +905,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         else if (toolRef.current === "ellipse") shapeType = "ellipse";
         else if (toolRef.current === "triangle") shapeType = "triangle";
         else if (toolRef.current === "arrow") shapeType = "arrow";
+        else if (toolRef.current === "line") shapeType = "line";
         else if (toolRef.current === "shape") shapeType = "rectangle";
 
         isDrawingRef.current = true;
@@ -917,6 +958,21 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         // Check shapes (reverse order for topmost first)
         for (let i = shapes.length - 1; i >= 0; i--) {
           const shape = shapes[i];
+          if (shape.type === "line") {
+            const dist = distToSegment(
+              pos.x,
+              pos.y,
+              shape.x,
+              shape.y,
+              shape.x + (shape.width || 0),
+              shape.y + (shape.height || 0)
+            );
+            if (dist <= 10 + (shape.strokeWidth || 2) / 2) {
+              clickedShapeId = shape.id;
+              break;
+            }
+            continue;
+          }
           if (
             shape.type === "rectangle" ||
             shape.type === "triangle" ||
@@ -1059,7 +1115,8 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           toolRef.current === "circle" ||
           toolRef.current === "ellipse" ||
           toolRef.current === "triangle" ||
-          toolRef.current === "arrow")
+          toolRef.current === "arrow" ||
+          toolRef.current === "line")
       ) {
         // Use shapeStartRef for the original click position (never changes during drag)
         const start = shapeStartRef.current;
@@ -1100,13 +1157,26 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             radiusY: Math.abs(dy) / 2,
           };
         } else {
-          // triangle / arrow
+          // triangle / arrow / line — width/height are displacement (dx, dy).
+          // Shift-snap to 0/45/90 deg for line, mirroring Excalidraw behaviour.
+          let dx = point.x - start.x;
+          let dy = point.y - start.y;
+          if (
+            currentShapeRef.current.type === "line" &&
+            (e.evt as MouseEvent).shiftKey
+          ) {
+            const angle = Math.atan2(dy, dx);
+            const snapped = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+            const len = Math.hypot(dx, dy);
+            dx = Math.cos(snapped) * len;
+            dy = Math.sin(snapped) * len;
+          }
           updated = {
             ...currentShapeRef.current,
             x: start.x,
             y: start.y,
-            width: point.x - start.x,
-            height: point.y - start.y,
+            width: dx,
+            height: dy,
           };
         }
         currentShapeRef.current = updated;
@@ -1138,7 +1208,10 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           (shape.type === "circle" && shape.radius !== 0) ||
           (shape.type === "ellipse" && shape.radiusX !== 0) ||
           (shape.type === "triangle" && shape.width !== 0) ||
-          (shape.type === "arrow" && shape.width !== 0)
+          (shape.type === "arrow" && shape.width !== 0) ||
+          (shape.type === "line" &&
+            (Math.abs(shape.width || 0) > 1 ||
+              Math.abs(shape.height || 0) > 1))
         ) {
           setShapes((prev) => [...prev, shape]);
         }
@@ -1168,7 +1241,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     return (
       <div
         ref={containerRef}
-        className="relative h-full w-full rounded-xl border-2 border-[#2E2E2E] shadow-panel overflow-hidden overscroll-none touch-none"
+        className="relative h-full w-full rounded-[14px] border border-[var(--cc-border-subtle)] overflow-hidden overscroll-none touch-none shadow-[0_24px_60px_-30px_rgba(0,0,0,0.65),0_2px_8px_-4px_rgba(0,0,0,0.5)] ring-1 ring-inset ring-white/[0.02]"
         style={{ background: "#ffffff" }}
       >
         <Stage
@@ -1177,6 +1250,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -1207,39 +1281,45 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             }
           }}
         >
-          {/* Background Layer - Grid doesn't scale with zoom */}
-          <Layer>
-            {/* Grid Lines - Visual guide for drawing */}
-            {gridEnabled && (
-              <>
-                {/* Vertical grid lines */}
-                {Array.from({
-                  length: Math.ceil(canvasSize.width / 20) + 1,
-                }).map((_, i) => (
-                  <Line
-                    key={`v-${i}`}
-                    points={[i * 20, 0, i * 20, canvasSize.height]}
-                    stroke="rgba(46, 46, 46, 0.3)"
-                    strokeWidth={1}
-                  />
-                ))}
-                {/* Horizontal grid lines */}
-                {Array.from({
-                  length: Math.ceil(canvasSize.height / 20) + 1,
-                }).map((_, i) => (
-                  <Line
-                    key={`h-${i}`}
-                    points={[0, i * 20, canvasSize.width, i * 20]}
-                    stroke="rgba(46, 46, 46, 0.3)"
-                    strokeWidth={1}
-                  />
-                ))}
-              </>
-            )}
-          </Layer>
-
-          {/* Content Layer - Scales with zoom */}
+          {/* Content Layer — grid + drawings share the same scaled layer so
+              the grid always moves and zooms in lock-step with the drawing
+              (BUG 5). Grid bounds are inflated by 1/scale so the visible grid
+              still covers the viewport when zoomed out below 100%. */}
           <Layer scaleX={scale} scaleY={scale}>
+            <Group ref={gridGroupRef} listening={false}>
+              {gridEnabled && (() => {
+                const gridSize = 20;
+                const inflate = Math.max(1, 1 / scale);
+                const gw = Math.ceil((canvasSize.width * inflate) / gridSize);
+                const gh = Math.ceil((canvasSize.height * inflate) / gridSize);
+                const w = gw * gridSize;
+                const h = gh * gridSize;
+                return (
+                  <>
+                    {Array.from({ length: gw + 1 }).map((_, i) => (
+                      <Line
+                        key={`v-${i}`}
+                        points={[i * gridSize, 0, i * gridSize, h]}
+                        stroke="rgba(46, 46, 46, 0.22)"
+                        strokeWidth={1 / scale}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                    ))}
+                    {Array.from({ length: gh + 1 }).map((_, i) => (
+                      <Line
+                        key={`h-${i}`}
+                        points={[0, i * gridSize, w, i * gridSize]}
+                        stroke="rgba(46, 46, 46, 0.22)"
+                        strokeWidth={1 / scale}
+                        listening={false}
+                        perfectDrawEnabled={false}
+                      />
+                    ))}
+                  </>
+                );
+              })()}
+            </Group>
             {/* Drawn Lines */}
             {lines.map((line, i) => {
               const isSelected = selectedLineIndex === i && tool === "select";
@@ -1414,6 +1494,36 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                     onTransformEnd={(e) =>
                       handleShapeTransformEnd(shape.id, e.target)
                     }
+                  />
+                );
+              } else if (shape.type === "line") {
+                // Straight point-to-point line. x,y is the start; width/height
+                // are the displacement to the end point.
+                const x1 = shape.x;
+                const y1 = shape.y;
+                const x2 = shape.x + (shape.width || 0);
+                const y2 = shape.y + (shape.height || 0);
+                return (
+                  <Line
+                    key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
+                    points={[x1, y1, x2, y2]}
+                    stroke={
+                      isSelected ? "#FF6B00" : shape.stroke || "#000000"
+                    }
+                    strokeWidth={shape.strokeWidth || 2}
+                    lineCap="round"
+                    lineJoin="round"
+                    hitStrokeWidth={Math.max(14, (shape.strokeWidth || 2) + 8)}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
                   />
                 );
               } else if (shape.type === "arrow") {
@@ -1844,6 +1954,20 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                   pointerLength={10}
                   pointerWidth={10}
                 />
+              ) : currentShape.type === "line" ? (
+                <Line
+                  points={[
+                    currentShape.x,
+                    currentShape.y,
+                    currentShape.x + (currentShape.width || 0),
+                    currentShape.y + (currentShape.height || 0),
+                  ]}
+                  stroke={currentShape.stroke || "#000000"}
+                  strokeWidth={currentShape.strokeWidth || 2}
+                  lineCap="round"
+                  lineJoin="round"
+                  listening={false}
+                />
               ) : null)}
 
             {/* Empty State Hint */}
@@ -1903,61 +2027,9 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           </div>
         )}
 
-        {/* Canvas Info Overlay */}
-        <div className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-3 rounded-lg bg-white/90 px-3 py-2 text-xs font-medium text-muted shadow-sm backdrop-blur-sm">
-          <span>
-            {canvasSize.width} × {canvasSize.height}
-          </span>
-          <span>•</span>
-          <span>
-            {tool === "pen"
-              ? "Drawing"
-              : tool === "select"
-                ? "Selection"
-                : tool === "bin"
-                  ? "Delete"
-                  : tool === "erase"
-                    ? "Eraser"
-                    : tool === "ellipse"
-                      ? "Ellipse"
-                      : tool === "triangle"
-                        ? "Triangle"
-                        : tool === "arrow"
-                          ? "Arrow"
-                          : tool.charAt(0).toUpperCase() + tool.slice(1)}{" "}
-            Mode
-          </span>
-          {gridEnabled && (
-            <>
-              <span>•</span>
-              <span className="text-accent">Grid On</span>
-            </>
-          )}
-          {snapEnabled && gridEnabled && (
-            <>
-              <span>•</span>
-              <span className="text-accent">Snap On</span>
-            </>
-          )}
-          {zoom !== 100 && (
-            <>
-              <span>•</span>
-              <span>Zoom: {zoom}%</span>
-            </>
-          )}
-          {selectedShapeId && (
-            <>
-              <span>•</span>
-              <span className="text-[#FF6B00]">Shape Selected</span>
-            </>
-          )}
-          {selectedLineIndex !== null && (
-            <>
-              <span>•</span>
-              <span className="text-[#FF6B00]">Drawing Selected</span>
-            </>
-          )}
-        </div>
+        {/* Canvas info overlay moved out — the page-level <StatusBar /> renders
+            the dimensions / mode / grid / zoom indicator in a position that
+            never collides with the floating toolbar or zoom pill (BUG 6). */}
       </div>
     );
   }

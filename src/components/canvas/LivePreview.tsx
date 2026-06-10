@@ -34,7 +34,7 @@ const DEVICE_PRESETS: Record<
  *     the component name is left as a top-level binding, then mounting it via
  *     ReactDOM.createRoot.
  */
-function buildReactDocument(rawCode: string): string {
+function buildReactDocument(rawCode: string, parentOrigin: string): string {
   let code = rawCode;
 
   // Remove import/require lines — Babel-standalone runs in classic-script mode
@@ -84,10 +84,10 @@ function buildReactDocument(rawCode: string): string {
     const originalLog = console.log;
     console.log = function(...args) {
       originalLog.apply(console, args);
-      window.parent.postMessage({ type: 'console', data: args.map(a => String(a)).join(' ') }, '*');
+      window.parent.postMessage({ type: 'console', data: args.map(a => String(a)).join(' ') }, '${parentOrigin}');
     };
     window.onerror = function(msg, url, line) {
-      window.parent.postMessage({ type: 'error', data: 'Error: ' + msg + ' at line ' + line }, '*');
+      window.parent.postMessage({ type: 'error', data: 'Error: ' + msg + ' at line ' + line }, '${parentOrigin}');
       return false;
     };
   </script>
@@ -101,14 +101,14 @@ function buildReactDocument(rawCode: string): string {
         '<pre style="color:#b00;padding:16px;white-space:pre-wrap;font-family:monospace;">' +
         'Render error: ' + (err && err.message ? err.message : String(err)) +
         '</pre>';
-      window.parent.postMessage({ type: 'error', data: String(err) }, '*');
+      window.parent.postMessage({ type: 'error', data: String(err) }, '${parentOrigin}');
     }
   </script>
 </body>
 </html>`;
 }
 
-function buildHtmlDocument(rawCode: string): string {
+function buildHtmlDocument(rawCode: string, parentOrigin: string): string {
   if (rawCode.includes("<!DOCTYPE") || rawCode.includes("<html")) {
     return rawCode;
   }
@@ -127,10 +127,10 @@ ${rawCode}
   const originalLog = console.log;
   console.log = function(...args) {
     originalLog.apply(console, args);
-    window.parent.postMessage({ type: 'console', data: args.map(a => String(a)).join(' ') }, '*');
+    window.parent.postMessage({ type: 'console', data: args.map(a => String(a)).join(' ') }, '${parentOrigin}');
   };
   window.onerror = function(msg, url, line) {
-    window.parent.postMessage({ type: 'error', data: 'Error: ' + msg + ' at line ' + line }, '*');
+    window.parent.postMessage({ type: 'error', data: 'Error: ' + msg + ' at line ' + line }, '${parentOrigin}');
     return false;
   };
 </script>
@@ -181,11 +181,18 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
 
   const dimensions = getDeviceDimensions();
 
-  const autoScale = Math.min(
-    containerSize.width / dimensions.width,
-    containerSize.height / dimensions.height,
-    1
-  );
+  // In "Fit" mode the preview card IS the container, so its baseline scale is
+  // 1 and any manual zoom must apply on top of it (BUG 2 — previously the zoom
+  // shrank the white card itself, leaving a floating tile inside the black
+  // container).
+  const autoScale =
+    device === "fit"
+      ? 1
+      : Math.min(
+          containerSize.width / dimensions.width,
+          containerSize.height / dimensions.height,
+          1
+        );
 
   const scale = manualZoom ?? autoScale;
 
@@ -209,8 +216,8 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
 
     const htmlContent =
       language === "react"
-        ? buildReactDocument(code)
-        : buildHtmlDocument(code);
+        ? buildReactDocument(code, window.location.origin)
+        : buildHtmlDocument(code, window.location.origin);
 
     iframeDoc.open();
     iframeDoc.write(htmlContent);
@@ -219,6 +226,7 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
       if (event.data.type === "console" || event.data.type === "error") {
         setConsoleOutput((prev) => [...prev, event.data.data]);
         if (event.data.type === "error") {
@@ -237,27 +245,29 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
   };
 
   const handleOpenInNewWindow = () => {
-    const newWindow = window.open("", "_blank");
+    const newWindow = window.open("", "_blank", "noopener,noreferrer");
     if (!newWindow) return;
     const htmlContent =
-      language === "react" ? buildReactDocument(code) : buildHtmlDocument(code);
+      language === "react" ? buildReactDocument(code, window.location.origin) : buildHtmlDocument(code, window.location.origin);
     newWindow.document.open();
     newWindow.document.write(htmlContent);
     newWindow.document.close();
   };
 
   return (
-    <div className="flex h-full flex-col bg-[#0A0A0A]">
-      <div className="flex items-center justify-between border-b border-[#2E2E2E] bg-[#1A1A1A] px-4 py-2">
-        <div className="flex items-center gap-2">
+    <div className="flex h-full flex-col bg-[var(--cc-bg-canvas)]">
+      <div className="flex items-center justify-between border-b border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] px-3 py-1.5">
+        {/* Segmented device picker. Inactive tabs now keep a visible chip
+            background so they read as buttons against the dark chrome. */}
+        <div className="flex items-center gap-0.5 rounded-[8px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)]/60 p-0.5">
           {Object.entries(DEVICE_PRESETS).map(([key, preset]) => (
             <button
               key={key}
               onClick={() => selectDevice(key as DeviceType)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`rounded-[6px] px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
                 device === key
-                  ? "bg-white text-[#0A0A0A]"
-                  : "bg-[#2E2E2E] text-[#A0A0A0] hover:bg-white/10 hover:text-white"
+                  ? "bg-[var(--cc-accent)] text-white shadow-[0_2px_6px_-2px_var(--cc-accent-glow-strong)]"
+                  : "text-[var(--cc-text-primary)] hover:bg-white/[0.07]"
               }`}
               title={`${preset.label} (${preset.width}x${preset.height})`}
             >
@@ -268,7 +278,7 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
           {device !== "desktop" && device !== "fit" && (
             <button
               onClick={toggleOrientation}
-              className="ml-2 rounded-lg bg-[#2E2E2E] p-2 text-white transition-all hover:bg-white/10"
+              className="ml-1 flex h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] transition-all hover:bg-white/[0.07] hover:text-[var(--cc-text-primary)]"
               title="Toggle Orientation"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -283,17 +293,21 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowConsole(!showConsole)}
-            className="rounded-lg bg-[#2E2E2E] px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-white/10"
+            className={`rounded-[6px] border px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
+              showConsole
+                ? "border-[var(--cc-accent-glow-strong)] bg-[var(--cc-accent-glow)] text-[var(--cc-accent)]"
+                : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
+            }`}
           >
             Console {consoleOutput.length > 0 && `(${consoleOutput.length})`}
           </button>
 
           <button
             onClick={handleRefresh}
-            className="rounded-lg bg-[#2E2E2E] p-2 text-white transition-all hover:bg-white/10"
+            className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] transition-all hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
             title="Refresh Preview"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -308,7 +322,7 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
 
           <button
             onClick={handleOpenInNewWindow}
-            className="rounded-lg bg-[#2E2E2E] p-2 text-white transition-all hover:bg-white/10"
+            className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] transition-all hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
             title="Open in New Window"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -321,19 +335,21 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
             </svg>
           </button>
 
-          <div className="flex items-center gap-1 rounded-lg bg-[#2E2E2E] px-1 py-0.5">
+          <div className="ml-1 flex items-center gap-0.5 rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-1 py-0.5">
             <button
               onClick={() =>
                 setManualZoom((z) =>
                   Math.max(0.1, +((z ?? autoScale) - 0.1).toFixed(2))
                 )
               }
-              className="rounded px-1.5 py-0.5 text-xs text-white hover:bg-white/10"
+              className="flex h-5 w-5 items-center justify-center rounded text-[var(--cc-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
               title="Zoom out"
             >
-              −
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" className="h-3 w-3">
+                <path d="M5 12h14" />
+              </svg>
             </button>
-            <span className="min-w-14 text-center text-xs tabular-nums text-[#A0A0A0]">
+            <span className="min-w-[42px] text-center text-[11px] font-medium tabular-nums text-[var(--cc-text-primary)]">
               {Math.round(scale * 100)}%
             </span>
             <button
@@ -342,44 +358,89 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
                   Math.min(2, +((z ?? autoScale) + 0.1).toFixed(2))
                 )
               }
-              className="rounded px-1.5 py-0.5 text-xs text-white hover:bg-white/10"
+              className="flex h-5 w-5 items-center justify-center rounded text-[var(--cc-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
               title="Zoom in"
             >
-              +
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" className="h-3 w-3">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
             </button>
             {manualZoom !== null && (
               <button
                 onClick={() => setManualZoom(null)}
-                className="rounded px-1.5 py-0.5 text-xs text-[#FF6B00] hover:bg-white/10"
+                className="ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--cc-accent)] hover:bg-white/[0.06]"
                 title="Reset to auto-fit"
               >
                 Auto
               </button>
             )}
           </div>
-          <span className="text-xs text-[#666666] tabular-nums">
+          <span className="ml-1 text-[10px] font-mono tabular-nums text-[var(--cc-text-muted)]">
             {Math.round(dimensions.width)} × {Math.round(dimensions.height)}
           </span>
         </div>
       </div>
 
-      <div ref={containerRef} className="flex-1 overflow-auto bg-[#0A0A0A] p-6">
-        <div
-          className="mx-auto bg-white shadow-2xl"
-          style={{
-            width: dimensions.width,
-            height: dimensions.height,
-            transform: `scale(${scale})`,
-            transformOrigin: "top center",
-          }}
-        >
-          <iframe
-            ref={iframeRef}
-            title="Live Preview"
-            sandbox="allow-scripts allow-same-origin allow-forms"
-            className="h-full w-full border-0"
-          />
-        </div>
+      <div
+        ref={containerRef}
+        className={`flex-1 overflow-auto bg-[#0A0A0A] ${
+          device === "fit" ? "p-0" : "p-6"
+        }`}
+      >
+        {device === "fit" ? (
+          /* Fit: the white card fills the container entirely. Manual zoom
+             scales the iframe content, not the wrapper — eliminates the
+             "tiny white card on black background" zoom-out artifact (BUG 2). */
+          <div
+            className="relative h-full w-full bg-white"
+            style={{ overflow: scale < 1 ? "hidden" : "auto" }}
+          >
+            <iframe
+              ref={iframeRef}
+              title="Live Preview"
+              sandbox="allow-scripts allow-same-origin allow-forms"
+              className="border-0"
+              style={{
+                width: `${100 / scale}%`,
+                height: `${100 / scale}%`,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+              }}
+            />
+          </div>
+        ) : (
+          /* Device-frame mode. Three constraints we need at once:
+             1. The white card must clip its iframe so a desktop-width layout
+                doesn't bleed past the frame edge and show a horizontal
+                scrollbar inside the "phone" (what the user reported).
+             2. The iframe's *viewport* must match the device width so
+                Tailwind / media queries actually behave like the device.
+             3. Then the whole frame is scaled-to-fit the container. */
+          <div
+            className="mx-auto overflow-hidden bg-white shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] ring-1 ring-black/40"
+            style={{
+              width: dimensions.width,
+              height: dimensions.height,
+              transform: `scale(${scale})`,
+              transformOrigin: "top center",
+              borderRadius:
+                device === "mobile" ? 28 : device === "tablet" ? 18 : 8,
+            }}
+          >
+            <iframe
+              ref={iframeRef}
+              title="Live Preview"
+              sandbox="allow-scripts allow-same-origin allow-forms"
+              className="h-full w-full border-0"
+              style={{
+                // Match the iframe's own viewport to the device size — keeps
+                // breakpoint-aware layouts honest at mobile/tablet widths.
+                width: dimensions.width,
+                height: dimensions.height,
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {showConsole && (

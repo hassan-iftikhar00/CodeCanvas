@@ -424,6 +424,7 @@ export default function Navbar({
                   alt=""
                   width={28}
                   height={28}
+                  referrerPolicy="no-referrer"
                   className="h-7 w-7 rounded-full object-cover"
                   onError={() => setAvatarError(true)}
                 />

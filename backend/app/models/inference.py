@@ -38,6 +38,7 @@ import io
 import json
 import os
 import re
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -645,17 +646,120 @@ def _build_gemini_prompt(
         "- A container (navbar/footer/section) MAY have no `card` children if the detector missed them. In that case, the container's `inner text labels` block lists the user's text annotations with their positions — use those positions to lay them out.\n"
         "- An element marked `[SYNTHESIZED]` was NOT returned by the detector — the pipeline inferred it from clustered text/card positions. Treat it as a real container.\n\n"
         "Layout rules:\n"
+        "- STRICT FIDELITY (most important rule, overrides every other instinct). Render ONLY the detected components above plus any unbound text below. Do NOT invent extra elements — no page titles, no headings, no subtitles, no taglines, no footer copyright lines, no branding text, no decorative dividers, no helper text, no \"this would look better with X\" additions. If the user drew three components, the output has exactly those three. The detector and canvas annotations are the source of truth; you are a renderer, not a designer. A login form drawn as just email + password + button must render as just email + password + button — not as email + password + button + a 'Sign In' heading you decided to add.\n"
         "- Compose the components in the order given (which is top-to-bottom on the canvas). A `navbar` MUST render at the top of the page; a `footer` MUST render at the bottom; everything else goes between them in canvas-y order.\n"
         "- Inside a navbar, multiple cards / text labels are nav items — arrange them horizontally, with the leftmost one (smallest x) typically being the brand/logo and the rightmost ones being the nav links.\n"
         "- Inside a section with stacked cards / text labels (similar x, increasing y), arrange them vertically. Group an `Email:`-style label with the wide-thin card immediately below or beside it as a labelled input.\n"
         "- A `card` whose attached text is an action verb is a `<button>`. A `card` immediately below a label-style text and shaped wide-thin is an `<input>`. A long text-only annotation in a section is a heading or paragraph.\n"
         "- When a component is annotated with `contains text: \"...\"`, that text is the COMPLETE intended copy. Use it verbatim. Do NOT prefix, suffix, or augment it with boilerplate (no \"©\", \"All rights reserved\", \"Welcome to\", taglines, slogans, default headings). If the user wrote `\"This is the footer\"`, the footer's only visible text is `\"This is the footer\"`.\n"
-        "- For components WITHOUT a `contains text:` annotation, use minimal, sensible default content appropriate to the inferred role (an unlabelled button can say \"Submit\"; an unlabelled heading can say \"Welcome\"). Keep defaults short and avoid inventing branding/copyright text.\n"
+        "- When an element has an `inner text labels` block listing multiple positioned items, render each item as its OWN element at the indicated position. Do NOT concatenate the items into one string. Do NOT pick one and drop the others. Each positioned label is a separate piece of content the user drew.\n"
+        "- For DETECTED components WITHOUT any text annotation, use a SHORT GENERIC placeholder appropriate to the inferred role (unlabelled button → \"Button\", unlabelled input → placeholder \"Enter text\", unlabelled image card → empty image placeholder, unlabelled heading-shaped card → \"Heading\"). Do NOT invent product-specific copy like \"Welcome\", \"Sign In\", \"Get started today\", \"Subscribe to our newsletter\". Generic placeholders only — if the user wanted real copy, they would have written it on the canvas.\n"
         "- The \"Additional text the user wrote on the canvas\" list (if present) is unbound text — place each item somewhere reasonable, verbatim, no augmentation.\n"
-        "- The output should be visually polished and responsive.\n\n"
+        "- The output should be visually clean and responsive, but visual polish must NEVER lead to adding elements that are not in the detection list.\n\n"
         f"Output rules:\n- {framework_rule}\n"
         "- Return ONLY the code. No prose, no markdown fences, no explanations."
     )
+
+
+# ── Per-(key, model) state (module-level, process-scoped) ────────────────────
+# Wiped on process restart — intentional. 60s RPM cooldowns recover within a
+# restart window; 24h daily cooldowns re-arm on the first failed request.
+#
+# Cooldowns are tracked per-(key, model) — NOT per-key — because Pro and Flash
+# on the same key have independent quota pools. Pro hitting per_day does not
+# prevent Flash from serving on the same key, and the next request should skip
+# the known-exhausted Pro instead of paying ~2s to confirm it's still 429.
+_GEMINI_MODELS = (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL)
+_model_cooldowns: dict[tuple[int, str], float] = {}  # (key_index, model_name) → unix ts
+_key_last_used: dict[int, float] = {}                # key_index → last_success_at
+
+
+def _is_model_cooled(key_index: int, model_name: str) -> bool:
+    return time.time() < _model_cooldowns.get((key_index, model_name), 0.0)
+
+
+def _model_cooldown_remaining(key_index: int, model_name: str) -> int:
+    return max(0, int(_model_cooldowns.get((key_index, model_name), 0.0) - time.time()))
+
+
+def _apply_model_cooldown(key_index: int, model_name: str, duration: float) -> None:
+    _model_cooldowns[(key_index, model_name)] = time.time() + duration
+
+
+def _is_key_fully_cooled(key_index: int) -> bool:
+    """A key is unusable only when EVERY model on it is currently cooling."""
+    return all(_is_model_cooled(key_index, m) for m in _GEMINI_MODELS)
+
+
+def _earliest_resume_ts(n: int) -> float:
+    """Earliest unix ts at which any (key, model) becomes usable again.
+
+    Caller should only invoke this when every (key, model) is currently cooling
+    — otherwise the min may include a stale zero from a never-cooled pair.
+    """
+    return min(_model_cooldowns.get((i, m), 0.0) for i in range(n) for m in _GEMINI_MODELS)
+
+
+class GeminiQuotaExhausted(Exception):
+    """Raised when all configured Gemini API keys have hit their DAILY quota."""
+
+
+class GeminiRateLimited(Exception):
+    """Raised when a per-minute rate limit is hit — temporary, retry in ~60 s."""
+
+
+def _classify_gemini_429(error: Exception) -> str:
+    """Classify a Gemini 429-family error as 'per_minute', 'per_day', or 'ambiguous'.
+
+    Uses structured isinstance check first so classification degrades gracefully
+    if Google restructures their exception hierarchy. Per-minute takes precedence
+    over per-day if both keywords appear in the same message — prevents escalating
+    to a 24-hour cooldown during ordinary RPM spikes.
+    """
+    try:
+        from google.api_core import exceptions as _gapi
+        is_429 = isinstance(error, (_gapi.ResourceExhausted, _gapi.TooManyRequests))
+    except ImportError:
+        is_429 = False
+
+    if not is_429:
+        cls = type(error).__name__
+        raw = str(error)
+        is_429 = (
+            cls in ("ResourceExhausted", "TooManyRequests")
+            or "429" in raw
+            or "RESOURCE_EXHAUSTED" in raw
+            or "quota" in raw.lower()
+        )
+
+    if not is_429:
+        return "other"
+
+    msg = str(error).lower()
+    is_per_minute = (
+        "per-minute" in msg
+        or "per minute" in msg
+        or "perminute" in msg          # quota_id camelCase: GenerateRequestsPerMinute...
+        or "generatecontent-per-minute" in msg
+        or "too many requests" in msg
+        or "requests per minute" in msg
+        or "rate limit" in msg
+    )
+    is_per_day = (
+        "per-day" in msg
+        or "per day" in msg
+        or "perday" in msg             # quota_id camelCase: GenerateRequestsPerDay...
+        or "generatecontent-per-day" in msg
+        or "daily" in msg
+    )
+
+    # Per-day takes precedence: Google bundles all violated limits in one error.
+    # When both appear, the daily limit is the binding constraint (longer reset).
+    if is_per_day:
+        return "per_day"
+    if is_per_minute:
+        return "per_minute"
+    return "ambiguous"
 
 
 def generate_with_gemini(
@@ -666,47 +770,161 @@ def generate_with_gemini(
     *,
     api_key: Optional[str] = None,
     extra_text: Optional[List[str]] = None,
-) -> Optional[str]:
-    """Call Gemini to synthesize code from detected elements. Returns code string or None on failure."""
-    api_key = api_key or os.getenv("GEMINI_API_KEY")
-    if not api_key or not elements:
-        return None
+) -> str:
+    """Call Gemini to synthesize code from detected elements.
+
+    Routing:
+      - Keys tried in deterministic order (sorted by env var suffix).
+      - Cooldowns are per-(key, model): Pro hitting per_day on key=1 cools only
+        (key=1, pro); Flash on the same key keeps serving and is preferred on
+        the next request without the wasted ~2s probe to confirm Pro is still 429.
+      - per_minute → 60s cooldown on that (key, model), try next model.
+      - per_day    → 24h cooldown on that (key, model), try next model.
+      - ambiguous  → 60s cooldown on that (key, model), try next model
+                     (raw_error logged for classifier tuning).
+      - Non-quota errors → no cooldown, try fallback model on same key.
+      - Pre-flight + per-key skip: bail / rotate when every model is cooling.
+    """
+    _key_re = re.compile(r"^GEMINI_API_KEY(_(\d+))?$")
+    _env_keys = sorted(
+        ((int(m.group(2)) if m.group(2) else 0), v.strip())
+        for k, v in os.environ.items()
+        if (m := _key_re.match(k)) and v.strip()
+    )
+    api_keys = [v for _, v in _env_keys]
+    if api_key and api_key not in api_keys:
+        api_keys.insert(0, api_key)
+
+    if not api_keys:
+        raise GeminiQuotaExhausted("No GEMINI_API_KEY configured.")
 
     try:
         import google.generativeai as genai
-    except ImportError as error:
-        print(f"google-generativeai not installed: {error}")
-        return None
+    except ImportError as exc:
+        raise RuntimeError(f"google-generativeai not installed: {exc}") from exc
 
-    try:
-        genai.configure(api_key=api_key)
-    except Exception as error:
-        print(f"Gemini configure failed: {error}")
-        return None
+    n = len(api_keys)
 
-    prompt = _build_gemini_prompt(elements, framework, styling, description, extra_text=extra_text)
+    # ── Pre-flight: bail immediately if every (key, model) is cooling ────────
+    if all(_is_key_fully_cooled(i) for i in range(n)):
+        retry_after = max(1, int(_earliest_resume_ts(n) - time.time()))
+        print(f"[gemini] all_keys_cooling retry_after={retry_after}s")
+        raise GeminiRateLimited(
+            f"All Gemini keys are temporarily rate limited. Retry in {retry_after}s."
+        )
 
-    for model_name in (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL):
+    prompt = _build_gemini_prompt(
+        elements, framework, styling, description, extra_text=extra_text
+    )
+
+    any_daily_exhausted = False
+
+    for key_index, current_key in enumerate(api_keys):
+
+        if _is_key_fully_cooled(key_index):
+            remaining = min(
+                _model_cooldown_remaining(key_index, m) for m in _GEMINI_MODELS
+            )
+            print(
+                f"[gemini] key={key_index + 1} status=skipped"
+                f" reason=all_models_cooling remaining={remaining}s"
+            )
+            continue
+
         try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            text = getattr(response, "text", None)
-            if text:
-                return _strip_code_fences(text)
-            print(f"Gemini [{model_name}] returned empty response")
-        except Exception as error:
-            print(f"Gemini [{model_name}] failed: {error}")
+            genai.configure(api_key=current_key)
+        except Exception as exc:
+            print(f"[gemini] key={key_index + 1} status=configure_error error={exc!r}")
+            continue
 
-    # TODO(H5 follow-up): when both Gemini models fail (typically free-tier
-    # quota exhaustion: 429 GenerateRequestsPerDayPerProjectPerModel), fall
-    # through to OpenRouter as a *generation* fallback (separate from the
-    # OpenRouter chat-refinement path in main.py — different system prompt,
-    # different model pool). This breaks CLAUDE_CONTEXT decision #2 ("Gemini
-    # only for code generation") so it's a real architectural change and
-    # needs an explicit go-ahead. Until then, callers fall back to the
-    # template generator in CodeGenerator._template_based_generation, which
-    # produces a near-empty shell for the 4-class output.
-    return None
+        for model_name in _GEMINI_MODELS:
+            if _is_model_cooled(key_index, model_name):
+                print(
+                    f"[gemini] key={key_index + 1} model={model_name} status=skipped"
+                    f" reason=cooling remaining={_model_cooldown_remaining(key_index, model_name)}s"
+                )
+                continue
+
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                text = getattr(response, "text", None)
+                if text:
+                    _key_last_used[key_index] = time.time()
+                    print(
+                        f"[gemini] key={key_index + 1} model={model_name}"
+                        f" status=success chars={len(text)}"
+                    )
+                    return _strip_code_fences(text)
+                print(
+                    f"[gemini] key={key_index + 1} model={model_name}"
+                    " status=empty_response"
+                )
+
+            except Exception as exc:
+                kind = _classify_gemini_429(exc)
+                trying_next = "yes" if model_name == GEMINI_PRIMARY_MODEL else "no"
+
+                if kind == "per_day":
+                    _apply_model_cooldown(key_index, model_name, 86_400)
+                    any_daily_exhausted = True
+                    print(
+                        f"[gemini] key={key_index + 1} model={model_name}"
+                        f" status=per_day_429 trying_fallback={trying_next}"
+                        f" cooldown=86400s"
+                    )
+                    continue
+
+                if kind in ("per_minute", "ambiguous"):
+                    _apply_model_cooldown(key_index, model_name, 60)
+                    extra = f" raw_error={str(exc)!r}" if kind == "ambiguous" else ""
+                    print(
+                        f"[gemini] key={key_index + 1} model={model_name}"
+                        f" status={kind}_429 trying_fallback={trying_next}"
+                        f" cooldown=60s{extra}"
+                    )
+                    continue
+
+                # Non-quota failure — try fallback model on the same key (no cooldown).
+                print(
+                    f"[gemini] key={key_index + 1} model={model_name}"
+                    f" status=error error={exc!r}"
+                )
+
+        # Key became fully cooled during this iteration — log the routing decision.
+        if _is_key_fully_cooled(key_index):
+            next_key = next(
+                (j + 1 for j in range(key_index + 1, n) if not _is_key_fully_cooled(j)),
+                None,
+            )
+            available = sum(1 for j in range(n) if not _is_key_fully_cooled(j))
+            if next_key:
+                print(
+                    f"[gemini] routing key={key_index + 1}->key={next_key}"
+                    f" available={available}"
+                )
+            else:
+                print(f"[gemini] routing key={key_index + 1}->none available={available}")
+
+    # ── Post-loop: all keys tried ─────────────────────────────────────────────
+    if all(_is_key_fully_cooled(i) for i in range(n)):
+        retry_after = max(1, int(_earliest_resume_ts(n) - time.time()))
+        print(f"[gemini] all_keys_cooling retry_after={retry_after}s")
+        raise GeminiRateLimited(
+            f"All Gemini keys are temporarily rate limited. Retry in {retry_after}s."
+        )
+
+    if any_daily_exhausted:
+        print("[gemini] all_keys_exhausted reason=daily_quota")
+        raise GeminiQuotaExhausted(
+            f"All {n} Gemini API key(s) have hit their daily quota."
+            " Try again tomorrow or add more keys."
+        )
+
+    print("[gemini] all_keys_exhausted reason=unknown")
+    raise GeminiQuotaExhausted(
+        f"All {n} Gemini API key(s) failed — check backend logs for details."
+    )
 
 
 class SketchDetector:

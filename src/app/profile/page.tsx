@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
+import { DeleteAccountModal } from "@/components/profile/DeleteAccountModal";
+import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ProfileSkeleton from "@/components/profile/ProfileSkeleton";
-import ThemeToggle from "@/components/theme/ThemeToggle";
 
 interface Profile {
   id: string;
@@ -34,7 +35,7 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
- 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -195,58 +196,43 @@ export default function ProfilePage() {
     router.push("/");
   };
 
-  return (
-    <div className="min-h-screen bg-[var(--cc-bg-canvas)]">
-      {/* Header */}
-      <header className="border-b border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)]">
-        <div className="mx-auto flex h-12 max-w-5xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--cc-text-secondary)] transition-colors hover:text-[var(--cc-text-primary)]"
-          >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            Dashboard
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="" className="h-6 w-6" />
-              <span className="text-[14px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
-                CodeCanvas
-              </span>
-            </Link>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+  const handleDeleteAccount = async () => {
+    const response = await fetch("/api/account/delete", { method: "POST" });
 
-      {/* Main */}
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-        {loading ? (
-          <ProfileSkeleton />
-        ) : (
-          <ErrorBoundary
-            variant="panel"
-            title="Profile unavailable"
-            message="We could not load this page. Try again in a moment."
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
-            >
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(
+        data.error || "Failed to delete account. Please try again."
+      );
+    }
+
+    // Server has deleted auth.users — clear the local session and navigate away.
+    // Use window.location for a full reload so all in-memory auth state is gone.
+    await supabase.auth.signOut();
+    window.location.href = "/auth/login";
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <ProfileSkeleton />
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <ErrorBoundary
+        variant="panel"
+        title="Profile unavailable"
+        message="We could not load this page. Try again in a moment."
+      >
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
+        >
           <div className="mb-6">
             <h1 className="text-[24px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
               Profile settings
@@ -492,36 +478,86 @@ export default function ProfilePage() {
               <h2 className="mb-1 text-[14px] font-semibold text-[var(--cc-error)]">
                 Danger zone
               </h2>
-              <p className="mb-3 text-[12px] text-[var(--cc-text-secondary)]">
-                Signing out will end your current session.
+              <p className="mb-4 text-[12px] text-[var(--cc-text-secondary)]">
+                These actions are permanent or affect your current session.
               </p>
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                onClick={handleLogout}
-                className="cc-danger inline-flex items-center gap-1.5 rounded-[var(--cc-radius-button)] border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.08)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--cc-error)] transition-colors hover:bg-[rgba(239,68,68,0.16)]"
-              >
-                <svg
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
+
+              {/* Sign out */}
+              <div className="flex items-center justify-between gap-4 border-t border-[rgba(239,68,68,0.12)] pt-4">
+                <div>
+                  <p className="text-[12px] font-semibold text-[var(--cc-text-primary)]">
+                    Sign out
+                  </p>
+                  <p className="text-[11px] text-[var(--cc-text-muted)]">
+                    End your current session on this device.
+                  </p>
+                </div>
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={handleLogout}
+                  className="flex-none inline-flex items-center gap-1.5 rounded-[var(--cc-radius-button)] border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.08)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--cc-error)] transition-colors hover:bg-[rgba(239,68,68,0.16)]"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                  />
-                </svg>
-                Sign out
-              </motion.button>
+                  <svg
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                    />
+                  </svg>
+                  Sign out
+                </motion.button>
+              </div>
+
+              {/* Delete account */}
+              <div className="mt-4 flex items-center justify-between gap-4 border-t border-[rgba(239,68,68,0.12)] pt-4">
+                <div>
+                  <p className="text-[12px] font-semibold text-[var(--cc-text-primary)]">
+                    Delete account
+                  </p>
+                  <p className="text-[11px] text-[var(--cc-text-muted)]">
+                    Permanently remove your account, all projects, and all data.
+                    This cannot be undone.
+                  </p>
+                </div>
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => setShowDeleteModal(true)}
+                  className="flex-none inline-flex items-center gap-1.5 rounded-[var(--cc-radius-button)] bg-red-600 px-3.5 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-red-700"
+                >
+                  <svg
+                    className="h-3.5 w-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                  Delete account
+                </motion.button>
+              </div>
             </section>
           </div>
-            </motion.div>
-          </ErrorBoundary>
-        )}
-      </main>
-    </div>
+        </motion.div>
+      </div>
+      </ErrorBoundary>
+
+      <DeleteAccountModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAccount}
+      />
+    </DashboardLayout>
   );
 }
 

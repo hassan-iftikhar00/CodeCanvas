@@ -38,6 +38,7 @@ const WIDTHS: {
 
 const VISIBLE_TOOLS: Tool[] = [
   "pen",
+  "line",
   "rectangle",
   "circle",
   "ellipse",
@@ -73,7 +74,7 @@ export default function StyleRibbon({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
-          className="absolute bottom-16 left-1/2 z-30 w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] -translate-x-1/2 flex flex-wrap items-center justify-center gap-2 rounded-[10px] cc-frost px-2 py-2 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] sm:bottom-4 sm:w-auto sm:max-w-none sm:gap-3 sm:px-3"
+          className="absolute bottom-16 left-1/2 z-40 w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] -translate-x-1/2 flex flex-wrap items-center justify-center gap-2 rounded-[12px] border border-[var(--cc-border-subtle)] bg-gradient-to-b from-[var(--cc-bg-elevated)] to-[var(--cc-bg-surface)] px-2 py-2 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl sm:bottom-3 sm:w-auto sm:max-w-none sm:gap-3 sm:px-3"
         >
           {/* Color swatches */}
           <RibbonSection label="Color">

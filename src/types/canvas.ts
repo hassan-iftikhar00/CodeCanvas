@@ -2,6 +2,7 @@ export type Tool =
   | "select"
   | "hand"
   | "pen"
+  | "line"
   | "rectangle"
   | "circle"
   | "ellipse"
@@ -46,6 +47,7 @@ export const TOOL_KEY_MAP: Record<string, Tool> = {
   v: "select",
   h: "hand",
   p: "pen",
+  n: "line",
   r: "rectangle",
   o: "circle",
   l: "ellipse",
@@ -61,7 +63,9 @@ export const ZOOM_MAX = 300;
 export const ZOOM_DEFAULT = 100;
 export const ZOOM_STEP = 10;
 
-export const CODE_PANEL_MIN_HEIGHT = 200;
-export const CODE_PANEL_MAX_HEIGHT = 600;
+export const CODE_PANEL_MIN_HEIGHT = 220;
+// Upper hard cap; the drag handler also clamps to viewport-aware bounds so the
+// canvas never gets squeezed below ~180px regardless of this value.
+export const CODE_PANEL_MAX_HEIGHT = 1400;
 export const SPLIT_RATIO_MIN = 0.15;
 export const SPLIT_RATIO_MAX = 0.85;

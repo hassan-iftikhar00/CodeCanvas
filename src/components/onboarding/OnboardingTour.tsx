@@ -32,7 +32,7 @@ interface OnboardingTourProps {
 
 const HIGHLIGHT_PADDING = 10;
 const TOOLTIP_GAP = 16;
-const VIEWPORT_PADDING = 8;
+const VIEWPORT_PADDING = 0;
 
 export default function OnboardingTour({
   isOpen,
@@ -69,14 +69,10 @@ export default function OnboardingTour({
     const rect = target.getBoundingClientRect();
     const top = Math.max(rect.top - HIGHLIGHT_PADDING, VIEWPORT_PADDING);
     const left = Math.max(rect.left - HIGHLIGHT_PADDING, VIEWPORT_PADDING);
-    const width = Math.min(
-      rect.width + HIGHLIGHT_PADDING * 2,
-      window.innerWidth - left - VIEWPORT_PADDING
-    );
-    const height = Math.min(
-      rect.height + HIGHLIGHT_PADDING * 2,
-      window.innerHeight - top - VIEWPORT_PADDING
-    );
+    const bottom = Math.min(rect.bottom + HIGHLIGHT_PADDING, window.innerHeight - VIEWPORT_PADDING);
+    const right = Math.min(rect.right + HIGHLIGHT_PADDING, window.innerWidth - VIEWPORT_PADDING);
+    const width = right - left;
+    const height = bottom - top;
 
     setHighlightRect({ top, left, width, height });
   }, [currentStep]);

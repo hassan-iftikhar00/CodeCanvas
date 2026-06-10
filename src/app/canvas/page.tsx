@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   useState,
@@ -18,14 +18,13 @@ import ShortcutsPanel from "@/components/ShortcutsPanel";
 import LayerPanel, { type Layer } from "@/components/canvas/LayerPanel";
 import ExportDialog, { type ExportOptions } from "@/components/ExportDialog";
 import TemplatesPanel from "@/components/canvas/TemplatesPanel";
-import SaveIndicator from "@/components/SaveIndicator";
 import ZoomPill from "@/components/canvas/ZoomPill";
 import FloatingToolbar from "@/components/canvas/FloatingToolbar";
 import CanvasSurface from "@/components/canvas/CanvasSurface";
 import StyleRibbon from "@/components/canvas/StyleRibbon";
+import StatusBar from "@/components/canvas/StatusBar";
 import Navbar from "@/components/Navbar";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import CodePanelSkeleton from "@/components/canvas/CodePanelSkeleton";
 import OnboardingTour, {
   type OnboardingStep,
 } from "@/components/onboarding/OnboardingTour";
@@ -40,6 +39,7 @@ import MonacoCodeEditor from "@/components/canvas/MonacoCodeEditor";
 import LivePreview from "@/components/canvas/LivePreview";
 import ChatInterface from "@/components/canvas/ChatInterface";
 import ComponentPalette from "@/components/canvas/ComponentPalette";
+import GenerationProgress from "@/components/canvas/GenerationProgress";
 import { useVersionHistory } from "@/hooks/useVersionHistory";
 import { useToast } from "@/components/ui/Toast";
 import { registerCanvasCommands } from "@/components/CommandPalette";
@@ -93,29 +93,16 @@ export default function CanvasPage() {
 function CanvasPageFallback() {
   return (
     <div
-      className="flex h-screen flex-col bg-[var(--cc-bg-canvas)]"
+      className="flex h-screen items-center justify-center bg-[var(--charcoal-black)]"
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
-      <div className="h-12 border-b border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] px-4 py-3">
-        <div className="skeleton h-6 w-48" />
-      </div>
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 p-6">
-          <div className="h-full rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-4">
-            <div className="skeleton h-full w-full" />
-          </div>
-        </div>
-        <div className="hidden w-72 border-l border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-4 lg:block">
-          <div className="skeleton h-4 w-24" />
-          <div className="mt-4 space-y-2">
-            <div className="skeleton h-10 w-full" />
-            <div className="skeleton h-10 w-full" />
-            <div className="skeleton h-10 w-full" />
-          </div>
-        </div>
-      </div>
+      <span className="sr-only">Loading canvas...</span>
+      <div
+        aria-hidden="true"
+        className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--orange-primary)] border-t-transparent"
+      />
     </div>
   );
 }
@@ -125,20 +112,14 @@ function CanvasPageInner() {
   // Ã¢â€â‚¬Ã¢â€â‚¬ Core state Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [currentTool, setCurrentTool] = useState<Tool>("pen");
   const [currentMode, setCurrentMode] = useState<Mode>("sketch");
-  const [rightPanel, setRightPanel] = useState<RightPanel>(() => {
-    if (typeof window === "undefined") return "chat";
-    return window.matchMedia("(max-width: 1023px)").matches ? null : "chat";
-  });
-  const [isMobileView, setIsMobileView] = useState(false);
+  const [rightPanel, setRightPanel] = useState<RightPanel>("chat");
   const [showCodePanel, setShowCodePanel] = useState(false);
-  const [isCanvasEmpty, setIsCanvasEmpty] = useState(true);
   const [codePanelHeight, setCodePanelHeight] = useState(350);
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [codeCopied, setCodeCopied] = useState(false);
   const [gridEnabled, setGridEnabled] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
-  const [showMobileWarning, setShowMobileWarning] = useState(true);
   const [importedDesign, setImportedDesign] = useState<
     { x: number; y: number }[][] | null
   >(null);
@@ -151,7 +132,6 @@ function CanvasPageInner() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const exportOpenedByTourRef = useRef(false);
-  const rightPanelRef = useRef<RightPanel>(rightPanel);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ Layers Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [layers, setLayers] = useState<Layer[]>([
@@ -206,6 +186,7 @@ function CanvasPageInner() {
     Array<{ type: string; bounds: unknown }>
   >([]);
   const [usedFallback, setUsedFallback] = useState(false);
+  const [fallbackMessage, setFallbackMessage] = useState<string | null>(null);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ History & versions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const history = useHistory({
@@ -225,6 +206,10 @@ function CanvasPageInner() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const codePanelDragRef = useRef(false);
+  const codePanelRef = useRef<HTMLDivElement>(null);
+  const codePanelHeightRef = useRef(350);
+  const mainRef = useRef<HTMLElement>(null);
+  const [canvasArea, setCanvasArea] = useState({ width: 0, height: 0 });
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ User Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
@@ -263,45 +248,6 @@ function CanvasPageInner() {
     ],
     []
   );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const checkEmpty = () => {
-      const data = canvasRef.current?.getCanvasData();
-      if (!data) return;
-      const empty =
-        (data.lines?.length ?? 0) === 0 &&
-        (data.shapes?.length ?? 0) === 0 &&
-        (data.componentGroups?.length ?? 0) === 0;
-      setIsCanvasEmpty(empty);
-    };
-    checkEmpty();
-    const intervalId = window.setInterval(checkEmpty, 200);
-    return () => window.clearInterval(intervalId);
-  }, [currentProject?.id]);
-
-  useEffect(() => {
-    rightPanelRef.current = rightPanel;
-  }, [rightPanel]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const media = window.matchMedia("(max-width: 1023px)");
-    const update = () => {
-      const isMobile = media.matches;
-      setIsMobileView(isMobile);
-      if (isMobile && rightPanelRef.current) {
-        setRightPanel(null);
-      }
-    };
-    update();
-    if (typeof media.addEventListener === "function") {
-      media.addEventListener("change", update);
-      return () => media.removeEventListener("change", update);
-    }
-    media.addListener(update);
-    return () => media.removeListener(update);
-  }, []);
 
   // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
   // Effects
@@ -519,6 +465,7 @@ function CanvasPageInner() {
           v: "select",
           h: "hand",
           p: "pen",
+          n: "line",
           r: "rectangle",
           o: "circle",
           l: "ellipse",
@@ -590,6 +537,23 @@ function CanvasPageInner() {
     };
     window.addEventListener("wheel", handleWheel, { passive: false });
     return () => window.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  // ── Track canvas-area size for the status bar ────────────────────
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const sync = () => {
+      const r = el.getBoundingClientRect();
+      setCanvasArea({
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+      });
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
@@ -920,6 +884,7 @@ function CanvasPageInner() {
       setEditedCode(result.code);
       setDetectedElements(result.detectedElements ?? result.elements ?? []);
       setUsedFallback(Boolean(result.usedFallback));
+      setFallbackMessage(result.message ?? null);
       setCurrentMode("preview");
       setShowCodePanel(true);
     } catch (err) {
@@ -933,27 +898,68 @@ function CanvasPageInner() {
     }
   };
 
-  // Code panel resize via drag
-  const handleCodePanelDrag = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      codePanelDragRef.current = true;
-      const startY = e.clientY;
-      const startH = codePanelHeight;
-      const onMove = (ev: MouseEvent) => {
-        const delta = startY - ev.clientY;
-        setCodePanelHeight(clampCodePanelHeight(startH + delta));
-      };
-      const onUp = () => {
-        codePanelDragRef.current = false;
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
-      };
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
-    },
-    [codePanelHeight]
-  );
+  // Keep a ref of the current panel height so the drag handler can be stable.
+  useEffect(() => {
+    codePanelHeightRef.current = codePanelHeight;
+  }, [codePanelHeight]);
+
+  // Code panel resize via drag — imperative for smoothness.
+  // The drag writes height directly to the DOM inside a single rAF tick so we
+  // don't churn React state (and thus avoid restarting Konva's ResizeObserver
+  // on every mousemove, which was the source of the flicker).
+  const handleCodePanelDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    codePanelDragRef.current = true;
+    const startY = e.clientY;
+    const startH = codePanelHeightRef.current;
+    // Bound max by viewport so the canvas can't be squeezed to nothing on
+    // short screens, but otherwise let the preview panel grow large enough to
+    // actually be usable (BUG 1 — the previous cap of 600 was too tight on
+    // 1080p+ displays, leaving the preview thumbnail-sized).
+    // Floor: leave ~180px for the canvas area + status bar.
+    const CANVAS_MIN_HEIGHT = 180;
+    const dynMax = Math.min(
+      CODE_PANEL_MAX_HEIGHT,
+      Math.max(CODE_PANEL_MIN_HEIGHT, window.innerHeight - CANVAS_MIN_HEIGHT)
+    );
+    const clampDyn = (h: number) =>
+      Math.min(dynMax, Math.max(CODE_PANEL_MIN_HEIGHT, h));
+
+    let pendingH = startH;
+    let finalH = startH;
+    let rafId: number | null = null;
+
+    const apply = () => {
+      rafId = null;
+      if (codePanelRef.current) {
+        codePanelRef.current.style.height = `${pendingH}px`;
+      }
+    };
+
+    const onMove = (ev: MouseEvent) => {
+      const delta = startY - ev.clientY;
+      finalH = clampDyn(startH + delta);
+      pendingH = finalH;
+      if (rafId === null) rafId = requestAnimationFrame(apply);
+    };
+
+    const onUp = () => {
+      codePanelDragRef.current = false;
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      // Commit the final value to React state so other consumers see it.
+      setCodePanelHeight(finalH);
+      codePanelHeightRef.current = finalH;
+    };
+
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
 
   // Stable refs let us register commands once without re-registering on every render
   // when callbacks like handleRunDetection get a new identity.
@@ -1110,36 +1116,30 @@ function CanvasPageInner() {
   // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 
   return (
-    <div className="flex h-[100svh] flex-col bg-[var(--cc-bg-canvas)] overflow-hidden select-none lg:h-screen">
+    <div className="flex h-screen flex-col bg-[var(--cc-bg-canvas)] overflow-hidden select-none">
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Top Navbar Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-      <ErrorBoundary
-        variant="panel"
-        title="Editor header unavailable"
-        message="We could not load the top bar. The editor is still available."
-      >
-        <Navbar
-          projectName={projectName}
-          originalProjectName={originalProjectName}
-          onProjectNameChange={setProjectName}
-          onSaveProjectName={handleSaveProjectName}
-          isSavingName={isSavingName}
-          currentProjectId={currentProject?.id}
-          isSaving={isSaving}
-          lastSaved={lastSaved}
-          saveError={error}
-          onSave={handleSaveProject}
-          onRunDetection={handleRunDetection}
-          isGenerating={isGenerating}
-          onExport={() => setShowExport(true)}
-          onTemplatesToggle={() => setShowTemplates(true)}
-          onChatToggle={() =>
-            setRightPanel(rightPanel === "chat" ? null : "chat")
-          }
-          onHistoryToggle={() => {}}
-          isChatActive={rightPanel === "chat"}
-          isHistoryActive={false}
-        />
-      </ErrorBoundary>
+      <Navbar
+        projectName={projectName}
+        originalProjectName={originalProjectName}
+        onProjectNameChange={setProjectName}
+        onSaveProjectName={handleSaveProjectName}
+        isSavingName={isSavingName}
+        currentProjectId={currentProject?.id}
+        isSaving={isSaving}
+        lastSaved={lastSaved}
+        saveError={error}
+        onSave={handleSaveProject}
+        onRunDetection={handleRunDetection}
+        isGenerating={isGenerating}
+        onExport={() => setShowExport(true)}
+        onTemplatesToggle={() => setShowTemplates(true)}
+        onChatToggle={() =>
+          setRightPanel(rightPanel === "chat" ? null : "chat")
+        }
+        onHistoryToggle={() => {}}
+        isChatActive={rightPanel === "chat"}
+        isHistoryActive={false}
+      />
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Main workspace Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className="flex flex-1 overflow-hidden">
@@ -1151,183 +1151,162 @@ function CanvasPageInner() {
           {/* Style ribbon is now floating at the bottom of the canvas (see <StyleRibbon /> below). */}
 
           {/* Ã¢â€â‚¬Ã¢â€â‚¬ Canvas area Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-          <ErrorBoundary
-            variant="panel"
-            title="Canvas unavailable"
-            message="We could not render the canvas. Try again."
-            resetKeys={[currentMode, currentTool, zoom]}
+          <main
+            ref={mainRef}
+            className="relative flex-1 min-h-0 overflow-hidden bg-[var(--cc-bg-canvas)]"
           >
-            <main className="relative flex-1 overflow-hidden bg-[var(--cc-bg-canvas)]">
-              {showMobileWarning ? (
-                <div className="absolute left-3 right-3 top-3 z-40 sm:hidden">
-                  <div className="rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)]/95 p-3 text-[12px] text-[var(--cc-text-secondary)] shadow-[0_12px_30px_-18px_rgba(0,0,0,0.6)] backdrop-blur">
-                    <div className="flex items-start gap-2">
-                      <svg
-                        className="mt-0.5 h-4 w-4 flex-none text-[var(--cc-accent)]"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                        />
-                      </svg>
-                      <div className="flex-1">
-                        <p className="text-[12px] font-semibold text-[var(--cc-text-primary)]">
-                          Canvas works best on desktop.
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-[var(--cc-text-secondary)]">
-                          For the best experience, use a larger screen.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowMobileWarning(false)}
-                        className="rounded-[var(--cc-radius-button)] p-1 text-[var(--cc-text-muted)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
-                        aria-label="Dismiss mobile warning"
-                      >
-                        <svg
-                          className="h-3.5 w-3.5"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path d="M18 6L6 18M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-              <CanvasSurface
-                isEmpty={isCanvasEmpty}
-                onUserInteract={() => setIsCanvasEmpty(false)}
-              >
-                <div className="flex h-full items-center justify-center p-2 sm:p-4 md:p-6">
-                  <ErrorBoundary
-                    variant="panel"
-                    title="Canvas surface failed"
-                    message="The drawing area could not be loaded."
-                  >
-                    <SketchCanvas
-                      ref={canvasRef}
-                      tool={toolForCanvas()}
-                      mode={currentMode}
-                      gridEnabled={gridEnabled}
-                      snapEnabled={snapEnabled}
-                      importedDesign={importedDesign}
-                      strokeColor={strokeColor}
-                      fillColor={fillColor}
-                      strokeWidth={strokeWidth}
-                      zoom={zoom}
-                      canvasState={history.state}
-                      onStateChange={history.setState}
-                    />
-                  </ErrorBoundary>
-                </div>
-              </CanvasSurface>
-
-              {/* Floating left toolbar — drawing tools */}
-              <ErrorBoundary
-                variant="panel"
-                title="Toolbar unavailable"
-                message="We could not load the drawing tools."
-              >
-                <FloatingToolbar
-                  currentTool={currentTool}
-                  onSelectTool={setCurrentTool}
-                />
-              </ErrorBoundary>
-
-              {/* Floating bottom style ribbon — slides in/out per tool */}
-              <ErrorBoundary
-                variant="panel"
-                title="Style controls unavailable"
-                message="We could not load the styling controls."
-              >
-                <StyleRibbon
-                  currentTool={currentTool}
-                  strokeColor={strokeColor}
-                  fillColor={fillColor}
-                  strokeWidth={strokeWidth}
-                  onStrokeColorChange={setStrokeColor}
-                  onFillColorChange={setFillColor}
-                  onStrokeWidthChange={setStrokeWidth}
-                />
-              </ErrorBoundary>
-
-              {/* Frosted-glass zoom pill */}
-              <ErrorBoundary
-                variant="panel"
-                title="Zoom controls unavailable"
-                message="We could not load zoom controls."
-              >
-                <ZoomPill
-                  zoom={zoom}
-                  onZoomChange={setZoom}
-                  onFitToScreen={handleFitToScreen}
-                />
-              </ErrorBoundary>
-
-              {/* Code panel toggle (when hidden) */}
-              {!showCodePanel && (
-                <button
-                  onClick={() => setShowCodePanel(true)}
-                  className="absolute bottom-4 right-4 z-30 flex items-center gap-2 rounded-lg border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-3 py-2 text-xs font-medium text-[var(--cc-text-secondary)] shadow-lg transition-all hover:border-[var(--cc-accent)] hover:text-[var(--cc-text-primary)] hover:shadow-xl"
+            <CanvasSurface
+              isEmpty={(() => {
+                const s = history.state as
+                  | {
+                      lines?: unknown[];
+                      shapes?: unknown[];
+                      componentGroups?: unknown[];
+                    }
+                  | undefined;
+                if (!s) return true;
+                return (
+                  (s.lines?.length ?? 0) === 0 &&
+                  (s.shapes?.length ?? 0) === 0 &&
+                  (s.componentGroups?.length ?? 0) === 0
+                );
+              })()}
+            >
+              <div className="flex h-full items-center justify-center p-2 sm:p-4 md:p-6">
+                <ErrorBoundary
+                  variant="panel"
+                  title="Canvas surface failed"
+                  message="The drawing area could not be loaded."
                 >
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                  </svg>
-                  Code
-                </button>
-              )}
-            </main>
-          </ErrorBoundary>
+                  <SketchCanvas
+                    ref={canvasRef}
+                    tool={toolForCanvas()}
+                    mode={currentMode}
+                    gridEnabled={gridEnabled}
+                    snapEnabled={snapEnabled}
+                    importedDesign={importedDesign}
+                    strokeColor={strokeColor}
+                    fillColor={fillColor}
+                    strokeWidth={strokeWidth}
+                    zoom={zoom}
+                    canvasState={history.state}
+                    onStateChange={history.setState}
+                  />
+                </ErrorBoundary>
+              </div>
+            </CanvasSurface>
+
+            {/* Floating left toolbar — drawing tools */}
+            <ErrorBoundary
+              variant="panel"
+              title="Toolbar unavailable"
+              message="We could not load the drawing tools."
+            >
+              <FloatingToolbar
+                currentTool={currentTool}
+                onSelectTool={setCurrentTool}
+              />
+            </ErrorBoundary>
+
+            {/* Floating bottom style ribbon — slides in/out per tool */}
+            <ErrorBoundary
+              variant="panel"
+              title="Style controls unavailable"
+              message="We could not load the styling controls."
+            >
+              <StyleRibbon
+                currentTool={currentTool}
+                strokeColor={strokeColor}
+                fillColor={fillColor}
+                strokeWidth={strokeWidth}
+                onStrokeColorChange={setStrokeColor}
+                onFillColorChange={setFillColor}
+                onStrokeWidthChange={setStrokeWidth}
+              />
+            </ErrorBoundary>
+
+            {/* Frosted-glass zoom pill */}
+            <ErrorBoundary
+              variant="panel"
+              title="Zoom controls unavailable"
+              message="We could not load zoom controls."
+            >
+              <ZoomPill
+                zoom={zoom}
+                onZoomChange={setZoom}
+                onFitToScreen={handleFitToScreen}
+              />
+            </ErrorBoundary>
+
+            {/* Code panel toggle (when hidden) */}
+            {!showCodePanel && (
+              <button
+                onClick={() => setShowCodePanel(true)}
+                className="absolute bottom-4 right-4 z-30 flex items-center gap-2 rounded-[10px] border border-[var(--cc-border-subtle)] bg-gradient-to-b from-[var(--cc-bg-elevated)] to-[var(--cc-bg-surface)] px-3 py-2 text-xs font-medium text-[var(--cc-text-secondary)] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] transition-all duration-150 hover:border-[var(--cc-accent)] hover:text-[var(--cc-text-primary)] hover:shadow-[0_12px_28px_-8px_var(--cc-accent-glow-strong)]"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                Code
+              </button>
+            )}
+          </main>
+
+          {/* Persistent status bar — owns dimensions / mode / grid / zoom.
+              Lives in the page chrome (not the Konva white box) so it can
+              never be overlapped by the floating toolbar (BUG 6). */}
+          <StatusBar
+            width={canvasArea.width}
+            height={canvasArea.height}
+            tool={currentTool}
+            gridEnabled={gridEnabled}
+            snapEnabled={snapEnabled}
+            zoom={zoom}
+            onZoomIn={() => setZoom((z) => clampZoom(z + ZOOM_STEP))}
+            onZoomOut={() => setZoom((z) => clampZoom(z - ZOOM_STEP))}
+            onZoomReset={() => setZoom(ZOOM_DEFAULT)}
+          />
 
           {/* Ã¢â€â‚¬Ã¢â€â‚¬ Code panel (collapsible, resizable) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
           {showCodePanel && (
-            <ErrorBoundary
-              variant="panel"
-              title="Code panel unavailable"
-              message="We could not render the code panel. Try again."
-              resetKeys={[codeViewMode, generatedCode, editedCode, splitRatio]}
+            <div
+              ref={codePanelRef}
+              data-onboarding="code-panel"
+              className="flex flex-col flex-shrink-0 border-t border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] will-change-[height]"
+              style={{ height: codePanelHeight }}
             >
-              <div
-                data-onboarding="code-panel"
-                className="border-t border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)]"
-                style={{ height: codePanelHeight }}
-              >
-              {/* Drag handle */}
+              {/* Drag handle — tactile, hover reveals an accented grip pill. */}
               <div
                 onMouseDown={handleCodePanelDrag}
-                className="group flex h-2 cursor-row-resize items-center justify-center hover:bg-[var(--cc-accent-bg-soft)]"
+                onDoubleClick={() => {
+                  setCodePanelHeight(350);
+                  codePanelHeightRef.current = 350;
+                }}
+                title="Drag to resize · double-click to reset"
+                className="group relative flex h-2.5 shrink-0 cursor-row-resize items-center justify-center transition-colors hover:bg-[var(--cc-accent-glow)]"
               >
-                <div className="h-0.5 w-8 rounded-full bg-[var(--cc-border-subtle)] transition-colors group-hover:bg-[var(--cc-accent)]" />
+                <div className="h-1 w-10 rounded-full bg-[var(--cc-border-emphasis)] transition-all duration-150 group-hover:w-16 group-hover:bg-[var(--cc-accent)]" />
               </div>
 
-              <div className="flex h-[calc(100%-8px)] flex-col">
-                {/* Tab bar */}
-                <div className="flex items-center justify-between border-b border-[var(--cc-border-subtle)] px-3 py-1.5">
-                  <div className="flex gap-1">
+              <div className="flex min-h-0 flex-1 flex-col">
+                {/* Tab bar — VS Code-style segmented control on the left,
+                    actions on the right. */}
+                <div className="flex items-center justify-between border-b border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)]/40 px-2 py-1.5">
+                  <div className="flex items-center gap-0.5 rounded-[8px] bg-[var(--cc-bg-canvas)] p-0.5">
                     {(["code", "preview", "split"] as const).map((mode) => (
                       <button
                         key={mode}
                         onClick={() => setCodeViewMode(mode)}
-                        className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition-all ${
+                        className={`rounded-[6px] px-2.5 py-1 text-[11px] font-medium capitalize transition-all duration-150 ${
                           codeViewMode === mode
-                            ? "bg-[var(--cc-toggle-active-bg)] text-[var(--cc-toggle-active-text)]"
-                            : "text-[var(--cc-text-secondary)] hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+                            ? "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-primary)] shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
+                            : "text-[var(--cc-text-secondary)] hover:bg-white/[0.04] hover:text-[var(--cc-text-primary)]"
                         }`}
                       >
                         {mode}
@@ -1338,13 +1317,13 @@ function CanvasPageInner() {
                     <button
                       onClick={handleCopyCode}
                       disabled={!generatedCode && !editedCode}
-                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[var(--cc-text-secondary)]"
+                      className="flex items-center gap-1.5 rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--cc-text-secondary)] transition-all duration-150 hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
                       title="Copy code to clipboard"
                     >
                       {codeCopied ? (
                         <>
                           <svg
-                            className="h-3.5 w-3.5 text-green-400"
+                            className="h-3 w-3 text-emerald-400"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
@@ -1352,12 +1331,12 @@ function CanvasPageInner() {
                           >
                             <path d="M5 13l4 4L19 7" />
                           </svg>
-                          <span className="text-green-400">Copied</span>
+                          <span className="text-emerald-400">Copied</span>
                         </>
                       ) : (
                         <>
                           <svg
-                            className="h-3.5 w-3.5"
+                            className="h-3 w-3"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
@@ -1370,14 +1349,13 @@ function CanvasPageInner() {
                         </>
                       )}
                     </button>
-                    <div className="mx-1 h-4 w-px bg-[var(--cc-border-subtle)]" />
                     <button
                       onClick={() => setShowCodePanel(false)}
-                      className="rounded p-1 text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+                      className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[var(--cc-text-secondary)] transition-colors hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
                       title="Collapse code panel"
                     >
                       <svg
-                        className="h-4 w-4"
+                        className="h-3.5 w-3.5"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -1396,7 +1374,7 @@ function CanvasPageInner() {
                       className={`flex items-center gap-2 border-b px-3 py-1.5 text-[11px] ${
                         usedFallback
                           ? "border-yellow-500/30 bg-yellow-500/5 text-yellow-300"
-                          : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)]"
+                          : "border-[#1E1E1E] bg-[#0A0A0A] text-[#A0A0A0]"
                       }`}
                     >
                       {usedFallback ? (
@@ -1411,14 +1389,14 @@ function CanvasPageInner() {
                             <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                           </svg>
                           <span>
-                            No UI elements detected. Showing a default
-                            template. Try drawing larger, clearer boxes.
+                            {fallbackMessage ??
+                              "No UI elements detected. Showing a default template. Try drawing larger, clearer boxes."}
                           </span>
                         </>
                       ) : (
                         <>
                           <svg
-                            className="h-3.5 w-3.5 shrink-0 text-[var(--cc-accent)]"
+                            className="h-3.5 w-3.5 shrink-0 text-[#FF6B00]"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
@@ -1426,7 +1404,7 @@ function CanvasPageInner() {
                           >
                             <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          <span className="font-medium text-[var(--cc-text-primary)]">
+                          <span className="font-medium text-[#D0D0D0]">
                             Detected:
                           </span>
                           <span>
@@ -1454,10 +1432,8 @@ function CanvasPageInner() {
                   )}
 
                 {/* Content */}
-                <div className="flex-1 overflow-hidden">
-                  {isGenerating && !generatedCode && !editedCode ? (
-                    <CodePanelSkeleton />
-                  ) : generatedCode || editedCode ? (
+                <div className="relative flex-1 overflow-hidden">
+                  {generatedCode || editedCode ? (
                     <>
                       {codeViewMode === "code" && (
                         <ErrorBoundary
@@ -1477,8 +1453,8 @@ function CanvasPageInner() {
                       {codeViewMode === "preview" && (
                         <ErrorBoundary
                           variant="panel"
-                          title="Preview failed to load"
-                          message="We could not render the preview."
+                          title="Preview unavailable"
+                          message="We could not render the live preview."
                           resetKeys={[editedCode, generatedCode]}
                         >
                           <LivePreview
@@ -1513,16 +1489,16 @@ function CanvasPageInner() {
                           <div
                             onMouseDown={handleSplitDrag}
                             onDoubleClick={() => setSplitRatio(0.5)}
-                            className="group relative flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-[var(--cc-border-subtle)] hover:bg-[var(--cc-accent-bg-soft)]"
+                            className="group relative flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-[#1E1E1E] hover:bg-[#FF6B00]/40"
                             title="Drag to resize · double-click to reset"
                           >
-                            <div className="h-8 w-0.5 rounded-full bg-[var(--cc-border-emphasis)] transition-colors group-hover:bg-[var(--cc-accent)]" />
+                            <div className="h-8 w-0.5 rounded-full bg-[#3E3E3E] transition-colors group-hover:bg-[#FF6B00]" />
                           </div>
                           <div className="h-full flex-1 overflow-hidden">
                             <ErrorBoundary
                               variant="panel"
-                              title="Preview failed to load"
-                              message="We could not render the preview."
+                              title="Preview unavailable"
+                              message="We could not render the live preview."
                               resetKeys={[editedCode, generatedCode]}
                             >
                               <LivePreview
@@ -1534,8 +1510,10 @@ function CanvasPageInner() {
                         </div>
                       )}
                     </>
+                  ) : isGenerating ? (
+                    <GenerationProgress isGenerating hasPriorCode={false} />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-[var(--cc-text-muted)]">
+                    <div className="flex h-full items-center justify-center text-[#999]">
                       <div className="text-center">
                         <svg
                           className="mx-auto mb-2 h-10 w-10 opacity-40"
@@ -1553,45 +1531,31 @@ function CanvasPageInner() {
                       </div>
                     </div>
                   )}
+
+                  {isGenerating && (generatedCode || editedCode) && (
+                    <div className="absolute inset-0 z-10 bg-[#0A0A0A]/85 backdrop-blur-sm">
+                      <GenerationProgress isGenerating hasPriorCode />
+                    </div>
+                  )}
                 </div>
               </div>
-              </div>
-            </ErrorBoundary>
+            </div>
           )}
         </div>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Right panel Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
         {rightPanel && (
-          <>
-            {isMobileView ? (
-              <div
-                className="fixed inset-0 z-30 bg-black/50 backdrop-blur-[2px]"
-                onClick={() => setRightPanel(null)}
-              />
-            ) : null}
-            <ErrorBoundary
-              variant="panel"
-              title="Panel unavailable"
-              message="This panel failed to load. You can keep working elsewhere."
-              resetKeys={[rightPanel, currentProject?.id]}
-            >
-              <aside
-                className={`overflow-y-auto border-l border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] ${
-                  isMobileView
-                    ? "fixed inset-y-0 right-0 z-40 w-full max-w-[320px] shadow-[0_20px_50px_-24px_rgba(0,0,0,0.7)]"
-                    : "w-72"
-                }`}
-              >
+          <aside className="w-72 overflow-y-auto border-l border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)]">
             {/* Properties panel */}
             {rightPanel === "properties" && (
               <div className="p-4">
                 <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--cc-text-muted)]">
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#888]">
                     Properties
                   </h2>
                   <button
                     onClick={() => setRightPanel(null)}
-                    className="rounded p-1 text-[var(--cc-text-secondary)] hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+                    className="rounded p-1 text-[#999] hover:bg-[#1E1E1E] hover:text-white"
                   >
                     <svg
                       className="h-3.5 w-3.5"
@@ -1607,31 +1571,31 @@ function CanvasPageInner() {
 
                 {/* Grid Settings */}
                 <div className="mb-4">
-                  <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-[var(--cc-text-muted)]">
+                  <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-[#999]">
                     Canvas
                   </label>
                   <div className="space-y-2">
-                    <label className="flex items-center justify-between rounded-lg bg-[var(--cc-bg-canvas)] px-3 py-2">
-                      <span className="text-xs text-[var(--cc-text-secondary)]">Show Grid</span>
+                    <label className="flex items-center justify-between rounded-lg bg-[#0A0A0A] px-3 py-2">
+                      <span className="text-xs text-[#A0A0A0]">Show Grid</span>
                       <button
                         onClick={() => setGridEnabled(!gridEnabled)}
-                        className={`relative h-5 w-9 rounded-full transition-colors ${gridEnabled ? "bg-[var(--cc-accent)]" : "bg-[var(--cc-border-subtle)]"}`}
+                        className={`relative h-5 w-9 rounded-full transition-colors ${gridEnabled ? "bg-[#FF6B00]" : "bg-[#2E2E2E]"}`}
                       >
                         <span
-                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-[var(--cc-text-inverse)] transition-transform ${gridEnabled ? "translate-x-[18px]" : "translate-x-0.5"}`}
+                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${gridEnabled ? "translate-x-[18px]" : "translate-x-0.5"}`}
                         />
                       </button>
                     </label>
-                    <label className="flex items-center justify-between rounded-lg bg-[var(--cc-bg-canvas)] px-3 py-2">
-                      <span className="text-xs text-[var(--cc-text-secondary)]">
+                    <label className="flex items-center justify-between rounded-lg bg-[#0A0A0A] px-3 py-2">
+                      <span className="text-xs text-[#A0A0A0]">
                         Snap to Grid
                       </span>
                       <button
                         onClick={() => setSnapEnabled(!snapEnabled)}
-                        className={`relative h-5 w-9 rounded-full transition-colors ${snapEnabled ? "bg-[var(--cc-accent)]" : "bg-[var(--cc-border-subtle)]"}`}
+                        className={`relative h-5 w-9 rounded-full transition-colors ${snapEnabled ? "bg-[#FF6B00]" : "bg-[#2E2E2E]"}`}
                       >
                         <span
-                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-[var(--cc-text-inverse)] transition-transform ${snapEnabled ? "translate-x-[18px]" : "translate-x-0.5"}`}
+                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${snapEnabled ? "translate-x-[18px]" : "translate-x-0.5"}`}
                         />
                       </button>
                     </label>
@@ -1640,12 +1604,12 @@ function CanvasPageInner() {
 
                 {/* Version Checkpoints */}
                 <div className="mt-6">
-                  <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[var(--cc-text-muted)]">
+                  <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#999]">
                     Checkpoints
                   </h3>
                   <button
                     onClick={handleCreateCheckpoint}
-                    className="w-full rounded-lg border border-dashed border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2 text-xs text-[var(--cc-text-secondary)] transition-all hover:border-[var(--cc-accent)] hover:text-[var(--cc-accent)]"
+                    className="w-full rounded-lg border border-dashed border-[#2E2E2E] bg-[#0A0A0A] px-3 py-2 text-xs text-[#A0A0A0] transition-all hover:border-[#FF6B00] hover:text-[#FF6B00]"
                   >
                     + Create Checkpoint
                   </button>
@@ -1654,14 +1618,14 @@ function CanvasPageInner() {
                       {versionHistory.versions.slice(0, 3).map((v) => (
                         <div
                           key={v.id}
-                          className="flex items-center justify-between rounded-lg bg-[var(--cc-bg-canvas)] px-3 py-1.5"
+                          className="flex items-center justify-between rounded-lg bg-[#0A0A0A] px-3 py-1.5"
                         >
-                          <span className="truncate text-xs text-[var(--cc-text-secondary)]">
+                          <span className="truncate text-xs text-[#A0A0A0]">
                             {v.description || "Checkpoint"}
                           </span>
                           <button
                             onClick={() => handleRestoreVersion(v.id)}
-                            className="ml-2 text-[10px] text-[var(--cc-accent)] hover:underline"
+                            className="ml-2 text-[10px] text-[#FF6B00] hover:underline"
                           >
                             Restore
                           </button>
@@ -1677,7 +1641,7 @@ function CanvasPageInner() {
             {rightPanel === "layers" && (
               <div className="p-4">
                 <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--cc-text-muted)]">
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#888]">
                     Layers
                   </h2>
                   <div className="flex items-center gap-1">
@@ -1694,7 +1658,7 @@ function CanvasPageInner() {
                         setLayers((prev) => [...prev, newLayer]);
                         setSelectedLayerId(newLayer.id);
                       }}
-                      className="rounded p-1 text-[var(--cc-text-secondary)] hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+                      className="rounded p-1 text-[#999] hover:bg-[#1E1E1E] hover:text-white"
                       title="Add Layer"
                     >
                       <svg
@@ -1709,7 +1673,7 @@ function CanvasPageInner() {
                     </button>
                     <button
                       onClick={() => setRightPanel(null)}
-                      className="rounded p-1 text-[var(--cc-text-secondary)] hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+                      className="rounded p-1 text-[#999] hover:bg-[#1E1E1E] hover:text-white"
                     >
                       <svg
                         className="h-3.5 w-3.5"
@@ -1723,46 +1687,30 @@ function CanvasPageInner() {
                     </button>
                   </div>
                 </div>
-                <ErrorBoundary
-                  variant="panel"
-                  title="Layers unavailable"
-                  message="We could not load the layers list."
-                  resetKeys={[layers.length, selectedLayerId]}
-                >
-                  <LayerPanel
-                    layers={layers}
-                    selectedLayerId={selectedLayerId}
-                    onSelectLayer={handleSelectLayer}
-                    onToggleVisibility={handleToggleVisibility}
-                    onToggleLock={handleToggleLock}
-                    onDeleteLayer={handleDeleteLayer}
-                    onDuplicateLayer={handleDuplicateLayer}
-                    onRenameLayer={handleRenameLayer}
-                  />
-                </ErrorBoundary>
+                <LayerPanel
+                  layers={layers}
+                  selectedLayerId={selectedLayerId}
+                  onSelectLayer={handleSelectLayer}
+                  onToggleVisibility={handleToggleVisibility}
+                  onToggleLock={handleToggleLock}
+                  onDeleteLayer={handleDeleteLayer}
+                  onDuplicateLayer={handleDuplicateLayer}
+                  onRenameLayer={handleRenameLayer}
+                />
               </div>
             )}
 
             {/* Chat panel — sketch-first workflow: hasCode gates chat input */}
             {rightPanel === "chat" && (
-              <ErrorBoundary
-                variant="panel"
-                title="Chat unavailable"
-                message="We could not load the chat panel."
-                resetKeys={[currentProject?.id, editedCode, generatedCode]}
-              >
-                <ChatInterface
-                  key={currentProject?.id ?? "no-project"}
-                  onSendMessage={handleChatMessage}
-                  isProcessing={isGenerating}
-                  hasCode={!!(editedCode || generatedCode)}
-                  projectId={currentProject?.id}
-                />
-              </ErrorBoundary>
+              <ChatInterface
+                key={currentProject?.id ?? "no-project"}
+                onSendMessage={handleChatMessage}
+                isProcessing={isGenerating}
+                hasCode={!!(editedCode || generatedCode)}
+                projectId={currentProject?.id}
+              />
             )}
-              </aside>
-            </ErrorBoundary>
-          </>
+          </aside>
         )}
       </div>
 
@@ -1770,7 +1718,7 @@ function CanvasPageInner() {
       {!showCodePanel && (
         <button
           onClick={() => setShowCodePanel(true)}
-          className="hidden fixed bottom-14 right-4 z-20 flex items-center gap-2 rounded-lg border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-3 py-2 text-xs font-medium text-[var(--cc-text-secondary)] shadow-lg transition-all hover:border-[var(--cc-accent)] hover:text-[var(--cc-text-primary)] hover:shadow-xl"
+          className="hidden fixed bottom-14 right-4 z-20 flex items-center gap-2 rounded-lg bg-[#1A1A1A] border border-[#2E2E2E] px-3 py-2 text-xs font-medium text-[#A0A0A0] shadow-lg transition-all hover:border-[#FF6B00] hover:text-white hover:shadow-xl"
         >
           <svg
             className="h-4 w-4"
@@ -1788,11 +1736,11 @@ function CanvasPageInner() {
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Welcome dialog Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       {showWelcomeDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-[#2E2E2E] bg-[#1A1A1A] p-6 shadow-2xl">
             <div className="mb-4 flex items-center gap-3">
-              <div className="rounded-full bg-[var(--cc-accent-bg-soft)] p-3">
+              <div className="rounded-full bg-[#FF6B00]/20 p-3">
                 <svg
-                  className="h-6 w-6 text-[var(--cc-accent)]"
+                  className="h-6 w-6 text-[#FF6B00]"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1801,16 +1749,16 @@ function CanvasPageInner() {
                   <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-[var(--cc-text-primary)]">Design Imported!</h2>
+              <h2 className="text-xl font-bold text-white">Design Imported!</h2>
             </div>
-            <p className="mb-6 text-[var(--cc-text-secondary)]">
+            <p className="mb-6 text-[#A0A0A0]">
               Your sketch from the mini canvas has been imported. What would you
               like to do?
             </p>
             <div className="space-y-3">
               <button
                 onClick={() => setShowWelcomeDialog(false)}
-                className="w-full rounded-lg border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-6 py-3 font-semibold text-[var(--cc-text-primary)] transition-all hover:bg-[var(--cc-bg-canvas)]"
+                className="w-full rounded-lg border border-[#2E2E2E] bg-[#2E2E2E] px-6 py-3 font-semibold text-white transition-all hover:bg-[#3E3E3E]"
               >
                 Continue Designing
               </button>
@@ -1819,7 +1767,7 @@ function CanvasPageInner() {
                   setShowWelcomeDialog(false);
                   setCurrentMode("detect");
                 }}
-                className="w-full rounded-lg border border-[var(--cc-accent-border-soft)] bg-[var(--cc-accent-bg-soft)] px-6 py-3 font-semibold text-[var(--cc-text-primary)] transition-all hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)]"
+                className="w-full rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-6 py-3 font-semibold text-white transition-all hover:bg-[#FF6B00]/30 hover:shadow-[0_0_20px_rgba(255,107,0,0.4)]"
               >
                 Analyze Design
               </button>
@@ -1829,7 +1777,7 @@ function CanvasPageInner() {
                   setImportedDesign(null);
                   localStorage.removeItem("miniCanvasDesign");
                 }}
-                className="w-full rounded-lg border border-[var(--cc-border-subtle)] bg-transparent px-6 py-3 text-sm text-[var(--cc-text-secondary)] transition-all hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+                className="w-full rounded-lg border border-[#2E2E2E] bg-transparent px-6 py-3 text-sm text-[#A0A0A0] transition-all hover:bg-[#2E2E2E] hover:text-white"
               >
                 Start Fresh
               </button>
@@ -1838,57 +1786,40 @@ function CanvasPageInner() {
         </div>
       )}
 
-      <ErrorBoundary
-        variant="panel"
-        title="Onboarding unavailable"
-        message="We could not load the onboarding tour."
-      >
-        <OnboardingTour
-          isOpen={showOnboarding}
-          steps={onboardingSteps}
-          stepIndex={onboardingStep}
-          onNext={handleOnboardingNext}
-          onBack={handleOnboardingBack}
-          onSkip={handleOnboardingSkip}
-          onFinish={handleOnboardingFinish}
-        />
-      </ErrorBoundary>
+      <OnboardingTour
+        isOpen={showOnboarding}
+        steps={onboardingSteps}
+        stepIndex={onboardingStep}
+        onNext={handleOnboardingNext}
+        onBack={handleOnboardingBack}
+        onSkip={handleOnboardingSkip}
+        onFinish={handleOnboardingFinish}
+      />
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Modals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-      <ErrorBoundary
-        variant="panel"
-        title="Overlay unavailable"
-        message="We could not load this dialog."
-      >
-        <>
-          <ShortcutsPanel
-            isOpen={showShortcuts}
-            onClose={() => setShowShortcuts(false)}
-          />
-          <ExportDialog
-            isOpen={showExport}
-            onClose={() => setShowExport(false)}
-            onExport={handleExport}
-            canvasData={canvasRef.current?.getCanvasData()}
-            generatedCode={editedCode || generatedCode}
-          />
-          <TemplatesPanel
-            isOpen={showTemplates}
-            onClose={() => setShowTemplates(false)}
-            onInsertTemplate={handleInsertTemplate}
-          />
-          <ComponentPalette
-            isOpen={showComponents}
-            onClose={() => setShowComponents(false)}
-            onInsertComponent={handleInsertComponent}
-          />
-          <SaveIndicator
-            isSaving={isSaving}
-            lastSaved={lastSaved}
-            error={error}
-          />
-        </>
-      </ErrorBoundary>
+      <ShortcutsPanel
+        isOpen={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+      />
+      <ExportDialog
+        isOpen={showExport}
+        onClose={() => setShowExport(false)}
+        onExport={handleExport}
+        canvasData={canvasRef.current?.getCanvasData()}
+        generatedCode={editedCode || generatedCode}
+      />
+      <TemplatesPanel
+        isOpen={showTemplates}
+        onClose={() => setShowTemplates(false)}
+        onInsertTemplate={handleInsertTemplate}
+      />
+      <ComponentPalette
+        isOpen={showComponents}
+        onClose={() => setShowComponents(false)}
+        onInsertComponent={handleInsertComponent}
+      />
+      {/* Duplicate floating save indicator removed (BUG 3) — the header's
+          single save-dot in <Navbar /> is now the only save-status surface. */}
     </div>
   );
 }

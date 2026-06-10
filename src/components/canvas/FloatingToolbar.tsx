@@ -34,6 +34,13 @@ const TOOLS: ToolItem[] = [
     icon: <PenIcon />,
   },
   {
+    id: "line",
+    label: "Line",
+    shortcut: "N",
+    group: "draw",
+    icon: <LineIcon />,
+  },
+  {
     id: "rectangle",
     label: "Rectangle",
     shortcut: "R",
@@ -114,7 +121,12 @@ export default function FloatingToolbar({
       aria-label="Drawing tools"
       aria-orientation="vertical"
       data-onboarding="draw-tools"
-      className="absolute left-4 top-1/2 z-30 -translate-y-1/2 flex flex-col items-center gap-1 rounded-[12px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)]/95 p-1.5 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] backdrop-blur-md"
+      // Anchored near the top with a safe top inset and a max-height clamp so
+      // the toolbar can never be clipped when the code panel grows and the
+      // canvas area shrinks (BUG 4). overflow-y-auto + scrollbar-hidden lets
+      // long tool lists stay reachable on short viewports.
+      style={{ scrollbarWidth: "none" }}
+      className="absolute left-3 top-3 z-40 flex max-h-[calc(100%-1.5rem)] flex-col items-center gap-0.5 overflow-y-auto rounded-[14px] border border-[var(--cc-border-subtle)] bg-gradient-to-b from-[var(--cc-bg-elevated)] to-[var(--cc-bg-surface)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl [&::-webkit-scrollbar]:hidden"
     >
       {GROUP_ORDER.map((group, gi) => (
         <div key={group} className="flex flex-col items-center gap-1">
@@ -159,10 +171,10 @@ function ToolButton({
           duration: 0.22,
           ease: [0.34, 1.56, 0.64, 1],
         }}
-        className={`relative flex h-9 w-9 items-center justify-center rounded-[8px] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] ${
+        className={`relative flex h-9 w-9 items-center justify-center rounded-[9px] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] ${
           active
-            ? "bg-[var(--cc-accent-glow)] text-[var(--cc-accent)]"
-            : "text-[var(--cc-text-secondary)] hover:bg-[var(--cc-border-subtle)] hover:text-[var(--cc-text-primary)]"
+            ? "bg-[var(--cc-accent-glow)] text-[var(--cc-accent)] shadow-[inset_0_0_0_1px_var(--cc-accent-glow-strong)]"
+            : "text-[var(--cc-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)] active:bg-white/[0.10]"
         }`}
       >
         {/* Active left accent bar */}
@@ -224,6 +236,16 @@ function PenIcon() {
     <svg {..._icon}>
       <path d="M12 19l7-7 3 3-7 7-3-3z" />
       <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+    </svg>
+  );
+}
+function LineIcon() {
+  return (
+    <svg {..._icon}>
+      {/* Point-to-point straight line with end dots — Excalidraw style */}
+      <circle cx="5" cy="19" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="5" r="1.6" fill="currentColor" stroke="none" />
+      <line x1="5" y1="19" x2="19" y2="5" />
     </svg>
   );
 }

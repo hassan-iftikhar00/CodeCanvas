@@ -11,7 +11,7 @@ export interface CanvasData {
   }>;
   shapes?: Array<{
     id?: string;
-    type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow";
+    type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow" | "line";
     x?: number;
     y?: number;
     width?: number;

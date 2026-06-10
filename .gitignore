@@ -20,6 +20,7 @@ backend/synthetic_data/_smoketest/
 backend/synthetic_data/_verify/
 backend/synthetic_data/_primitives_test.jpg
 synthetic_dataset/
+synthetic_dataset.zip
 verify/
 **/_stats.json
 
