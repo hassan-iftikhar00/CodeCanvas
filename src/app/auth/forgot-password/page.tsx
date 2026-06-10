@@ -4,6 +4,8 @@ import { useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
+import AuthLoadingSkeleton from "@/components/auth/AuthLoadingSkeleton";
+import ThemeToggle from "@/components/theme/ThemeToggle";
 
 // Email validation regex - checks for @ and valid domain structure
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -89,8 +91,15 @@ export default function ForgotPasswordPage() {
     }
   };
 
+  if (loading && !success) {
+    return <AuthLoadingSkeleton />;
+  }
+
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-[var(--cc-bg-canvas)]">
+    <div className="relative flex min-h-[100svh] overflow-x-hidden overflow-y-auto bg-[var(--cc-bg-canvas)]">
+      <div className="absolute right-4 top-4 z-20">
+        <ThemeToggle />
+      </div>
       {/* Subtle ambient glow */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-[var(--cc-accent-glow)] blur-[100px]" />
@@ -98,7 +107,7 @@ export default function ForgotPasswordPage() {
       </div>
 
       {/* Centered Form */}
-      <div className="flex flex-1 items-center justify-center p-6 sm:p-12">
+      <div className="flex flex-1 items-start justify-center px-4 py-10 sm:items-center sm:p-12">
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -332,7 +341,7 @@ export default function ForgotPasswordPage() {
                   <p className="mt-8 text-center text-sm text-[var(--cc-text-muted)]">
                     <Link
                       href="/auth/login"
-                      className="inline-flex items-center gap-2 font-semibold text-[var(--cc-accent)] hover:text-[#FF8533] transition-colors"
+                      className="inline-flex items-center gap-2 font-semibold text-[var(--cc-accent)] hover:text-[var(--cc-accent)] transition-colors"
                     >
                       <svg
                         className="w-4 h-4"

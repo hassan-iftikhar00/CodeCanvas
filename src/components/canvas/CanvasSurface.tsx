@@ -6,15 +6,20 @@ interface CanvasSurfaceProps {
   children: React.ReactNode;
   isEmpty?: boolean;
   emptyHint?: string;
+  onUserInteract?: () => void;
 }
 
 export default function CanvasSurface({
   children,
   isEmpty,
   emptyHint = "Start sketching or press T to type",
+  onUserInteract,
 }: CanvasSurfaceProps) {
   return (
-    <div className="relative h-full w-full overflow-hidden cc-dot-grid cc-vignette">
+    <div
+      className="relative h-full w-full overflow-hidden overscroll-none touch-none cc-dot-grid cc-vignette"
+      onPointerDownCapture={onUserInteract}
+    >
       {children}
 
       <AnimatePresence>
