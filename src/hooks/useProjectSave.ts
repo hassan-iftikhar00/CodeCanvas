@@ -1,5 +1,29 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+
+export interface CanvasShapeData {
+  id?: string;
+  type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow" | "line";
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  radius?: number;
+  radiusX?: number;
+  radiusY?: number;
+  text?: string;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  cornerRadius?: number;
+  draggable?: boolean;
+  selected?: boolean;
+  fontSize?: number;
+  fontFamily?: string;
+  scaleX?: number;
+  scaleY?: number;
+  rotation?: number;
+}
 
 export interface CanvasData {
   lines?: Array<{
@@ -9,28 +33,14 @@ export interface CanvasData {
     width?: number;
     id?: string;
   }>;
-  shapes?: Array<{
+  shapes?: CanvasShapeData[];
+  componentGroups?: Array<{
     id?: string;
-    type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow" | "line";
+    name?: string;
     x?: number;
     y?: number;
-    width?: number;
-    height?: number;
-    radius?: number;
-    radiusX?: number;
-    radiusY?: number;
-    text?: string;
-    fill?: string;
-    stroke?: string;
-    strokeWidth?: number;
-    cornerRadius?: number;
-    draggable?: boolean;
+    shapes?: CanvasShapeData[];
     selected?: boolean;
-    fontSize?: number;
-    fontFamily?: string;
-    scaleX?: number;
-    scaleY?: number;
-    rotation?: number;
   }>;
 }
 
@@ -40,6 +50,7 @@ interface Project {
   description?: string;
   canvas_data: CanvasData;
   thumbnail_url?: string;
+  generated_code?: string;
   created_at: string;
   updated_at: string;
 }
@@ -48,12 +59,14 @@ interface UseProjectSaveReturn {
   saveProject: (
     title: string,
     canvasData: CanvasData,
-    thumbnail_url?: string
+    thumbnail_url?: string,
+    generated_code?: string
   ) => Promise<string | null>;
   updateProject: (
     projectId: string,
     canvasData: CanvasData,
-    thumbnail_url?: string
+    thumbnail_url?: string,
+    generated_code?: string
   ) => Promise<boolean>;
   updateProjectTitle: (projectId: string, title: string) => Promise<boolean>;
   loadProject: (projectId: string) => Promise<Project | null>;
@@ -67,13 +80,19 @@ export function useProjectSave(): UseProjectSaveReturn {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  // Supabase client MUST be memoized: every render of useProjectSave previously
+  // created a fresh client, which made saveProject/loadProject/etc. unstable
+  // references. Consumers that listed loadProject in a useEffect dep array
+  // (canvas/page.tsx project-load) re-ran the effect on every parent render -
+  // which reloaded the DB project mid-edit and wiped local canvas state.
+  const supabase = useMemo(() => createClient(), []);
 
   const saveProject = useCallback(
     async (
       title: string,
       canvasData: CanvasData,
-      thumbnail_url?: string
+      thumbnail_url?: string,
+      generated_code?: string
     ): Promise<string | null> => {
       setIsSaving(true);
       setError(null);
@@ -87,14 +106,19 @@ export function useProjectSave(): UseProjectSaveReturn {
           throw new Error("User not authenticated");
         }
 
+        const insertData: Record<string, unknown> = {
+          user_id: user.id,
+          title,
+          canvas_data: canvasData,
+          thumbnail_url,
+        };
+        if (generated_code !== undefined) {
+          insertData.generated_code = generated_code;
+        }
+
         const { data, error: saveError } = await supabase
           .from("projects")
-          .insert({
-            user_id: user.id,
-            title,
-            canvas_data: canvasData,
-            thumbnail_url,
-          })
+          .insert(insertData)
           .select()
           .single();
 
@@ -119,23 +143,23 @@ export function useProjectSave(): UseProjectSaveReturn {
     async (
       projectId: string,
       canvasData: CanvasData,
-      thumbnail_url?: string
+      thumbnail_url?: string,
+      generated_code?: string
     ): Promise<boolean> => {
       setIsSaving(true);
       setError(null);
 
       try {
-        const updateData: {
-          canvas_data: CanvasData;
-          updated_at: string;
-          thumbnail_url?: string;
-        } = {
+        const updateData: Record<string, unknown> = {
           canvas_data: canvasData,
           updated_at: new Date().toISOString(),
         };
 
         if (thumbnail_url) {
           updateData.thumbnail_url = thumbnail_url;
+        }
+        if (generated_code !== undefined) {
+          updateData.generated_code = generated_code;
         }
 
         const { error: updateError } = await supabase
@@ -268,7 +292,8 @@ export function useAutoSave(
     // Skip if canvas is empty
     const hasContent =
       (canvasData.lines && canvasData.lines.length > 0) ||
-      (canvasData.shapes && canvasData.shapes.length > 0);
+      (canvasData.shapes && canvasData.shapes.length > 0) ||
+      (canvasData.componentGroups && canvasData.componentGroups.length > 0);
     if (!hasContent) return;
 
     // Clear existing timeout

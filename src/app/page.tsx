@@ -16,7 +16,7 @@ const GridScan = dynamic(() => import("@/components/GridScan"), {
 });
 
 // ============================================================
-// Fonts — Warm Studio (LIGHT mode)
+// Fonts - Warm Studio (LIGHT mode)
 // ============================================================
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -35,7 +35,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 // ============================================================
-// Tokens — Warm Studio (light variant only for this pilot)
+// Tokens - Warm Studio (light variant only for this pilot)
 // ============================================================
 const T = {
   bg: "#F1E9D8",
@@ -80,7 +80,7 @@ const motionCSS = `
 `;
 
 // ============================================================
-// Logo & wordmark — terracotta C
+// Logo & wordmark - terracotta C
 // ============================================================
 function Logo({
   size = 28,
@@ -127,7 +127,7 @@ function Wordmark({
 }
 
 // ============================================================
-// PAGE — original structure, Warm Studio skin
+// PAGE - original structure, Warm Studio skin
 // ============================================================
 export default function Home() {
   const [isDrawing, setIsDrawing] = useState(false);
@@ -285,13 +285,13 @@ export default function Home() {
           }}
           aria-hidden
         />
-        {/* GridScan — cursor-reactive shader grid (Three.js).
+        {/* GridScan - cursor-reactive shader grid (Three.js).
             IMPORTANT: this wrapper MUST be pointer-events-auto so the
             component's internal mousemove listener (GridScan.tsx, line ~398)
             can receive cursor coords. The hero content overlay at z-10 is
             pointer-events-none with selective auto on interactive children,
             so cursor passes through the empty hero space and hits GridScan
-            below — the same pattern React Bits' Dot Grid uses for proximity
+            below - the same pattern React Bits' Dot Grid uses for proximity
             response and click shockwaves. */}
         <div className="absolute inset-0 z-0 pointer-events-auto">
           <GridScan
@@ -408,7 +408,7 @@ export default function Home() {
                 className="max-w-lg text-base leading-relaxed sm:text-lg md:text-xl"
                 style={{ color: T.muted }}
               >
-                Convert rough sketches into production-ready frontends — live
+                Convert rough sketches into production-ready frontends - live
                 preview and one-click export.
               </motion.p>
 
@@ -618,7 +618,7 @@ export default function Home() {
                   </motion.div>
                 )}
 
-                {/* Mono status strip — the tool signature */}
+                {/* Mono status strip - the tool signature */}
                 <div
                   className="flex items-center justify-between px-4 py-2 text-[10px]"
                   style={{
@@ -829,10 +829,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ───────── Pricing — temporarily disabled, will migrate to Warm Studio later ───────── */}
+      {/* ───────── Pricing - temporarily disabled, will migrate to Warm Studio later ───────── */}
       {/* <Pricing /> */}
 
-      {/* ───────── Testimonials — untouched component ───────── */}
+      {/* ───────── Testimonials - untouched component ───────── */}
       <Testimonials />
 
       {/* ───────── CTA Section ───────── */}
@@ -907,7 +907,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ───────── Footer — untouched component ───────── */}
+      {/* ───────── Footer - untouched component ───────── */}
       <Footer />
     </div>
   );

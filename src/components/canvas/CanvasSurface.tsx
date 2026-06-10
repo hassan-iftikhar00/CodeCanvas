@@ -57,7 +57,7 @@ export default function CanvasSurface({
               </kbd>{" "}
               to draw,
               <kbd className="mx-0.5 rounded-[var(--cc-radius-tag)] bg-[var(--cc-bg-elevated)] px-1.5 py-0.5 font-mono text-white">
-                Ctrl/⌘K
+                Ctrl+K
               </kbd>
               for commands
             </p>

@@ -123,7 +123,7 @@ function PreviewNav() {
         <div className="flex items-center gap-3">
           <div className="h-2 w-2 rounded-full bg-neutral-900" />
           <span className="text-[13px] font-medium tracking-tight text-neutral-900">
-            CodeCanvas — Design Preview
+            CodeCanvas - Design Preview
           </span>
           <span className="text-[12px] text-neutral-500">
             4 directions, one decision
@@ -219,7 +219,7 @@ function PaletteRow({
 }
 
 // ============================================================
-// DIRECTION 1 — EDITORIAL LIGHT
+// DIRECTION 1 - EDITORIAL LIGHT
 // ============================================================
 function DirectionOne() {
   const palette = [
@@ -331,7 +331,7 @@ function DirectionOne() {
           </div>
         </div>
 
-        {/* Workspace mock — toolbar + canvas + code panel */}
+        {/* Workspace mock - toolbar + canvas + code panel */}
         <div className="mt-14">
           <SectionLabel color="#76706A">Workspace</SectionLabel>
           <div className="mt-3 grid grid-cols-12 gap-6">
@@ -365,7 +365,7 @@ function DirectionOne() {
                     className="text-[13px]"
                     style={{ color: "#76706A", fontFamily: "var(--font-jetbrains)" }}
                   >
-                    canvas — draw to begin
+                    canvas - draw to begin
                   </div>
                 </div>
               </div>
@@ -502,13 +502,13 @@ function DirectionOne() {
                 Subheadings carry the weight.
               </div>
               <div className="text-[14px] leading-[1.7]" style={{ color: "#1C1A17" }}>
-                Body copy in Inter — neutral, gets out of the way.
+                Body copy in Inter - neutral, gets out of the way.
               </div>
               <div
                 className="text-[11px] uppercase tracking-[0.18em]"
                 style={{ color: "#76706A" }}
               >
-                Caption — Inter, 11px, +0.18em
+                Caption - Inter, 11px, +0.18em
               </div>
               <div
                 className="text-[12px]"
@@ -525,7 +525,7 @@ function DirectionOne() {
 }
 
 // ============================================================
-// DIRECTION 2 — DEEP JEWEL
+// DIRECTION 2 - DEEP JEWEL
 // ============================================================
 function DirectionTwo() {
   const palette = [
@@ -562,7 +562,7 @@ function DirectionTwo() {
             className="text-[11px] uppercase tracking-[0.24em]"
             style={{ color: "#D4A24C", fontFamily: "var(--font-geist-mono)" }}
           >
-            02 / Deep Jewel — premium · midnight · confident
+            02 / Deep Jewel - premium · midnight · confident
           </div>
           <h1
             className="mt-6 text-[88px] font-medium leading-[1] tracking-[-0.03em]"
@@ -859,13 +859,13 @@ function DirectionTwo() {
                 Tight tracking does the work.
               </div>
               <div className="text-[14px] leading-[1.7]" style={{ color: "#EFEAE0" }}>
-                Body in Geist 400 — calm, modern, opinion-free.
+                Body in Geist 400 - calm, modern, opinion-free.
               </div>
               <div
                 className="text-[11px] uppercase tracking-[0.22em]"
                 style={{ color: "#8892AC", fontFamily: "var(--font-geist-mono)" }}
               >
-                Caption — mono, +0.22em
+                Caption - mono, +0.22em
               </div>
               <div
                 className="text-[12px]"
@@ -882,7 +882,7 @@ function DirectionTwo() {
 }
 
 // ============================================================
-// DIRECTION 3 — WARM STUDIO
+// DIRECTION 3 - WARM STUDIO
 // ============================================================
 function DirectionThree() {
   const palette = [
@@ -927,7 +927,7 @@ function DirectionThree() {
             className="text-[11px] uppercase tracking-[0.2em]"
             style={{ color: "#BD5B3D", fontFamily: "var(--font-fraunces)" }}
           >
-            03 — Warm Studio · creative · human · structured
+            03 - Warm Studio · creative · human · structured
           </div>
           <h1
             className="mt-5 text-[96px] leading-[0.98] tracking-[-0.025em]"
@@ -1060,7 +1060,7 @@ function DirectionThree() {
                     </div>
                   </div>
                 </div>
-                {/* Dark ink status bar — mono, file path, dims, active tool */}
+                {/* Dark ink status bar - mono, file path, dims, active tool */}
                 <div
                   className="flex items-center justify-between px-4 py-2 text-[10px]"
                   style={{
@@ -1146,7 +1146,7 @@ function DirectionThree() {
                       "linear-gradient(135deg, #F1E9D8 0%, #E3D9C3 100%)",
                   }}
                 />
-                {/* Mono stats row — tool-feel inside the warm tile */}
+                {/* Mono stats row - tool-feel inside the warm tile */}
                 <div
                   className="mt-3 grid grid-cols-3 rounded-xl border text-[10px]"
                   style={{
@@ -1196,13 +1196,13 @@ function DirectionThree() {
             </div>
           </div>
 
-          {/* Code / preview — dark ink anchor on code side, mono everywhere technical */}
+          {/* Code / preview - dark ink anchor on code side, mono everywhere technical */}
           <div
             className="mt-6 overflow-hidden rounded-2xl border"
             style={{ borderColor: "#E3D9C3" }}
           >
             <div className="grid grid-cols-2">
-              {/* Code side — Ink (#1A1410) */}
+              {/* Code side - Ink (#1A1410) */}
               <div style={{ background: "#1A1410" }}>
                 {/* Tab / file header */}
                 <div
@@ -1328,7 +1328,7 @@ function DirectionThree() {
                   </div>
                 </div>
               </div>
-              {/* Preview side — Parchment */}
+              {/* Preview side - Parchment */}
               <div className="p-10" style={{ background: "#FAF4E4" }}>
                 <div
                   className="text-[10px] uppercase tracking-[0.18em]"
@@ -1351,7 +1351,7 @@ function DirectionThree() {
                 </p>
               </div>
             </div>
-            {/* Bottom command bar — mono keyboard shortcuts + provider status */}
+            {/* Bottom command bar - mono keyboard shortcuts + provider status */}
             <div
               className="flex items-center justify-between border-t px-5 py-2 text-[10px]"
               style={{
@@ -1367,8 +1367,8 @@ function DirectionThree() {
                 <span>3.2 KB</span>
               </div>
               <div className="flex items-center gap-4">
-                <span>⌘K commands</span>
-                <span>⌘S save</span>
+                <span>Ctrl+K commands</span>
+                <span>Ctrl+S save</span>
                 <span style={{ color: "#3F5E4F" }}>● gemini · 1.2s</span>
               </div>
             </div>
@@ -1422,7 +1422,7 @@ function DirectionThree() {
                 <span className="italic">Optical sizes</span> for warmth.
               </div>
               <div className="text-[14px] leading-[1.7]" style={{ color: "#2A1F18" }}>
-                Body in Inter — keeps the serif as the personality.
+                Body in Inter - keeps the serif as the personality.
               </div>
               <div
                 className="text-[11px] uppercase tracking-[0.2em]"
@@ -1445,7 +1445,7 @@ function DirectionThree() {
 }
 
 // ============================================================
-// DIRECTION 4 — MINIMAL PRECISION
+// DIRECTION 4 - MINIMAL PRECISION
 // ============================================================
 function DirectionFour() {
   const palette = [
@@ -1732,7 +1732,7 @@ function DirectionFour() {
                 Hierarchy by weight, not color.
               </div>
               <div className="text-[14px] leading-[1.6]">
-                Body in Inter — dense, neutral, calibrated.
+                Body in Inter - dense, neutral, calibrated.
               </div>
               <div
                 className="text-[10px] uppercase tracking-[0.2em]"
@@ -1775,7 +1775,7 @@ function SectionLabel({
 }
 
 // ============================================================
-// VOTING SECTION (blank — placeholder for later)
+// VOTING SECTION (blank - placeholder for later)
 // ============================================================
 function VotingSection() {
   return (

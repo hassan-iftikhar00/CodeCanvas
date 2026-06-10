@@ -6,7 +6,7 @@ const STORAGE_BUCKETS = ["avatars", "sketch-exports", "project-assets"] as const
 
 export async function POST() {
   // Step 1: Verify the requesting user's session server-side.
-  // Never accept a user_id from the client body — always derive from the JWT.
+  // Never accept a user_id from the client body - always derive from the JWT.
   const supabase = await createClient();
   const {
     data: { user },
@@ -21,7 +21,7 @@ export async function POST() {
   const admin = createAdminClient();
 
   // Step 2: Delete all storage objects owned by this user.
-  // Storage objects are NOT covered by DB cascade — they must be removed manually.
+  // Storage objects are NOT covered by DB cascade - they must be removed manually.
   // Failures are logged but non-fatal: a storage leak is less dangerous than
   // blocking account deletion because of an empty or inaccessible bucket.
   for (const bucket of STORAGE_BUCKETS) {

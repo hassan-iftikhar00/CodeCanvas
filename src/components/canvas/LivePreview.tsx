@@ -37,7 +37,7 @@ const DEVICE_PRESETS: Record<
 function buildReactDocument(rawCode: string, parentOrigin: string): string {
   let code = rawCode;
 
-  // Remove import/require lines — Babel-standalone runs in classic-script mode
+  // Remove import/require lines - Babel-standalone runs in classic-script mode
   // and can't resolve them. React/ReactDOM are exposed as globals below.
   code = code.replace(/^\s*import\s+[^;]+;?\s*$/gm, "");
   code = code.replace(/^\s*const\s+\w+\s*=\s*require\([^)]+\);?\s*$/gm, "");
@@ -76,7 +76,13 @@ function buildReactDocument(rawCode: string, parentOrigin: string): string {
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>* { box-sizing: border-box; } body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }</style>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+    /* Guarantee the preview is scrollable even if generated code sets
+       overflow:hidden on html/body (common in Gemini hero layouts). */
+    html, body { height: auto !important; min-height: 100%; overflow-y: auto !important; }
+  </style>
 </head>
 <body>
   <div id="root"></div>
@@ -119,7 +125,13 @@ function buildHtmlDocument(rawCode: string, parentOrigin: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' 'unsafe-eval' https:; style-src 'unsafe-inline' https:;">
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>* { margin: 0; padding: 0; box-sizing: border-box; } body { font-family: system-ui, -apple-system, sans-serif; }</style>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    /* Guarantee the preview is scrollable even if generated code sets
+       overflow:hidden on html/body (common in Gemini hero layouts). */
+    html, body { height: auto !important; min-height: 100%; overflow-y: auto !important; }
+  </style>
 </head>
 <body>
 ${rawCode}
@@ -182,7 +194,7 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
   const dimensions = getDeviceDimensions();
 
   // In "Fit" mode the preview card IS the container, so its baseline scale is
-  // 1 and any manual zoom must apply on top of it (BUG 2 — previously the zoom
+  // 1 and any manual zoom must apply on top of it (BUG 2 - previously the zoom
   // shrank the white card itself, leaving a floating tile inside the black
   // container).
   const autoScale =
@@ -389,12 +401,9 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
       >
         {device === "fit" ? (
           /* Fit: the white card fills the container entirely. Manual zoom
-             scales the iframe content, not the wrapper — eliminates the
+             scales the iframe content, not the wrapper - eliminates the
              "tiny white card on black background" zoom-out artifact (BUG 2). */
-          <div
-            className="relative h-full w-full bg-white"
-            style={{ overflow: scale < 1 ? "hidden" : "auto" }}
-          >
+          <div className="relative h-full w-full overflow-auto bg-white">
             <iframe
               ref={iframeRef}
               title="Live Preview"
@@ -433,7 +442,7 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
               sandbox="allow-scripts allow-same-origin allow-forms"
               className="h-full w-full border-0"
               style={{
-                // Match the iframe's own viewport to the device size — keeps
+                // Match the iframe's own viewport to the device size - keeps
                 // breakpoint-aware layouts honest at mobile/tablet widths.
                 width: dimensions.width,
                 height: dimensions.height,

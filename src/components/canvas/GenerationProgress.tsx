@@ -14,12 +14,12 @@ interface Stage {
 }
 
 // Stage timings are calibrated to the observed backend latency profile:
-// Roboflow ~1–2s, then Gemini Flash dominates the remaining ~25–28s.
+// Roboflow ~1-2s, then Gemini Flash dominates the remaining ~25-28s.
 const STAGES: Stage[] = [
   { startAt: 0, title: "Reading your sketch", description: "Preparing the canvas image for detection." },
   { startAt: 2, title: "Detecting UI elements", description: "Running the object detector on your sketch." },
   { startAt: 5, title: "Generating code with AI", description: "Gemini is composing your component." },
-  { startAt: 25, title: "Polishing the output", description: "Cleaning up — almost there." },
+  { startAt: 25, title: "Polishing the output", description: "Cleaning up - almost there." },
   { startAt: 45, title: "Taking longer than usual", description: "AI calls can spike during peak hours." },
 ];
 

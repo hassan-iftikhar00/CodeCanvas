@@ -87,7 +87,7 @@ export function DeleteAccountModal({
 
     try {
       await onConfirm();
-      // onConfirm redirects the page — show a brief success state as a fallback
+      // onConfirm redirects the page - show a brief success state as a fallback
       setDeletionComplete(true);
     } catch (err) {
       setError(

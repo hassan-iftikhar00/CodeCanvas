@@ -161,7 +161,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               />
             }
           />
-
         </nav>
 
         {/* User card */}
@@ -270,7 +269,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       initial={{ opacity: 0, y: -4, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                      transition={{ duration: 0.15, ease: [0.22, 0.9, 0.28, 1] }}
+                      transition={{
+                        duration: 0.15,
+                        ease: [0.22, 0.9, 0.28, 1],
+                      }}
                       className="absolute right-0 top-full z-50 mt-1.5 w-56 overflow-hidden rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.7)]"
                       role="menu"
                     >

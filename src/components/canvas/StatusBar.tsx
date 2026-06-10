@@ -35,7 +35,7 @@ const TOOL_LABEL: Record<Tool, string> = {
  * keeping the bar full-width and placing the dot-divided segments inline.
  *
  * Previously the canvas dimensions + mode + grid + zoom indicator was
- * absolutely positioned inside the Konva white box at `bottom-4 left-4` —
+ * absolutely positioned inside the Konva white box at `bottom-4 left-4` -
  * which collided with the FloatingToolbar (also left-side) and the ZoomPill
  * (also bottom-4 left-4). Moving it out to its own page-level row solves the
  * z-index/overlap problem permanently (BUG 6).

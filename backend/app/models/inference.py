@@ -576,13 +576,25 @@ def _build_gemini_prompt(
         label_text = attrs.get("label_text")
         positioned_texts = attrs.get("positioned_texts") or []
         synthetic = attrs.get("synthetic") is True
+        synthetic_role = attrs.get("synthetic_role")
 
         suffix_parts: List[str] = []
         if synthetic:
-            suffix_parts.append(
-                " [SYNTHESIZED — the detector missed this region; "
-                "we inferred it from text/card positions]"
-            )
+            if synthetic_role == "input":
+                suffix_parts.append(
+                    " [SYNTHESIZED INPUT — the detector missed this rectangle; "
+                    "we inferred it because the attached text reads as a form-field label]"
+                )
+            elif synthetic_role == "button":
+                suffix_parts.append(
+                    " [SYNTHESIZED BUTTON — the detector missed this rectangle; "
+                    "we inferred it because the attached text reads as an action verb]"
+                )
+            else:
+                suffix_parts.append(
+                    " [SYNTHESIZED CONTAINER — the detector missed this region; "
+                    "we inferred it from text/card positions]"
+                )
         if label_text:
             suffix_parts.append(f' — contains text: "{label_text}"')
 
@@ -644,7 +656,7 @@ def _build_gemini_prompt(
         "    * its attached `contains text` annotation — short action-style text (\"Submit\", \"Sign up\", \"Buy now\", \"Login\") → button; trailing colon (\"Email:\", \"Password:\") → label for an adjacent input; longer phrase → heading or paragraph; single word like \"Home\"/\"Pricing\"/\"About\" inside a navbar → nav link.\n"
         "  Render each `card` as the appropriate semantic element (h1/h2/p/a/button/input/img), NEVER literally as a generic <div className=\"card\">.\n"
         "- A container (navbar/footer/section) MAY have no `card` children if the detector missed them. In that case, the container's `inner text labels` block lists the user's text annotations with their positions — use those positions to lay them out.\n"
-        "- An element marked `[SYNTHESIZED]` was NOT returned by the detector — the pipeline inferred it from clustered text/card positions. Treat it as a real container.\n\n"
+        "- An element marked `[SYNTHESIZED ...]` was NOT returned by the detector — the pipeline inferred it from text annotations or clustered positions. Treat it as if the detector had returned it: a `[SYNTHESIZED CONTAINER]` is a real navbar/footer/section, a `[SYNTHESIZED INPUT]` is a real `<input>` (use its `contains text` as the input's label/placeholder), and a `[SYNTHESIZED BUTTON]` is a real `<button>` (use its `contains text` as the button label). Do not skip synthesized elements and do not render them as raw text — they correspond to shapes the user actually drew that the detector missed.\n\n"
         "Layout rules:\n"
         "- STRICT FIDELITY (most important rule, overrides every other instinct). Render ONLY the detected components above plus any unbound text below. Do NOT invent extra elements — no page titles, no headings, no subtitles, no taglines, no footer copyright lines, no branding text, no decorative dividers, no helper text, no \"this would look better with X\" additions. If the user drew three components, the output has exactly those three. The detector and canvas annotations are the source of truth; you are a renderer, not a designer. A login form drawn as just email + password + button must render as just email + password + button — not as email + password + button + a 'Sign In' heading you decided to add.\n"
         "- Compose the components in the order given (which is top-to-bottom on the canvas). A `navbar` MUST render at the top of the page; a `footer` MUST render at the bottom; everything else goes between them in canvas-y order.\n"

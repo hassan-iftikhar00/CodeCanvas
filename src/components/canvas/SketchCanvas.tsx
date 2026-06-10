@@ -139,7 +139,26 @@ export interface SketchCanvasRef {
     transform: { offsetX: number; offsetY: number; scale: number };
   };
   exportAsDataURL: (mimeType?: string, quality?: number) => string;
+  replaceCanvasState: (data: {
+    lines?: LineData[];
+    shapes?: ShapeData[];
+    componentGroups?: ComponentGroup[];
+  }) => void;
 }
+
+// True when the user is typing in any text field (input, textarea, Monaco,
+// chat box, contenteditable). Global canvas key handlers must stay out of
+// the way in that case - checking only INPUT swallowed spaces in the chat
+// textarea.
+const isTypingTarget = () => {
+  const el = document.activeElement as HTMLElement | null;
+  if (!el) return false;
+  return (
+    el.tagName === "INPUT" ||
+    el.tagName === "TEXTAREA" ||
+    el.isContentEditable
+  );
+};
 
 const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
   (
@@ -178,7 +197,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const [spacePressed, setSpacePressed] = useState(false);
     const stageRef = useRef<Konva.Stage>(null);
 
-    // Refs that always hold the latest values — used inside Konva event handlers
+    // Refs that always hold the latest values - used inside Konva event handlers
     // to avoid stale closures when the mouse moves fast.
     const isDrawingRef = useRef(false);
     const toolRef = useRef(tool);
@@ -192,7 +211,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const zoomRef = useRef(zoom);
     const spaceRef = useRef(false);
 
-    // Active drawing line — updated imperatively via Konva API for zero-lag strokes
+    // Active drawing line - updated imperatively via Konva API for zero-lag strokes
     const drawingLineNodeRef = useRef<Konva.Line>(null);
     const drawingPointsRef = useRef<number[]>([]);
     const drawingLineDataRef = useRef<LineData | null>(null);
@@ -242,10 +261,31 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       x: 0,
       y: 0,
     });
-    const textInputRef = useRef<HTMLInputElement>(null);
+    // When set, the modal edits this existing text shape instead of adding one
+    const [editingTextId, setEditingTextId] = useState<string | null>(null);
+    const textInputRef = useRef<HTMLTextAreaElement>(null);
 
-    // Track which text element is being hovered for delete button
+    // Track which text element is being hovered for delete button.
+    // Hiding is delayed so the cursor can travel from the text to the delete
+    // button (which sits above the text) without the button unmounting.
     const [hoveredTextId, setHoveredTextId] = useState<string | null>(null);
+    const textHoverTimeoutRef = useRef<number | null>(null);
+    const handleTextHoverEnter = (id: string) => {
+      if (textHoverTimeoutRef.current !== null) {
+        window.clearTimeout(textHoverTimeoutRef.current);
+        textHoverTimeoutRef.current = null;
+      }
+      setHoveredTextId(id);
+    };
+    const handleTextHoverLeave = () => {
+      if (textHoverTimeoutRef.current !== null) {
+        window.clearTimeout(textHoverTimeoutRef.current);
+      }
+      textHoverTimeoutRef.current = window.setTimeout(() => {
+        setHoveredTextId(null);
+        textHoverTimeoutRef.current = null;
+      }, 300);
+    };
 
     // Expose methods to parent component via ref
     useImperativeHandle(ref, () => ({
@@ -262,6 +302,14 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         setComponentGroups([]);
         setSelectedShapeId(null);
         setSelectedGroupId(null);
+      },
+      replaceCanvasState: (data) => {
+        setLines(data.lines ?? []);
+        setShapes(data.shapes ?? []);
+        setComponentGroups(data.componentGroups ?? []);
+        setSelectedShapeId(null);
+        setSelectedGroupId(null);
+        setSelectedLineIndex(null);
       },
       insertTemplate: (data: TemplateCanvasData, templateName?: string) => {
         // Check if we should create a component group
@@ -329,7 +377,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         };
         if (!stageRef.current) return empty;
         // The exported PNG is the input to the AI detector, so it must be
-        // a clean, tight image of the user's drawing — no grid lines, no
+        // a clean, tight image of the user's drawing - no grid lines, no
         // empty viewport space, no zoom/pan artifacts.
         //
         // Approach:
@@ -471,11 +519,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     // Spacebar pan controls and keyboard shortcuts
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-        if (
-          e.code === "Space" &&
-          !spacePressed &&
-          document.activeElement?.tagName !== "INPUT"
-        ) {
+        if (e.code === "Space" && !spacePressed && !isTypingTarget()) {
           e.preventDefault();
           setSpacePressed(true);
           if (stageRef.current) {
@@ -490,7 +534,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             selectedLineIndex !== null ||
             selectedGroupId ||
             selectedGroupShapeId) &&
-          document.activeElement?.tagName !== "INPUT"
+          !isTypingTarget()
         ) {
           e.preventDefault();
           if (selectedShapeId) {
@@ -636,28 +680,50 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       }
     }, [zoom]);
 
-    // Handle text submission
+    // Handle text submission (create new, or update when editing)
     const handleTextSubmit = () => {
-      if (textInputValue.trim()) {
-        const newText: ShapeData = {
-          id: `text-${Date.now()}`,
-          type: "text",
-          x: pendingTextPosition.x,
-          y: pendingTextPosition.y,
-          text: textInputValue.trim(),
-          stroke: strokeColor,
-          fill: strokeColor,
-        };
-        setShapes([...shapes, newText]);
+      const value = textInputValue.trim();
+      if (value) {
+        if (editingTextId) {
+          setShapes((prev) =>
+            prev.map((shape) =>
+              shape.id === editingTextId ? { ...shape, text: value } : shape
+            )
+          );
+        } else {
+          const newText: ShapeData = {
+            id: `text-${Date.now()}`,
+            type: "text",
+            x: pendingTextPosition.x,
+            y: pendingTextPosition.y,
+            text: value,
+            stroke: strokeColor,
+            fill: strokeColor,
+          };
+          setShapes((prev) => [...prev, newText]);
+        }
       }
       setShowTextInput(false);
       setTextInputValue("");
+      setEditingTextId(null);
     };
 
     // Handle text cancellation
     const handleTextCancel = () => {
       setShowTextInput(false);
       setTextInputValue("");
+      setEditingTextId(null);
+    };
+
+    // Open the text modal pre-filled to edit an existing text shape
+    const handleTextEditStart = (
+      shape: ShapeData,
+      evt: { clientX: number; clientY: number }
+    ) => {
+      setEditingTextId(shape.id);
+      setTextInputValue(shape.text || "");
+      setTextInputPosition({ x: evt.clientX, y: evt.clientY });
+      setShowTextInput(true);
     };
 
     // Handle text element deletion
@@ -753,7 +819,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       const pos = getTransformedPointerPosition(e.target.getStage());
       if (!pos) return;
 
-      // Point-to-segment distance — used by line/pen hit-tests.
+      // Point-to-segment distance - used by line/pen hit-tests.
       const distToSegment = (
         px: number,
         py: number,
@@ -880,7 +946,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       if (toolRef.current === "pen") {
         isDrawingRef.current = true;
         setIsDrawing(true);
-        // Store drawing data in refs — NO React state updates during drawing
+        // Store drawing data in refs - NO React state updates during drawing
         drawingPointsRef.current = [pos.x, pos.y];
         drawingLineDataRef.current = {
           tool: "pen",
@@ -1091,14 +1157,14 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     };
 
     const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-      // Use ref — never stale even during rapid mouse events
+      // Use ref - never stale even during rapid mouse events
       if (!isDrawingRef.current) return;
       const stage = e.target.getStage();
       const point = getTransformedPointerPosition(stage);
       if (!point) return;
 
       if (toolRef.current === "pen") {
-        // Push points directly into ref — zero React re-renders during drawing
+        // Push points directly into ref - zero React re-renders during drawing
         drawingPointsRef.current.push(point.x, point.y);
         // Update Konva node directly for immediate visual feedback
         const node = drawingLineNodeRef.current;
@@ -1157,7 +1223,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             radiusY: Math.abs(dy) / 2,
           };
         } else {
-          // triangle / arrow / line — width/height are displacement (dx, dy).
+          // triangle / arrow / line - width/height are displacement (dx, dy).
           // Shift-snap to 0/45/90 deg for line, mirroring Excalidraw behaviour.
           let dx = point.x - start.x;
           let dy = point.y - start.y;
@@ -1281,7 +1347,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
             }
           }}
         >
-          {/* Content Layer — grid + drawings share the same scaled layer so
+          {/* Content Layer - grid + drawings share the same scaled layer so
               the grid always moves and zooms in lock-step with the drawing
               (BUG 5). Grid bounds are inflated by 1/scale so the visible grid
               still covers the viewport when zoomed out below 100%. */}
@@ -1347,7 +1413,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
               );
             })}
 
-            {/* Active drawing line — updated via Konva API, not React state */}
+            {/* Active drawing line - updated via Konva API, not React state */}
             {isActivelyDrawing && (
               <Line
                 ref={drawingLineNodeRef}
@@ -1570,8 +1636,23 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                     onDragEnd={(e) => {
                       handleTextDragEnd(shape.id, e.target.x(), e.target.y());
                     }}
-                    onMouseEnter={() => setHoveredTextId(shape.id)}
-                    onMouseLeave={() => setHoveredTextId(null)}
+                    onMouseEnter={() => handleTextHoverEnter(shape.id)}
+                    onMouseLeave={handleTextHoverLeave}
+                    onDblClick={(e) =>
+                      handleTextEditStart(shape, {
+                        clientX: e.evt.clientX,
+                        clientY: e.evt.clientY,
+                      })
+                    }
+                    onDblTap={(e) => {
+                      const touch = e.evt.changedTouches?.[0];
+                      if (touch) {
+                        handleTextEditStart(shape, {
+                          clientX: touch.clientX,
+                          clientY: touch.clientY,
+                        });
+                      }
+                    }}
                   >
                     <KonvaText
                       text={shape.text || "Text"}
@@ -1994,28 +2075,29 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
               marginTop: -8,
             }}
           >
-            <input
+            <textarea
               ref={textInputRef}
-              type="text"
               autoFocus
+              rows={2}
               value={textInputValue}
               onChange={(e) => setTextInputValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
                   handleTextSubmit();
                 } else if (e.key === "Escape") {
                   handleTextCancel();
                 }
               }}
-              placeholder="Enter your text"
-              className="w-48 rounded border border-gray-300 px-3 py-2 text-sm text-black placeholder-gray-400 focus:border-[#FF6B00] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/20"
+              placeholder="Enter your text (Shift+Enter for new line)"
+              className="w-56 resize-none rounded border border-gray-300 px-3 py-2 text-sm text-black placeholder-gray-400 focus:border-[#FF6B00] focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/20"
             />
             <div className="flex gap-2">
               <button
                 onClick={handleTextSubmit}
                 className="flex-1 rounded bg-[#FF6B00] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#FF8533]"
               >
-                Add
+                {editingTextId ? "Save" : "Add"}
               </button>
               <button
                 onClick={handleTextCancel}
@@ -2027,7 +2109,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           </div>
         )}
 
-        {/* Canvas info overlay moved out — the page-level <StatusBar /> renders
+        {/* Canvas info overlay moved out - the page-level <StatusBar /> renders
             the dimensions / mode / grid / zoom indicator in a position that
             never collides with the floating toolbar or zoom pill (BUG 6). */}
       </div>
