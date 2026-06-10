@@ -33,16 +33,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  console.log("Proxy - Path:", request.nextUrl.pathname);
-  console.log("Proxy - User:", user ? user.email : "Not authenticated");
-  console.log(
-    "Proxy - Cookies:",
-    request.cookies
-      .getAll()
-      .map((c) => c.name)
-      .join(", ")
-  );
-
   const pathname = request.nextUrl.pathname;
 
   const isAuthPage =
@@ -55,7 +45,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && isAuthPage) {
-    return NextResponse.redirect(new URL("/canvas", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return response;

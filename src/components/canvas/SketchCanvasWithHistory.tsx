@@ -10,7 +10,7 @@ import SketchCanvas, { type SketchCanvasRef } from "./SketchCanvas";
 
 interface CanvasShapeData {
   id?: string;
-  type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow";
+  type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow" | "line";
   x?: number;
   y?: number;
   width?: number;
