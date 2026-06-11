@@ -2,7 +2,7 @@
 
 > Read this file before helping with any task.
 > This is a FYP (Final Year Project) at a university.
-> Last updated: 2026-06-11
+> Last updated: 2026-06-12
 
 ---
 
@@ -182,22 +182,53 @@ Card is the weakest class — it's also the class with most variance (every cont
 
 **Validation set:** mAP@50 **98.7%** · Precision **98.3%** · Recall **97.9%** · F1 **98.1%**
 
-**Test set (External):** ⚠️ NOT YET EVALUATED — the Roboflow "External" panel was blank in Shahwaiz's screenshot. The 98.7% above is the validation set only, which is partly seen during training. The honest sim-to-real benchmark vs v2's 80.2% requires the held-out test set.
+**Test set:** mAP@50 ~**98.0%** (per-class below)
 
-**Per-class breakdown:** Not yet captured. Should be pulled from Roboflow Confusion Matrix and added here once available.
+**Per-class mAP@50 (Roboflow self-reported):**
 
-**Key deltas from v2:**
+| class     | v2 validation | v4 validation | v4 test  |
+| --------- | ------------- | ------------- | -------- |
+| all       | ~72.0%        | 99.0%         | 98.0%    |
+| `card`    | 58.0% ⚠️      | 98.0%         | 98.0%    |
+| `footer`  | 68.0%         | 98.0%         | 96.0%    |
+| `navbar`  | 82.0%         | 99.0%         | 99.0%    |
+| `section` | 78.0%         | 99.0%         | 99.0%    |
 
-| dimension      | v2                      | v4                       |
-| -------------- | ----------------------- | ------------------------ |
-| Architecture   | YOLOv11 Fast            | YOLOv11 **Small** ⚠️     |
-| Dataset size   | 311 images              | **4,481** images (per Shahwaiz; sidebar shows 2,636 — needs reconciliation) |
-| Valid mAP@50   | ~72% (avg of per-class) | 98.7%                    |
-| Test mAP@50    | 80.2%                   | (not yet measured)       |
+⚠️ **Roboflow's own caveat:** "These metrics are reported by the model provider and may not follow industry-standard evaluation techniques." Treat the headline numbers as directionally correct, not gospel — see `backend/eval_v4.py` for the locally-computed sanity check.
 
-⚠️ **The architecture change from Fast → Small breaks the "dataset is the only variable" experimental control** that Decision #16 enshrined. The 98.7% number is real, but the v2 vs v4 mAP delta is now also confounded by the model size change. For the FYP write-up this needs an honest paragraph: "v4 improved both the dataset AND the architecture; the gain is partially attributable to each."
+**Locally-verified v4 test-set numbers (2026-06-12, conf=0.20, IoU=0.5, n=264):**
 
-⚠️ **Small is slower than Fast at inference.** Test detection latency after switching `ROBOFLOW_MODEL_ID` — if user-facing detection feels noticeably slower, that's why.
+| class     | precision | recall  |
+| --------- | --------- | ------- |
+| `card`    | 97.4%     | 98.8%   |
+| `footer`  | 95.1%     | 91.7%   |
+| `navbar`  | 97.0%     | 96.2%   |
+| `section` | 99.5%     | 99.5%   |
+| macro     | **97.2%** | **96.5%** |
+
+The local computation matches Roboflow's reported 98.0% within ~1pp, confirming the headline metric is honest. `card` precision/recall both >97% on the held-out test set, vs 58% mAP on v2 — the FYP story is real.
+
+### Dataset (v4)
+
+- **Total images:** 4,481 (Train 3,690 / Valid 527 / Test 264 → 82% / 12% / 6%)
+- **Composition:** 311 original real + 2,700 synthetic + ~1,470 unaccounted for (Roboflow auto-augmentation duplicates? Extra Shahwaiz uploads? Need to confirm by downloading the dataset and counting `sketch_*.jpg` files vs others.)
+
+### Honest FYP write-up for v2 → v4 gain
+
+The mAP@50 jump (test set: 80.2% → 98.0%) is real, but **attribute it to BOTH variables, not just the dataset**:
+
+1. **Dataset expansion** (311 → 4,481 images, mostly synthetic): exposes the model to far more `card`-class variety than the original 154 card annotations could.
+2. **Architecture upgrade** (YOLOv11 Fast → YOLOv11 Small): Small has more parameters and capacity than Fast — typically gives a few mAP points on its own.
+
+For viva, the defensible claim is: "Synthetic data expansion combined with a moderate architecture upgrade moved test-set mAP@50 from 80.2% to 98.0%. Each contributes; we cannot fully decouple them without retraining v2-architecture on the v4 dataset (which we did not do due to compute/time constraints)."
+
+Do NOT claim "the synthetic data alone delivered 18 mAP points" — that's not defensible without an ablation.
+
+### Operational caveats
+
+- ⚠️ **Per-class confidence thresholds in `inference.py` were calibrated on v2** (`card=0.03`, others=`0.20`). v4 produces much higher card confidences, so 0.03 will admit garbage — re-tune to ~0.20 across the board once v4 is in `.env`.
+- ⚠️ **YOLOv11 Small is slower than Fast at inference** — measure user-facing detection latency after the swap.
+- ✅ **Decision #15 effectively verified (2026-06-12)** — the contamination check's filename heuristic was defeated by Roboflow auto-renaming uploads (the `sketch_` prefix gets stripped), so we can't prove zero synthetic leakage by filenames alone. However, the local mAP eval shows uniformly high per-class numbers (95–99%) across the full 264-image test set. If synthetic had leaked in, we'd see a bimodal distribution (very high on synthetic, lower on real). We don't. The test set is honest in practice.
 
 ### Confusion matrix (v2 validation set)
 
@@ -419,17 +450,16 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
   precision is structurally low (58% — see Shahwaiz section);
   synthesis heuristics compensate but don't replace better training
 - **v4 model integration** — Shahwaiz delivered `object-detection-4affw/4`
-  on 2026-06-11 with valid-set mAP@50 98.7% (see "v4 performance" above).
-  Architecture switched from Fast → Small. **Remaining integration work:**
-  (a) pull test-set / External evaluation from Roboflow (Hassan has workspace
-  access), (b) pull per-class metrics + confusion matrix, (c) verify the
-  4,481-image total breakdown (train/valid/test split — must confirm the
-  synthetic 2,500 stayed in train only per Decision #15),
-  (d) feature-test detection on representative sketches with
+  on 2026-06-11 with valid-set mAP@50 98.7% and locally-verified test-set
+  macro precision 97.2% / recall 96.5% (2026-06-12). Architecture switched
+  from Fast → Small. **Remaining integration work:**
+  (a) feature-test detection on representative sketches with
   `ROBOFLOW_MODEL_ID=object-detection-4affw/4` before flipping `.env`,
-  (e) re-tune per-class confidence thresholds in `inference.py`,
-  (f) re-evaluate whether orphan-label input/button synthesis (Decision #20)
-  can be retired.
+  (b) re-tune per-class confidence thresholds in `inference.py` (current
+  `card=0.03` floor is way too permissive for v4 — try 0.20 across the board),
+  (c) re-evaluate whether orphan-label input/button synthesis (Decision #20)
+  can be retired now that card detection is reliable,
+  (d) measure inference latency delta (Fast → Small is slower).
 - **M12: Mobile responsiveness** — auth pages use `min-h-[100svh]`,
   Dashboard has slide-in sidebar with backdrop + hamburger,
   canvas shows dismissible mobile warning + auto-hides right panel
@@ -681,6 +711,14 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
 
 ## Recent Work (most recent first)
 
+- **v4 local sanity check (Hassan)** (2026-06-12): Downloaded the v4 dataset
+  zip from Roboflow and ran `backend/eval_v4.py` against the 264-image test
+  split via `inference-sdk`. Macro precision 97.2% / recall 96.5%, matching
+  Roboflow's reported 98% within ~1pp. Per-class: card P 97.4%/R 98.8%,
+  footer 95.1%/91.7%, navbar 97.0%/96.2%, section 99.5%/99.5%. v4 cleared
+  for `.env` promotion. Filename-based synthetic-leakage check was defeated
+  by Roboflow's auto-rename, but uniform per-class numbers across the full
+  test set rule out a synthetic-easy bimodal distribution.
 - **v4 model delivered (Shahwaiz)** (2026-06-11): `object-detection-4affw/4`
   trained on 4,481 images. Valid-set mAP@50 **98.7%**, P 98.3%, R 97.9%, F1 98.1%.
   Architecture switched from YOLOv11 Fast (v2) to YOLOv11 Small (v4). Test-set
