@@ -22,6 +22,8 @@ from app.models.inference import (
     ExternalModelOutput,
     GeminiQuotaExhausted,
     GeminiRateLimited,
+    ROBOFLOW_DEFAULT_API_URL,
+    ROBOFLOW_DEFAULT_MODEL_ID,
     SketchDetector,
     _build_gemini_prompt,
     create_mock_external_model_output,
@@ -923,6 +925,9 @@ async def resolve_external_model_output(
         int(canvas_data.get("height") or 600),
     )
 
+    # v2 (YOLOv11 Fast) returned in 2–5s warm and ~15s cold, so 30s was safe.
+    # v4 (YOLOv11 Small) is slower — observed >30s on cold start. 60s gives
+    # headroom without hitting the 100s Next.js proxy ceiling.
     try:
         roboflow_output = await asyncio.wait_for(
             asyncio.to_thread(
@@ -930,10 +935,10 @@ async def resolve_external_model_output(
                 request.sketchImage,
                 canvas_size,
             ),
-            timeout=30.0,
+            timeout=60.0,
         )
     except asyncio.TimeoutError:
-        print("[error] Roboflow call timed out after 30s")
+        print("[error] Roboflow call timed out after 60s")
         raise HTTPException(
             status_code=504,
             detail="Sketch detection timed out — the Roboflow API did not respond in time. Please try again.",
@@ -1106,6 +1111,41 @@ async def load_models():
     except Exception as error:
         print(f"Warning: Could not load models: {error}")
         print("Running in development mode with mock predictions")
+
+
+@app.on_event("startup")
+async def warmup_roboflow():
+    """Pre-warm Roboflow's hosted inference so the first user detection
+    doesn't pay the cold-start tax (30-60s for v4 Small to load weights).
+
+    Fires in the background so backend startup is non-blocking. A failure
+    here is non-fatal — the user's first real request will still work,
+    just slower."""
+    api_key = os.getenv("ROBOFLOW_API_KEY")
+    if not api_key:
+        return  # validate_env already complained
+
+    async def _warm():
+        import time
+        start = time.time()
+        try:
+            from inference_sdk import InferenceHTTPClient
+            from PIL import Image
+
+            model_id = os.getenv("ROBOFLOW_MODEL_ID", ROBOFLOW_DEFAULT_MODEL_ID)
+            api_url = os.getenv("ROBOFLOW_API_URL", ROBOFLOW_DEFAULT_API_URL)
+
+            # 64x64 white image — minimum payload that triggers Roboflow's
+            # model-load path without spending a real inference credit's worth.
+            dummy = Image.new("RGB", (64, 64), (255, 255, 255))
+            client = InferenceHTTPClient(api_url=api_url, api_key=api_key)
+
+            await asyncio.to_thread(client.infer, dummy, model_id=model_id)
+            print(f"[startup] Roboflow {model_id} warm-up done in {time.time() - start:.1f}s")
+        except Exception as error:
+            print(f"[startup] Roboflow warm-up skipped after {time.time() - start:.1f}s (non-fatal): {error}")
+
+    asyncio.create_task(_warm())
 
 
 @app.get("/")

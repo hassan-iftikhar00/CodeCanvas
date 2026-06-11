@@ -226,7 +226,9 @@ Do NOT claim "the synthetic data alone delivered 18 mAP points" — that's not d
 
 ### Operational caveats
 
-- ⚠️ **Per-class confidence thresholds in `inference.py` were calibrated on v2** (`card=0.03`, others=`0.20`). v4 produces much higher card confidences, so 0.03 will admit garbage — re-tune to ~0.20 across the board once v4 is in `.env`.
+- ✅ **Per-class confidence thresholds re-tuned for v4 (2026-06-12)** — all four classes now at `0.20` in `_DEFAULT_PER_CLASS_THRESHOLDS`. v2's `card=0.03` floor would admit noise on v4's well-calibrated outputs.
+- ✅ **Roboflow timeout bumped 30s → 60s (2026-06-12)** in `backend/main.py` line ~933. YOLOv11 Small (v4) is slower than YOLOv11 Fast (v2); 30s wasn't enough headroom for cold starts.
+- ✅ **Backend startup warm-up (2026-06-12)** — `warmup_roboflow()` in `backend/main.py` fires one 64×64 dummy inference on FastAPI startup so the first real user request doesn't pay the cold-start tax. Background task; non-fatal if it fails. Watch for `[startup] Roboflow ... warm-up done in X.Xs` in backend output.
 - ⚠️ **YOLOv11 Small is slower than Fast at inference** — measure user-facing detection latency after the swap.
 - ✅ **Decision #15 effectively verified (2026-06-12)** — the contamination check's filename heuristic was defeated by Roboflow auto-renaming uploads (the `sketch_` prefix gets stripped), so we can't prove zero synthetic leakage by filenames alone. However, the local mAP eval shows uniformly high per-class numbers (95–99%) across the full 264-image test set. If synthetic had leaked in, we'd see a bimodal distribution (very high on synthetic, lower on real). We don't. The test set is honest in practice.
 
@@ -249,7 +251,7 @@ Key takeaways:
 ### Operational notes (load-bearing — read before debugging detection)
 
 1. **Input MUST be on a solid white (or non-black) background.** RGBA with transparent pixels gets composited to BLACK by both PIL's `.convert("RGB")` and Roboflow's preprocessor → dark sketch lines on black → effectively invisible → 0 predictions on what looks like a perfectly fine sketch in Windows Photos. The backend now composites alpha→white at decode time (`backend/app/models/inference.py`).
-2. **Per-class confidence thresholds** (in `inference.py`): `card=0.03`, `navbar/footer/section=0.20`. Single global threshold can't fit both calibrations because card confidence is structurally lower than container confidence. **⚠️ These were calibrated on v2; v4 likely produces higher card confidences and the 0.03 floor may admit false positives — re-tune after promoting v4 to `.env`.**
+2. **Per-class confidence thresholds** (in `inference.py`): all four classes at `0.20` (re-tuned 2026-06-12 for v4). v2 used `card=0.03` because v2's card class was structurally under-confident; v4 is well-calibrated and 0.03 would admit noise. If you ever swap `ROBOFLOW_MODEL_ID` back to `/2`, restore `card=0.03`. Override any class via env: `ROBOFLOW_CONFIDENCE_THRESHOLD_CARD=0.10`.
 3. **Class-aware NMS** (IoU > 0.5 within same class) deduplicates duplicate-region detections. Cross-class overlaps (card inside section) are KEPT — that's the intended hierarchy.
 4. **Oversize-card guard:** any `card` covering > 85% of the image is dropped (those are the model confusing itself with the surrounding `section`).
 5. **Server-side confidence floor** is set explicitly via `InferenceConfiguration(confidence_threshold=0.05)` so we can see everything above 5% — Roboflow's default floor is ~0.4, which would silently hide most card predictions.
@@ -455,8 +457,8 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
   from Fast → Small. **Remaining integration work:**
   (a) feature-test detection on representative sketches with
   `ROBOFLOW_MODEL_ID=object-detection-4affw/4` before flipping `.env`,
-  (b) re-tune per-class confidence thresholds in `inference.py` (current
-  `card=0.03` floor is way too permissive for v4 — try 0.20 across the board),
+  (b) ✅ re-tuned per-class confidence thresholds to `0.20` across all four
+  classes (commit 2026-06-12),
   (c) re-evaluate whether orphan-label input/button synthesis (Decision #20)
   can be retired now that card detection is reliable,
   (d) measure inference latency delta (Fast → Small is slower).
@@ -711,6 +713,17 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
 
 ## Recent Work (most recent first)
 
+- **v4 end-to-end smoke test (Claude via Playwright)** (2026-06-12):
+  Drove the canvas UI through 4 representative sketches on `feat/v4-model`.
+  Hero Section (1 section + 2 cards), 3-Column Cards (3 cards), Dashboard
+  Sidebar (1 section + 4 cards, the v2-weak sparse case) — all perfect.
+  Footer-in-isolation classified as 2 cards instead of 1 footer; same
+  behaviour expected on v2 (see Known Failure Modes), and Gemini's
+  positional rendering still produces footer-looking output. Detection
+  latency ~3-5s Roboflow + 25-40s Gemini post warm-up.
+  Also fixed two latency issues uncovered: bumped Roboflow timeout 30s → 60s
+  for v4 Small's higher inference time, and added `warmup_roboflow()`
+  startup handler to eat the cold-start tax during boot.
 - **v4 local sanity check (Hassan)** (2026-06-12): Downloaded the v4 dataset
   zip from Roboflow and ran `backend/eval_v4.py` against the 264-image test
   split via `inference-sdk`. Macro precision 97.2% / recall 96.5%, matching
@@ -863,6 +876,7 @@ These are real failure patterns seen in production or testing. Read before debug
 | Sparse sketches underperform dense ones                    | Model trained on data skewed toward dense hand-drawn layouts (~40%) — sparse wireframe style (~20%) is underrepresented and harder to generalise                                              |
 | Roboflow default threshold silently hides card predictions | Default Roboflow confidence floor is ~0.4 — most card predictions are below this. Always set `InferenceConfiguration(confidence_threshold=0.05)` explicitly.                                  |
 | Footer mislabelled as `card`                               | Confusion matrix shows ~1 footer per validation run lands on card. Low-confidence footers look like wide cards to the model.                                                                  |
+| Isolated-footer sketches (no page content above) classified as `card`  | v4 verified 2026-06-12 via the Footer template. A footer drawn alone in the bottom half of an otherwise empty canvas loses the "wide bar BELOW page content" context that defines the footer class. Same behaviour as v2 — not a v4 regression. Workaround: Gemini's positional rendering still produces a horizontal-link layout, so the user-facing output looks correct even when the detected class is wrong. |
 
 ---
 
