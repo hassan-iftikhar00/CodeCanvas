@@ -15,6 +15,10 @@
 # backend runtime debug artifacts
 backend/debug/
 
+# Playwright MCP testing artifacts
+.playwright-mcp/
+v4-test-*.png
+
 # Synthetic dataset generation outputs (large, regenerable, do not commit)
 backend/synthetic_data/_smoketest/
 backend/synthetic_data/_verify/

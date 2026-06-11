@@ -227,6 +227,8 @@ Do NOT claim "the synthetic data alone delivered 18 mAP points" — that's not d
 ### Operational caveats
 
 - ✅ **Per-class confidence thresholds re-tuned for v4 (2026-06-12)** — all four classes now at `0.20` in `_DEFAULT_PER_CLASS_THRESHOLDS`. v2's `card=0.03` floor would admit noise on v4's well-calibrated outputs.
+- ✅ **Roboflow timeout bumped 30s → 60s (2026-06-12)** in `backend/main.py` line ~933. YOLOv11 Small (v4) is slower than YOLOv11 Fast (v2); 30s wasn't enough headroom for cold starts.
+- ✅ **Backend startup warm-up (2026-06-12)** — `warmup_roboflow()` in `backend/main.py` fires one 64×64 dummy inference on FastAPI startup so the first real user request doesn't pay the cold-start tax. Background task; non-fatal if it fails. Watch for `[startup] Roboflow ... warm-up done in X.Xs` in backend output.
 - ⚠️ **YOLOv11 Small is slower than Fast at inference** — measure user-facing detection latency after the swap.
 - ✅ **Decision #15 effectively verified (2026-06-12)** — the contamination check's filename heuristic was defeated by Roboflow auto-renaming uploads (the `sketch_` prefix gets stripped), so we can't prove zero synthetic leakage by filenames alone. However, the local mAP eval shows uniformly high per-class numbers (95–99%) across the full 264-image test set. If synthetic had leaked in, we'd see a bimodal distribution (very high on synthetic, lower on real). We don't. The test set is honest in practice.
 
@@ -711,6 +713,17 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
 
 ## Recent Work (most recent first)
 
+- **v4 end-to-end smoke test (Claude via Playwright)** (2026-06-12):
+  Drove the canvas UI through 4 representative sketches on `feat/v4-model`.
+  Hero Section (1 section + 2 cards), 3-Column Cards (3 cards), Dashboard
+  Sidebar (1 section + 4 cards, the v2-weak sparse case) — all perfect.
+  Footer-in-isolation classified as 2 cards instead of 1 footer; same
+  behaviour expected on v2 (see Known Failure Modes), and Gemini's
+  positional rendering still produces footer-looking output. Detection
+  latency ~3-5s Roboflow + 25-40s Gemini post warm-up.
+  Also fixed two latency issues uncovered: bumped Roboflow timeout 30s → 60s
+  for v4 Small's higher inference time, and added `warmup_roboflow()`
+  startup handler to eat the cold-start tax during boot.
 - **v4 local sanity check (Hassan)** (2026-06-12): Downloaded the v4 dataset
   zip from Roboflow and ran `backend/eval_v4.py` against the 264-image test
   split via `inference-sdk`. Macro precision 97.2% / recall 96.5%, matching
@@ -863,6 +876,7 @@ These are real failure patterns seen in production or testing. Read before debug
 | Sparse sketches underperform dense ones                    | Model trained on data skewed toward dense hand-drawn layouts (~40%) — sparse wireframe style (~20%) is underrepresented and harder to generalise                                              |
 | Roboflow default threshold silently hides card predictions | Default Roboflow confidence floor is ~0.4 — most card predictions are below this. Always set `InferenceConfiguration(confidence_threshold=0.05)` explicitly.                                  |
 | Footer mislabelled as `card`                               | Confusion matrix shows ~1 footer per validation run lands on card. Low-confidence footers look like wide cards to the model.                                                                  |
+| Isolated-footer sketches (no page content above) classified as `card`  | v4 verified 2026-06-12 via the Footer template. A footer drawn alone in the bottom half of an otherwise empty canvas loses the "wide bar BELOW page content" context that defines the footer class. Same behaviour as v2 — not a v4 regression. Workaround: Gemini's positional rendering still produces a horizontal-link layout, so the user-facing output looks correct even when the detected class is wrong. |
 
 ---
 
