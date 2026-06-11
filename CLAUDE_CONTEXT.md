@@ -2,7 +2,7 @@
 
 > Read this file before helping with any task.
 > This is a FYP (Final Year Project) at a university.
-> Last updated: 2026-06-10
+> Last updated: 2026-06-11
 
 ---
 
@@ -92,7 +92,7 @@ Step 8: User can refine code via chat
 | **Hassan (Lead)** | Architecture, integration, reviews | Active                                                     |
 | **Maarij**        | Frontend / UI / Dashboard          | Assigned tasks                                             |
 | **Bilal**         | Backend / Database / API / Testing | Assigned tasks                                             |
-| **Shahwaiz**      | AI Model training                  | v2 live; v3 training pending (synthetic data handoff done) |
+| **Shahwaiz**      | AI Model training                  | v4 trained (mAP@50 98.7% valid set, 2026-06-11); v2 still live in `.env` pending Hassan integration |
 
 ### Important Rule
 
@@ -108,12 +108,12 @@ Step 8: User can refine code via chat
 ### Hosting & access
 
 - **Tool used:** Roboflow (cloud hosted)
-- **Model ID:** `object-detection-4affw/2`
-- **Architecture:** YOLOv11 Object Detection (Fast)
+- **Production Model ID (in `.env` right now):** `object-detection-4affw/2` (YOLOv11 Fast)
+- **Latest available model:** `object-detection-4affw/4` (YOLOv11 **Small**, trained 2026-06-11) — see "v4 performance" below. Not yet promoted to `.env`.
 - **API URL:** `https://detect.roboflow.com` (hosted inference; do not use `serverless.roboflow.com` — that endpoint is treated as a v1 server by `inference-sdk` and tries to auth via `/model/add`)
 - **Integration:** Via `inference-sdk` Python package
 - **Key location:** `ROBOFLOW_API_KEY` in `.env` (never in frontend)
-- **Status:** ✅ Trained and live
+- **Status:** v2 live in prod; v4 trained and awaiting integration validation
 
 ### Class semantics (confirmed with Shahwaiz)
 
@@ -178,7 +178,28 @@ Synthetic generation weights mirror this 40/40/20 distribution.
 
 Card is the weakest class — it's also the class with most variance (every content subtype lives under it).
 
-### Confusion matrix (validation set)
+### Performance (v4 model — trained 2026-06-11)
+
+**Validation set:** mAP@50 **98.7%** · Precision **98.3%** · Recall **97.9%** · F1 **98.1%**
+
+**Test set (External):** ⚠️ NOT YET EVALUATED — the Roboflow "External" panel was blank in Shahwaiz's screenshot. The 98.7% above is the validation set only, which is partly seen during training. The honest sim-to-real benchmark vs v2's 80.2% requires the held-out test set.
+
+**Per-class breakdown:** Not yet captured. Should be pulled from Roboflow Confusion Matrix and added here once available.
+
+**Key deltas from v2:**
+
+| dimension      | v2                      | v4                       |
+| -------------- | ----------------------- | ------------------------ |
+| Architecture   | YOLOv11 Fast            | YOLOv11 **Small** ⚠️     |
+| Dataset size   | 311 images              | **4,481** images (per Shahwaiz; sidebar shows 2,636 — needs reconciliation) |
+| Valid mAP@50   | ~72% (avg of per-class) | 98.7%                    |
+| Test mAP@50    | 80.2%                   | (not yet measured)       |
+
+⚠️ **The architecture change from Fast → Small breaks the "dataset is the only variable" experimental control** that Decision #16 enshrined. The 98.7% number is real, but the v2 vs v4 mAP delta is now also confounded by the model size change. For the FYP write-up this needs an honest paragraph: "v4 improved both the dataset AND the architecture; the gain is partially attributable to each."
+
+⚠️ **Small is slower than Fast at inference.** Test detection latency after switching `ROBOFLOW_MODEL_ID` — if user-facing detection feels noticeably slower, that's why.
+
+### Confusion matrix (v2 validation set)
 
 |              | predicted card | predicted footer | predicted navbar | predicted section | false neg |
 | ------------ | -------------- | ---------------- | ---------------- | ----------------- | --------- |
@@ -197,7 +218,7 @@ Key takeaways:
 ### Operational notes (load-bearing — read before debugging detection)
 
 1. **Input MUST be on a solid white (or non-black) background.** RGBA with transparent pixels gets composited to BLACK by both PIL's `.convert("RGB")` and Roboflow's preprocessor → dark sketch lines on black → effectively invisible → 0 predictions on what looks like a perfectly fine sketch in Windows Photos. The backend now composites alpha→white at decode time (`backend/app/models/inference.py`).
-2. **Per-class confidence thresholds** (in `inference.py`): `card=0.03`, `navbar/footer/section=0.20`. Single global threshold can't fit both calibrations because card confidence is structurally lower than container confidence.
+2. **Per-class confidence thresholds** (in `inference.py`): `card=0.03`, `navbar/footer/section=0.20`. Single global threshold can't fit both calibrations because card confidence is structurally lower than container confidence. **⚠️ These were calibrated on v2; v4 likely produces higher card confidences and the 0.03 floor may admit false positives — re-tune after promoting v4 to `.env`.**
 3. **Class-aware NMS** (IoU > 0.5 within same class) deduplicates duplicate-region detections. Cross-class overlaps (card inside section) are KEPT — that's the intended hierarchy.
 4. **Oversize-card guard:** any `card` covering > 85% of the image is dropped (those are the model confusing itself with the surrounding `section`).
 5. **Server-side confidence floor** is set explicitly via `InferenceConfiguration(confidence_threshold=0.05)` so we can see everything above 5% — Roboflow's default floor is ~0.4, which would silently hide most card predictions.
@@ -397,10 +418,18 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
 - Sketch detection accuracy — Roboflow integrated, but `card`
   precision is structurally low (58% — see Shahwaiz section);
   synthesis heuristics compensate but don't replace better training
-- **v3 model training** — 2,700 synthetic images generated (May 2026),
-  handoff doc sent to Shahwaiz; training `object-detection-4affw/3`
-  pending. Once Shahwaiz reports v3 mAP, update `ROBOFLOW_MODEL_ID`
-  in `.env` if v3 outperforms v2.
+- **v4 model integration** — Shahwaiz delivered `object-detection-4affw/4`
+  on 2026-06-11 with valid-set mAP@50 98.7% (see "v4 performance" above).
+  Architecture switched from Fast → Small. **Remaining integration work:**
+  (a) pull test-set / External evaluation from Roboflow (Hassan has workspace
+  access), (b) pull per-class metrics + confusion matrix, (c) verify the
+  4,481-image total breakdown (train/valid/test split — must confirm the
+  synthetic 2,500 stayed in train only per Decision #15),
+  (d) feature-test detection on representative sketches with
+  `ROBOFLOW_MODEL_ID=object-detection-4affw/4` before flipping `.env`,
+  (e) re-tune per-class confidence thresholds in `inference.py`,
+  (f) re-evaluate whether orphan-label input/button synthesis (Decision #20)
+  can be retired.
 - **M12: Mobile responsiveness** — auth pages use `min-h-[100svh]`,
   Dashboard has slide-in sidebar with backdrop + hamburger,
   canvas shows dismissible mobile warning + auto-hides right panel
@@ -589,9 +618,14 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
 15. **Synthetic images go to `train/` only; real splits are evaluation-only** — mixing
     synthetic into `val/` or `test/` corrupts the mAP signal. Shahwaiz's 17 valid + 18
     test images are the only honest measure of real-world performance. Never move them to train.
-16. **v3 Roboflow augmentation config is identical to v2** — same stretch, flip, rotation,
-    brightness, and 2-outputs setting. This isolates the dataset as the only variable so
-    v2 vs v3 mAP is a clean A/B comparison. Do NOT change augmentations when training v3.
+16. **v3/v4 Roboflow augmentation config was meant to be identical to v2** — same stretch,
+    flip, rotation, brightness, and 2-outputs setting. The goal was to isolate the dataset
+    as the only variable so v2 vs v3 mAP would be a clean A/B comparison.
+    **STATUS:** Partially violated. Shahwaiz's delivered v4 uses YOLOv11 **Small** instead
+    of v2's Fast. So the v2 → v4 mAP delta is now confounded by both dataset AND architecture
+    changes. For the FYP write-up, attribute the gain honestly to both, not just to data.
+    For any FUTURE comparison (e.g. v4 → v5 if we add more synthetic data), lock both
+    dataset and architecture so each variable can be isolated.
 17. **Theme system uses `data-theme` attribute on `<html>`** — light
     and dark CSS-var sets live under `html[data-theme="light|dark"]`
     in `globals.css`. `ThemeProvider` writes the attribute; an
@@ -647,6 +681,13 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
 
 ## Recent Work (most recent first)
 
+- **v4 model delivered (Shahwaiz)** (2026-06-11): `object-detection-4affw/4`
+  trained on 4,481 images. Valid-set mAP@50 **98.7%**, P 98.3%, R 97.9%, F1 98.1%.
+  Architecture switched from YOLOv11 Fast (v2) to YOLOv11 Small (v4). Test-set
+  (External) evaluation not yet captured — blank in delivered screenshot.
+  Production `.env` still points to v2; integration validation pending (see
+  "v4 model integration" in Partially Done). Synthetic dataset pipeline
+  (`backend/synthetic_data/`) considered complete for now.
 - **Canvas UX bug batch (Hassan)** (2026-06-10): Five fixes.
   (1) Spaces unusable in chat box — `SketchCanvas`'s global Space/pan
   handler only excluded `INPUT`, swallowing spaces in any TEXTAREA
@@ -758,11 +799,15 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
 
 ## Current Bottleneck
 
-The primary bottleneck is **Roboflow detection quality, not Gemini generation quality**.
-Most downstream code generation issues trace back to incorrect or incomplete component
-detection — especially weak `card` classification and poor handling of sparse layouts.
-Gemini produces good code when given accurate detections. Improving detection accuracy
-(more training data, better card examples) has higher leverage than tuning the Gemini prompt.
+**Until v4 is promoted to `.env`:** the bottleneck is still Roboflow v2 detection quality —
+weak `card` classification and poor handling of sparse layouts. Most downstream code
+generation issues trace back to incorrect or incomplete component detection.
+
+**Once v4 is integrated** (mAP@50 jumped from 80.2% test → 98.7% valid): the bottleneck
+will likely shift to **Gemini prompt fidelity and layout reconstruction** — i.e. whether
+the LLM faithfully renders the detected components without inventing extras (Decision #19)
+and whether spatial relationships survive the bbox → JSX translation. Re-evaluate this
+section after v4 ships and we have real failure-mode data.
 
 ---
 
