@@ -51,20 +51,25 @@ ROBOFLOW_DEFAULT_MODEL_ID = "object-detection-4affw/2"
 ROBOFLOW_DEFAULT_API_URL = "https://detect.roboflow.com"
 ROBOFLOW_DEFAULT_THRESHOLD = 0.4
 
-# Per-class confidence thresholds. Shahwaiz's 4-class object-detection-4affw model
-# has very different calibration per class:
-#   - navbar / footer / section are "container regions" (top bar / bottom bar /
-#     middle page body excluding header & footer). They're shape-shaped, easy
-#     to learn from ~311 training images, and come back at 0.2–0.9 confidence.
-#   - card is the catch-all "every other content unit" class — buttons, text,
-#     images, inputs, links all squashed into one label. High intra-class
-#     variance + small training set ⇒ model is structurally UNDER-confident on
-#     this class and returns 0.03–0.4 even for clear hits. A single global
-#     threshold cannot accommodate both calibrations, which is why a 0.25
-#     filter silently dropped every card the user drew.
+# Per-class confidence thresholds for object-detection-4affw.
+#
+# v2 (Fast, 311 images) was structurally under-confident on `card` (returned
+# 0.03–0.4 even for clear hits) because the class is a catch-all and the
+# training set was tiny. We compensated with card=0.03 + others=0.20.
+#
+# v4 (Small, 4,481 images incl. 2,500 synthetic, trained 2026-06-11) is
+# well-calibrated across all four classes. Locally-verified test-set numbers
+# at conf=0.20 (see backend/eval_v4.py, run 2026-06-12, n=264):
+#   card    P 97.4%  R 98.8%
+#   footer  P 95.1%  R 91.7%
+#   navbar  P 97.0%  R 96.2%
+#   section P 99.5%  R 99.5%
+# So 0.20 is now the right floor across the board — the old 0.03 card floor
+# would admit noise on v4. If you ever swap back to v2, restore card=0.03.
+#
 # Override any of these via env: ROBOFLOW_CONFIDENCE_THRESHOLD_<CLASS>=0.05
 _DEFAULT_PER_CLASS_THRESHOLDS = {
-    "card": 0.03,
+    "card": 0.20,
     "navbar": 0.20,
     "footer": 0.20,
     "section": 0.20,
