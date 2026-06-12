@@ -62,11 +62,9 @@ Step 4: FastAPI calls Roboflow API
 
 Step 5: Backend attaches text annotations to detected elements
         File: backend/main.py (_attach_text_annotations,
-        _synthesize_missing_containers,
-        _synthesize_inputs_for_orphan_labels, _infer_canvas_extents)
-        Handles oversized containers, top/bottom-band navbar/footer
-        recovery, and stop-gap input/button synthesis around orphan
-        label text when v2 misses inner shapes.
+        _synthesize_missing_containers, _infer_canvas_extents)
+        Handles oversized containers and top/bottom-band navbar/footer
+        recovery when the model misses them.
 
 Step 6: Gemini generates React + Tailwind code
         File: backend/app/models/inference.py
@@ -459,8 +457,8 @@ ROBOFLOW_MODEL_ID=object-detection-4affw/2
   `ROBOFLOW_MODEL_ID=object-detection-4affw/4` before flipping `.env`,
   (b) ✅ re-tuned per-class confidence thresholds to `0.20` across all four
   classes (commit 2026-06-12),
-  (c) re-evaluate whether orphan-label input/button synthesis (Decision #20)
-  can be retired now that card detection is reliable,
+  (c) ✅ orphan-label input/button synthesis retired (Decision #20),
+  verified dormant on v4 via Login Form Playwright test 2026-06-12,
   (d) measure inference latency delta (Fast → Small is slower).
 - **M12: Mobile responsiveness** — auth pages use `min-h-[100svh]`,
   Dashboard has slide-in sidebar with backdrop + hamburger,
@@ -687,32 +685,39 @@ Output is **gitignored** (`synthetic_dataset/`). All 2,700 images go to `train/`
     via a top-of-rules STRICT FIDELITY directive; the matcher
     enforces it by listing multi-label hits positionally instead
     of concatenating them.
-20. **Orphan-label input/button synthesis is a v2 stop-gap** — when
-    a text annotation reads as a form-field label (Email, Password,
-    Username, ...) or action verb (Sign In, Submit, ...) AND its
-    only enclosing detected element is a large container (>10% of
-    canvas area), `_synthesize_inputs_for_orphan_labels` in
-    `backend/main.py` synthesizes a virtual `card` of input/button
-    shape around the label so the matcher binds the label to a
-    real-sized element. The prompt builder tags these
-    `[SYNTHESIZED INPUT]` / `[SYNTHESIZED BUTTON]` so Gemini renders
-    them as real `<input>` / `<button>` rather than placeholders.
-    Reason: Roboflow v2 frequently misclassifies wide-thin inner
-    input rectangles as `section` / `footer` (similar aspect ratio)
-    and rejects them via per-class thresholds; strict fidelity then
-    leaves the label floating in space with no input box. Mirrors a
-    detected sibling input's x/width/height when available so the
-    synthesized input lines up with the real ones visually.
-    Auto-dormant when v3 ships (small-enclosing-element short-circuit
-    fires). Delete the helper, the `_INPUT_LABEL_WORDS` /
-    `_BUTTON_TEXT_WORDS` constants, and the role-aware `[SYNTHESIZED
-    INPUT|BUTTON]` prompt branch once v3 mAP confirms inner inputs
-    are reliably detected.
+20. **[RETIRED 2026-06-12] Orphan-label input/button synthesis** —
+    was a v2 stop-gap that synthesized virtual `card` elements around
+    form-field labels (Email, Password) and action-verb texts
+    (Sign In, Submit) when their only enclosing detected element was
+    a large container (>10% of canvas area). Compensated for v2
+    misclassifying wide-thin inner input rectangles as `section` /
+    `footer`. Verified dormant on v4 via the Login Form template
+    (zero `synthetic: True` flags in the API response — every inner
+    rectangle was detected as a card with conf 0.47–0.89). Helper
+    deleted; `_INPUT_LABEL_WORDS` / `_BUTTON_TEXT_WORDS` constants
+    removed; `[SYNTHESIZED INPUT|BUTTON]` prompt branches removed.
+    The `[SYNTHESIZED CONTAINER]` branch (Decision #11, navbar/footer
+    band synthesis) is independent and stays. If v4 ever regresses
+    on inner-input detection, restore from git history
+    (commit `42e8039^` or earlier).
 
 ---
 
 ## Recent Work (most recent first)
 
+- **Decision #20 retired (Claude via Playwright)** (2026-06-12):
+  Verified `_synthesize_inputs_for_orphan_labels` is dormant on v4
+  via the Login Form template (zero `synthetic: True` flags in
+  `/api/generate-code` response; every inner rectangle detected as
+  card at conf 0.47–0.89). Deleted `_INPUT_LABEL_WORDS` /
+  `_BUTTON_TEXT_WORDS` constants, `_looks_like_input_label`,
+  `_looks_like_button_text`, `_find_enclosing_element`,
+  `_synthesize_inputs_for_orphan_labels`,
+  `_ORPHAN_LABEL_CONTAINER_RATIO` from `backend/main.py`, and the
+  `[SYNTHESIZED INPUT|BUTTON]` branches from `_build_gemini_prompt`
+  in `backend/app/models/inference.py`. `[SYNTHESIZED CONTAINER]`
+  (Decision #11, navbar/footer band synthesis) is independent and
+  preserved.
 - **v4 end-to-end smoke test (Claude via Playwright)** (2026-06-12):
   Drove the canvas UI through 4 representative sketches on `feat/v4-model`.
   Hero Section (1 section + 2 cards), 3-Column Cards (3 cards), Dashboard
