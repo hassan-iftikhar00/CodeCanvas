@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import {
-  Loader2,
   MousePointer2,
   Monitor,
   Smartphone,
@@ -10,6 +9,28 @@ import {
   ExternalLink,
   Download,
 } from "lucide-react";
+import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
+
+const MONO = "var(--font-jetbrains-mono, ui-monospace, monospace)";
+const SANS = "var(--font-inter, ui-sans-serif, system-ui, sans-serif)";
+const SERIF = "var(--font-instrument-serif, Georgia, serif)";
+
+const DEMO_CODE = `function ActionButton() {
+  return (
+    <button className="
+      border border-[#1A1A1C]
+      bg-[#FAFAF7]
+      px-8 py-3
+      text-[#0E0E0F]
+      font-semibold
+      transition-colors
+      hover:bg-[#4A4B8C]
+      hover:text-[#FAFAF7]
+      hover:border-[#4A4B8C]">
+      Get started →
+    </button>
+  );
+}`;
 
 export default function DemoTheatre() {
   const [stage, setStage] = useState(0);
@@ -21,75 +42,30 @@ export default function DemoTheatre() {
   const [instructionText, setInstructionText] = useState("");
   const [isCodeComplete, setIsCodeComplete] = useState(false);
 
-  // The code to display with typewriter effect
-  const fullCode = `function ActionButton() {
-  return (
-    <button className="rounded-xl 
-      bg-[#FF6B00]/20 
-      border border-[#FF6B00]/50 
-      backdrop-blur-md 
-      px-8 py-4 
-      font-semibold 
-      text-white 
-      transition-all 
-      hover:bg-[#FF6B00]/30 
-      hover:shadow-[0_0_20px_rgba(255,107,0,0.4)]">
-      Get Started
-    </button>
-  );
-}`;
-
   useEffect(() => {
-    // Stage 0-5s: Draw a button-like shape with cursor + type instructions
     if (stage === 0) {
       const canvasWidth = 500;
       const canvasHeight = 350;
-      const drawDuration = 2500; // 2.5s for drawing
-      const textTypeDuration = 1000; // 1s for button text
-      const instructionTypeDuration = 1500; // 1.5s for instructions
-      const totalDuration =
-        drawDuration + textTypeDuration + instructionTypeDuration;
+      const drawDuration = 2500;
+      const textTypeDuration = 1000;
+      const instructionTypeDuration = 1500;
+      const totalDuration = drawDuration + textTypeDuration + instructionTypeDuration;
       const startTime = Date.now();
 
-      // Button shape path - centered rounded rectangle that looks like "Get Started"
       const centerX = canvasWidth / 2;
       const centerY = canvasHeight / 2;
       const btnWidth = 180;
-      const btnHeight = 60;
-      const radius = 12;
+      const btnHeight = 52;
 
-      // Create a rounded rectangle path (approximated with line segments for the curves)
+      // Sharp rectangle — Drafting Room uses no rounded corners
       const path = [
-        // Start at top-left after the corner
-        { x: centerX - btnWidth / 2 + radius, y: centerY - btnHeight / 2 },
-        // Top edge
-        { x: centerX + btnWidth / 2 - radius, y: centerY - btnHeight / 2 },
-        // Top-right corner (4 points for curve)
-        { x: centerX + btnWidth / 2 - radius / 2, y: centerY - btnHeight / 2 },
-        { x: centerX + btnWidth / 2, y: centerY - btnHeight / 2 + radius / 2 },
-        { x: centerX + btnWidth / 2, y: centerY - btnHeight / 2 + radius },
-        // Right edge
-        { x: centerX + btnWidth / 2, y: centerY + btnHeight / 2 - radius },
-        // Bottom-right corner
-        { x: centerX + btnWidth / 2, y: centerY + btnHeight / 2 - radius / 2 },
-        { x: centerX + btnWidth / 2 - radius / 2, y: centerY + btnHeight / 2 },
-        { x: centerX + btnWidth / 2 - radius, y: centerY + btnHeight / 2 },
-        // Bottom edge
-        { x: centerX - btnWidth / 2 + radius, y: centerY + btnHeight / 2 },
-        // Bottom-left corner
-        { x: centerX - btnWidth / 2 + radius / 2, y: centerY + btnHeight / 2 },
-        { x: centerX - btnWidth / 2, y: centerY + btnHeight / 2 - radius / 2 },
-        { x: centerX - btnWidth / 2, y: centerY + btnHeight / 2 - radius },
-        // Left edge
-        { x: centerX - btnWidth / 2, y: centerY - btnHeight / 2 + radius },
-        // Top-left corner
-        { x: centerX - btnWidth / 2, y: centerY - btnHeight / 2 + radius / 2 },
-        { x: centerX - btnWidth / 2 + radius / 2, y: centerY - btnHeight / 2 },
-        // Close path
-        { x: centerX - btnWidth / 2 + radius, y: centerY - btnHeight / 2 },
+        { x: centerX - btnWidth / 2, y: centerY - btnHeight / 2 },
+        { x: centerX + btnWidth / 2, y: centerY - btnHeight / 2 },
+        { x: centerX + btnWidth / 2, y: centerY + btnHeight / 2 },
+        { x: centerX - btnWidth / 2, y: centerY + btnHeight / 2 },
+        { x: centerX - btnWidth / 2, y: centerY - btnHeight / 2 },
       ];
 
-      // Calculate total distance
       let totalDistance = 0;
       for (let i = 0; i < path.length - 1; i++) {
         totalDistance += Math.sqrt(
@@ -98,16 +74,15 @@ export default function DemoTheatre() {
         );
       }
 
-      const buttonTextFull = "Get Started";
-      const instructionTextFull = "Make it orange with glass effect & glow";
+      const buttonTextFull = "Get started";
+      const instructionTextFull = "Add cobalt hover state and sharp corners";
 
       const interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
 
-        // Phase 1: Draw button outline (0-2.5s)
         if (elapsed < drawDuration) {
-          const progress = elapsed / drawDuration;
-          const currentDistance = progress * totalDistance;
+          const prog = elapsed / drawDuration;
+          const currentDistance = prog * totalDistance;
           let accumulatedDistance = 0;
           let currentPos = { x: path[0].x, y: path[0].y };
 
@@ -132,37 +107,29 @@ export default function DemoTheatre() {
 
           setCursorPos(currentPos);
           setStrokePath((prev) => [...prev, currentPos]);
-        }
-        // Phase 2: Type button text (2.5s-3.5s)
-        else if (elapsed < drawDuration + textTypeDuration) {
+        } else if (elapsed < drawDuration + textTypeDuration) {
           const textProgress = (elapsed - drawDuration) / textTypeDuration;
           const charIndex = Math.floor(textProgress * buttonTextFull.length);
           setButtonText(buttonTextFull.substring(0, charIndex));
-        }
-        // Phase 3: Type instructions (3.5s-5s)
-        else if (elapsed < totalDuration) {
-          setButtonText(buttonTextFull); // Ensure full text is shown
+        } else if (elapsed < totalDuration) {
+          setButtonText(buttonTextFull);
           const instructionProgress =
-            (elapsed - drawDuration - textTypeDuration) /
-            instructionTypeDuration;
+            (elapsed - drawDuration - textTypeDuration) / instructionTypeDuration;
           const charIndex = Math.floor(
             instructionProgress * instructionTextFull.length
           );
           setInstructionText(instructionTextFull.substring(0, charIndex));
-        }
-        // Complete
-        else {
+        } else {
           clearInterval(interval);
           setButtonText(buttonTextFull);
           setInstructionText(instructionTextFull);
           setTimeout(() => setStage(1), 500);
         }
-      }, 16); // ~60fps
+      }, 16);
 
       return () => clearInterval(interval);
     }
 
-    // Stage 1: Processing animation (2 seconds)
     if (stage === 1) {
       const duration = 2000;
       const startTime = Date.now();
@@ -181,26 +148,25 @@ export default function DemoTheatre() {
       return () => clearInterval(interval);
     }
 
-    // Stage 2: Typewriter effect (3 seconds)
     if (stage === 2) {
       const duration = 3000;
-      const charsPerFrame = fullCode.length / (duration / 30);
+      const charsPerFrame = DEMO_CODE.length / (duration / 30);
       let currentIndex = 0;
 
       const interval = setInterval(() => {
         currentIndex += charsPerFrame;
-        if (currentIndex >= fullCode.length) {
-          setCodeText(fullCode);
+        if (currentIndex >= DEMO_CODE.length) {
+          setCodeText(DEMO_CODE);
           setIsCodeComplete(true);
           clearInterval(interval);
         } else {
-          setCodeText(fullCode.substring(0, Math.floor(currentIndex)));
+          setCodeText(DEMO_CODE.substring(0, Math.floor(currentIndex)));
         }
       }, 30);
 
       return () => clearInterval(interval);
     }
-  }, [stage, fullCode]);
+  }, [stage]);
 
   const restartDemo = () => {
     setStage(0);
@@ -214,12 +180,26 @@ export default function DemoTheatre() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-8 relative">
-      {/* Fixed Replay Button - Top Left Corner */}
+    <div
+      className="min-h-screen flex items-center justify-center p-8 relative"
+      style={{ background: T.paper }}
+    >
+      {/* Replay button */}
       <button
         onClick={restartDemo}
-        className="fixed top-4 left-4 z-50 rounded-full bg-[#1A1A1A]/80 hover:bg-[#FF6B00] border border-[#2E2E2E] hover:border-[#FF6B00] p-2 text-[#A0A0A0] hover:text-white transition-all backdrop-blur-sm"
+        className="fixed top-4 left-4 z-50 p-2 transition-colors"
+        style={{ background: T.paper, border: `1px solid ${T.rule}`, color: T.muted }}
         title="Replay Demo"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = T.cobalt;
+          e.currentTarget.style.borderColor = T.cobalt;
+          e.currentTarget.style.color = T.paper;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = T.paper;
+          e.currentTarget.style.borderColor = T.rule;
+          e.currentTarget.style.color = T.muted;
+        }}
       >
         <RefreshCw className="w-4 h-4" />
       </button>
@@ -228,34 +208,61 @@ export default function DemoTheatre() {
         {/* Stage 0: Drawing Canvas */}
         {stage === 0 && (
           <div className="flex flex-col items-center justify-center space-y-8">
-            <div className="inline-flex items-center rounded-full bg-[#2E2E2E] px-4 py-1.5 text-sm font-medium text-[#A0A0A0] mb-2">
-              Sketch-to-code in seconds
-            </div>
-            <h1 className="text-5xl font-bold text-white mb-4">
-              Draw Your <span className="text-[#FF6B00]">Vision</span>
-            </h1>
             <div
-              className="relative bg-white rounded-xl shadow-2xl border-2 border-[#2E2E2E]"
-              style={{ width: 500, height: 350 }}
+              className="px-3 py-1 text-[10px] tracking-[0.16em] uppercase"
+              style={{
+                background: T.vellum,
+                border: `1px solid ${T.rule}`,
+                color: T.muted,
+                fontFamily: MONO,
+              }}
             >
-              {/* Stroke Path */}
+              DEMO · SKETCH-TO-CODE
+            </div>
+
+            <h1
+              className="text-5xl text-center"
+              style={{ color: T.graphite, fontFamily: SERIF }}
+            >
+              Draw your <span style={{ color: T.cobalt }}>vision.</span>
+            </h1>
+
+            {/* Graph-paper canvas */}
+            <div
+              className="relative"
+              style={{
+                width: 500,
+                height: 350,
+                background: T.paper,
+                border: `1px solid ${T.rule}`,
+                backgroundImage: `linear-gradient(to right, ${T.tick} 1px, transparent 1px), linear-gradient(to bottom, ${T.tick} 1px, transparent 1px)`,
+                backgroundSize: "20px 20px",
+              }}
+            >
               <svg
-                className="absolute inset-0 pointer-events-none rounded-xl"
+                className="absolute inset-0 pointer-events-none"
                 style={{ width: 500, height: 350 }}
               >
                 <polyline
                   points={strokePath.map((p) => `${p.x},${p.y}`).join(" ")}
                   fill="none"
-                  stroke="#111217"
-                  strokeWidth="2.5"
+                  stroke={T.graphite}
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
               </svg>
 
-              {/* "Get Started" text being typed inside button */}
               {buttonText && (
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[#111217] font-semibold text-base pointer-events-none">
+                <div
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{
+                    color: T.graphite,
+                    fontFamily: SANS,
+                    fontWeight: 600,
+                    fontSize: "14px",
+                  }}
+                >
                   {buttonText}
                   {buttonText.length < 11 && (
                     <span className="animate-pulse">|</span>
@@ -263,31 +270,39 @@ export default function DemoTheatre() {
                 </div>
               )}
 
-              {/* Animated Cursor - only show during drawing phase */}
               {strokePath.length < 200 && (
                 <div
                   className="absolute pointer-events-none"
-                  style={{
-                    left: cursorPos.x - 2,
-                    top: cursorPos.y - 2,
-                  }}
+                  style={{ left: cursorPos.x - 2, top: cursorPos.y - 2 }}
                 >
-                  <MousePointer2 className="text-[#FF6B00] w-6 h-6" />
+                  <MousePointer2 style={{ color: T.cobalt }} className="w-5 h-5" />
                 </div>
               )}
             </div>
 
-            {/* Instruction Input Field - appears after drawing */}
+            {/* Instruction input — appears after drawing */}
             {strokePath.length > 150 && (
               <div className="w-full max-w-md animate-fade-in">
-                <div className="rounded-xl border-2 border-[#2E2E2E] bg-[#1A1A1A] p-4 shadow-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="shrink-0 w-8 h-8 rounded-full bg-[#FF6B00]/20" />
+                <div
+                  className="p-4"
+                  style={{ background: T.paper, border: `1px solid ${T.rule}` }}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="shrink-0 w-2 h-2 mt-1.5"
+                      style={{ background: T.cobalt }}
+                    />
                     <div className="flex-1">
-                      <p className="text-xs text-[#A0A0A0] mb-1">
-                        Additional Instructions (optional)
+                      <p
+                        className="text-[10px] tracking-[0.14em] uppercase mb-1"
+                        style={{ color: T.muted, fontFamily: MONO }}
+                      >
+                        INSTRUCTIONS · OPTIONAL
                       </p>
-                      <p className="text-white font-mono text-sm">
+                      <p
+                        className="text-sm"
+                        style={{ color: T.graphite, fontFamily: MONO }}
+                      >
                         {instructionText}
                         {instructionText.length > 0 &&
                           instructionText.length < 40 && (
@@ -305,131 +320,201 @@ export default function DemoTheatre() {
         {/* Stage 1: Processing */}
         {stage === 1 && (
           <div className="flex flex-col items-center justify-center space-y-8">
-            <div className="relative">
-              <Loader2 className="w-16 h-16 text-[#FF6B00] animate-spin" />
-              <div className="absolute inset-0 w-16 h-16 rounded-full bg-[#FF6B00]/20 blur-xl animate-pulse" />
-            </div>
-            <h2 className="text-4xl font-bold text-white">
-              Generating Code with <span className="text-[#FF6B00]">AI</span>...
+            {/* CSS-only cobalt spinner */}
+            <div
+              className="w-10 h-10 animate-spin"
+              style={{
+                border: `2px solid ${T.vellum}`,
+                borderTopColor: T.cobalt,
+              }}
+            />
+            <h2
+              className="text-4xl text-center"
+              style={{ color: T.graphite, fontFamily: SERIF }}
+            >
+              Generating code<span style={{ color: T.cobalt }}> with AI</span>...
             </h2>
-            <div className="w-96 h-3 bg-[#2E2E2E] rounded-full overflow-hidden border border-[#2E2E2E]">
+            {/* 1px hairline progress bar */}
+            <div
+              className="w-96"
+              style={{ background: T.vellum, border: `1px solid ${T.rule}`, height: 2 }}
+            >
               <div
-                className="h-full bg-[#FF6B00] shadow-[0_0_10px_rgba(255,107,0,0.5)] transition-all duration-100"
-                style={{ width: `${progress}%` }}
+                className="h-full transition-all duration-100"
+                style={{ width: `${progress}%`, background: T.cobalt }}
               />
             </div>
-            <p className="text-[#A0A0A0] text-lg">
-              Analyzing your sketch • Generating components • Optimizing code
+            <p
+              className="text-[11px] tracking-[0.14em] uppercase"
+              style={{ color: T.muted, fontFamily: MONO }}
+            >
+              ANALYZING SKETCH · GENERATING COMPONENTS · OPTIMIZING CODE
             </p>
           </div>
         )}
 
-        {/* Stage 2: Split Screen - Code & Preview */}
+        {/* Stage 2: Split Screen — Code + Preview */}
         {stage === 2 && (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center rounded-full bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-4 py-1.5 text-sm font-medium text-[#FF6B00] mb-4">
-                Ready to Export
+              <div
+                className="inline-flex px-3 py-1 mb-4 text-[10px] tracking-[0.16em] uppercase"
+                style={{
+                  background: T.cobaltWash,
+                  border: `1px solid ${T.cobalt}`,
+                  color: T.cobalt,
+                  fontFamily: MONO,
+                }}
+              >
+                READY TO EXPORT
               </div>
-              <h2 className="text-4xl font-bold text-white">
-                Your Code is <span className="text-[#FF6B00]">Ready!</span>
+              <h2
+                className="text-4xl"
+                style={{ color: T.graphite, fontFamily: SERIF }}
+              >
+                Your code is <span style={{ color: T.cobalt }}>ready.</span>
               </h2>
             </div>
+
             <div className="grid grid-cols-2 gap-6">
-              {/* Left: Code Editor */}
-              <div className="bg-[#1A1A1A] rounded-xl shadow-2xl p-6 border border-[#2E2E2E]">
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className="ml-4 text-sm text-[#A0A0A0]">
-                    ActionButton.tsx
-                  </span>
+              {/* Code panel — dark slab */}
+              <div
+                className="p-6"
+                style={{
+                  background: "#0A0A0B",
+                  border: "1px solid #2A2A2D",
+                }}
+              >
+                <div
+                  className="flex items-center gap-2 mb-4 text-[10px] tracking-[0.14em] uppercase"
+                  style={{ color: "#86868A", fontFamily: MONO }}
+                >
+                  <span>~/output.tsx</span>
+                  <span style={{ color: "#2A2A2D" }}>·</span>
+                  <span>TSX</span>
                 </div>
-                <pre className="text-sm text-[#E0E0E0] font-mono leading-relaxed overflow-auto max-h-96">
+                <pre
+                  className="text-sm leading-relaxed overflow-auto max-h-96"
+                  style={{ color: "#F2F1EC", fontFamily: MONO }}
+                >
                   <code>{codeText}</code>
                 </pre>
               </div>
 
-              {/* Right: Live Preview - Only show after code is complete */}
+              {/* Live preview panel */}
               {isCodeComplete && (
-                <div className="bg-[#1A1A1A] border border-[#2E2E2E] rounded-xl shadow-2xl overflow-hidden flex flex-col animate-fade-in">
-                  {/* Preview Toolbar */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-[#2E2E2E] bg-[#0A0A0A]">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-[#A0A0A0] uppercase tracking-wide">
-                        Live Preview
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {/* Desktop/Mobile Toggle */}
-                      <div className="flex items-center gap-1 bg-[#2E2E2E] rounded-lg p-1">
-                        <button className="px-2 py-1 rounded bg-[#FF6B00] text-white text-xs font-medium">
+                <div
+                  className="animate-fade-in flex flex-col"
+                  style={{ border: `1px solid ${T.rule}`, background: T.paper }}
+                >
+                  {/* Toolbar */}
+                  <div
+                    className="flex items-center justify-between px-4 py-2"
+                    style={{ borderBottom: `1px solid ${T.rule}`, background: T.vellum }}
+                  >
+                    <span
+                      className="text-[10px] tracking-[0.16em] uppercase"
+                      style={{ color: T.muted, fontFamily: MONO }}
+                    >
+                      LIVE PREVIEW
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <div
+                        className="flex items-center"
+                        style={{ border: `1px solid ${T.rule}` }}
+                      >
+                        <button
+                          className="px-2 py-1"
+                          style={{ background: T.cobalt, color: T.paper }}
+                        >
                           <Monitor className="w-3 h-3" />
                         </button>
-                        <button className="px-2 py-1 rounded text-[#A0A0A0] hover:text-white text-xs font-medium">
+                        <button
+                          className="px-2 py-1"
+                          style={{ background: T.paper, color: T.muted }}
+                        >
                           <Smartphone className="w-3 h-3" />
                         </button>
                       </div>
-
-                      {/* Action Buttons */}
-                      <button
-                        className="p-1.5 rounded-lg hover:bg-[#2E2E2E] text-[#A0A0A0] hover:text-white transition-colors"
-                        title="Refresh"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        className="p-1.5 rounded-lg hover:bg-[#2E2E2E] text-[#A0A0A0] hover:text-white transition-colors"
-                        title="Open in new tab"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        className="p-1.5 rounded-lg hover:bg-[#2E2E2E] text-[#A0A0A0] hover:text-white transition-colors"
-                        title="Download"
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
+                      {([RefreshCw, ExternalLink, Download] as const).map((Icon, i) => (
+                        <button
+                          key={i}
+                          className="p-1.5 transition-colors"
+                          style={{ color: T.muted }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.color = T.graphite)
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.color = T.muted)
+                          }
+                        >
+                          <Icon className="w-4 h-4" />
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Preview Content */}
-                  <div className="flex-1 bg-linear-to-br from-[#1A1A1A] to-[#0A0A0A] p-8 flex items-center justify-center min-h-75">
-                    <div className="text-center space-y-6">
-                      {/* Simulated Browser Content */}
-                      {/* <div className="inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-[#2E2E2E]/50 border border-[#2E2E2E]">
-                      <div className="w-6 h-6 rounded bg-[#FF6B00] flex items-center justify-center text-white font-bold text-xs">
-                        CC
-                      </div>
-                      <span className="text-sm font-semibold text-white">
-                        CodeCanvas
-                      </span>
-                    </div> */}
-
-                      {/* The Generated Button */}
-                      <button className="rounded-xl bg-[#FF6B00]/20 border border-[#FF6B00]/50 backdrop-blur-md px-8 py-4 font-semibold text-white transition-all hover:bg-[#FF6B00]/30 hover:shadow-[0_0_20px_rgba(255,107,0,0.4)] hover:scale-105">
-                        Get Started
-                      </button>
-                    </div>
+                  {/* Preview content — graph paper bg, rendered button */}
+                  <div
+                    className="flex-1 p-8 flex items-center justify-center"
+                    style={{
+                      minHeight: 300,
+                      background: T.vellum,
+                      backgroundImage: `linear-gradient(to right, ${T.tick} 1px, transparent 1px), linear-gradient(to bottom, ${T.tick} 1px, transparent 1px)`,
+                      backgroundSize: "20px 20px",
+                    }}
+                  >
+                    <button
+                      className="px-8 py-3 font-semibold transition-colors"
+                      style={{
+                        background: T.paper,
+                        border: `1px solid ${T.rule}`,
+                        color: T.graphite,
+                        fontFamily: SANS,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = T.cobalt;
+                        e.currentTarget.style.borderColor = T.cobalt;
+                        e.currentTarget.style.color = T.paper;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = T.paper;
+                        e.currentTarget.style.borderColor = T.rule;
+                        e.currentTarget.style.color = T.graphite;
+                      }}
+                    >
+                      Get started →
+                    </button>
                   </div>
 
-                  {/* Preview Footer */}
-                  <div className="px-4 py-2 border-t border-[#2E2E2E] bg-[#0A0A0A] flex items-center justify-between">
-                    <span className="text-xs text-[#666666]">
-                      Desktop • 1920x1080
+                  {/* Footer */}
+                  <div
+                    className="px-4 py-2 flex items-center justify-between"
+                    style={{ borderTop: `1px solid ${T.rule}`, background: T.vellum }}
+                  >
+                    <span
+                      className="text-[10px] tracking-[0.12em] uppercase"
+                      style={{ color: T.muted, fontFamily: MONO }}
+                    >
+                      DESKTOP · 1920×1080
                     </span>
-
-                    {/* Preview Info */}
-                    <div className="flex items-center justify-center gap-2 text-xs text-[#A0A0A0]">
-                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                      <span>Live • Auto-updating</span>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-1.5 h-1.5 animate-pulse"
+                        style={{ background: "#1E6A3C" }}
+                      />
+                      <span
+                        className="text-[10px] tracking-[0.12em] uppercase"
+                        style={{ color: T.muted, fontFamily: MONO }}
+                      >
+                        LIVE · AUTO-UPDATING
+                      </span>
                     </div>
-                    <span className="text-xs text-[#FF6B00]">
-                      Generated in 2.3s
+                    <span
+                      className="text-[10px] tracking-[0.12em] uppercase"
+                      style={{ color: T.cobalt, fontFamily: MONO }}
+                    >
+                      GENERATED IN 2.3S
                     </span>
                   </div>
                 </div>

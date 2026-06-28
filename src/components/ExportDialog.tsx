@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import DraftingModal, {
+  ModalButton,
+  ModalSection,
+  ModalOption,
+} from "@/components/canvas/DraftingModal";
+import { T_CANVAS } from "@/components/canvas/canvasTokens";
 
 export type ExportFormat = "png" | "svg" | "json" | "zip" | "copy";
 export type CodeFramework = "react" | "vue" | "html" | "nextjs";
@@ -32,26 +38,22 @@ export default function ExportDialog({
   const [exportType, setExportType] = useState<"image" | "code">("code");
   const [imageFormat, setImageFormat] = useState<"png" | "svg">("png");
   const [codeFormat, setCodeFormat] = useState<"zip" | "json" | "copy">("copy");
-  const [framework, setFramework] = useState<CodeFramework>("html");
+  const [framework, setFramework] = useState<CodeFramework>("react");
   const [styling, setStyling] = useState<StylingOption>("tailwind");
   const [quality, setQuality] = useState(100);
-  const [includeAssets, setIncludeAssets] = useState(true);
   const [copied, setCopied] = useState(false);
-
-  if (!isOpen) return null;
 
   const handleCopyToClipboard = async () => {
     if (!generatedCode) {
-      alert("No code to copy!");
+      alert("No code to copy.");
       return;
     }
-
     try {
       await navigator.clipboard.writeText(generatedCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      alert("Failed to copy code to clipboard");
+      alert("Failed to copy code to clipboard.");
     }
   };
 
@@ -60,251 +62,263 @@ export default function ExportDialog({
       format: exportType === "image" ? imageFormat : codeFormat,
       framework: exportType === "code" ? framework : undefined,
       styling: exportType === "code" ? styling : undefined,
-      quality: exportType === "image" && imageFormat === "png" ? quality : undefined,
-      includeAssets: exportType === "code" ? includeAssets : undefined,
+      quality:
+        exportType === "image" && imageFormat === "png" ? quality : undefined,
+      includeAssets: exportType === "code" ? true : undefined,
     };
-
-    if (codeFormat === "copy") {
+    // Copy stays in-modal so the user sees the COPIED confirmation state.
+    // Everything else delegates to the parent and closes the dialog.
+    if (exportType === "code" && codeFormat === "copy") {
       handleCopyToClipboard();
-    } else {
-      onExport(options);
+      return;
     }
-    
-    if (codeFormat !== "copy") {
-      onClose();
-    }
+    onExport(options);
+    onClose();
   };
 
+  const isCopyMode = exportType === "code" && codeFormat === "copy";
+
   return (
-    <div
-      data-onboarding="export-dialog"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
-      onClick={onClose}
+    <DraftingModal
+      open={isOpen}
+      onClose={onClose}
+      slug="EXPORT · CHOOSE FORMAT"
+      title="Export your work."
+      subtitle="Pick how you want to take this away. Code goes to your editor, image to your slide deck."
+      dataOnboarding="export-dialog"
+      footer={
+        <div className="flex items-center justify-between">
+          <ModalButton onClick={onClose}>CANCEL</ModalButton>
+          <ModalButton variant="primary" onClick={handleExport}>
+            {copied ? (
+              <>
+                <CheckIcon />
+                COPIED
+              </>
+            ) : isCopyMode ? (
+              <>
+                <CopyIcon />
+                COPY TO CLIPBOARD
+              </>
+            ) : (
+              <>
+                <DownloadIcon />
+                EXPORT →
+              </>
+            )}
+          </ModalButton>
+        </div>
+      }
     >
-      <div
-        className="w-full max-w-2xl rounded-2xl border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] shadow-2xl animate-scale-in"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="border-b border-[var(--cc-border-subtle)] px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--cc-text-primary)]">Export Project</h2>
-              <p className="mt-1 text-sm text-[var(--cc-text-secondary)]">
-                Choose your export format and options
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-2 text-[var(--cc-text-secondary)] transition-all hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
-              aria-label="Close"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+      {/* TYPE TOGGLE — code / image */}
+      <ModalSection label="EXPORT TYPE">
+        <div className="grid grid-cols-2 gap-2">
+          <ModalOption
+            active={exportType === "code"}
+            onClick={() => setExportType("code")}
+            icon={<CodeIcon />}
+            label="CODE"
+            hint="Components, ZIP, JSON"
+          />
+          <ModalOption
+            active={exportType === "image"}
+            onClick={() => setExportType("image")}
+            icon={<ImageIcon />}
+            label="IMAGE"
+            hint="PNG or SVG of the sketch"
+          />
         </div>
+      </ModalSection>
 
-        {/* Export Type Toggle */}
-        <div className="px-6 pt-6">
-          <div className="flex gap-2 rounded-xl bg-[var(--cc-bg-canvas)] border border-[var(--cc-border-subtle)] p-1">
-            <button
-              onClick={() => setExportType("code")}
-              className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
-                exportType === "code"
-                  ? "bg-[var(--cc-toggle-active-bg)] text-[var(--cc-toggle-active-text)] shadow-sm"
-                  : "text-[var(--cc-text-secondary)] hover:text-[var(--cc-text-primary)]"
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                </svg>
-                Code Export
-              </div>
-            </button>
-            <button
-              onClick={() => setExportType("image")}
-              className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
-                exportType === "image"
-                  ? "bg-[var(--cc-toggle-active-bg)] text-[var(--cc-toggle-active-text)] shadow-sm"
-                  : "text-[var(--cc-text-secondary)] hover:text-[var(--cc-text-primary)]"
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                Image Export
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Export Options */}
-        <div className="p-6">
-          {exportType === "code" ? (
-            <div className="space-y-4">
-              {/* Code Format */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[var(--cc-text-primary)]">
-                  Export Method
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setCodeFormat("copy")}
-                    className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
-                      codeFormat === "copy"
-                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
-                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      Copy
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setCodeFormat("zip")}
-                    className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
-                      codeFormat === "zip"
-                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
-                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      ZIP
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setCodeFormat("json")}
-                    className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
-                      codeFormat === "json"
-                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
-                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      JSON
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Preview Code Snippet */}
-              {generatedCode && codeFormat === "copy" && (
-                <div className="rounded-lg border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[var(--cc-text-secondary)]">Code Preview</span>
-                    <span className="text-xs text-[var(--cc-text-muted)]">{generatedCode.length} chars</span>
-                  </div>
-                  <pre className="max-h-32 overflow-auto rounded border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] p-2 text-xs text-[var(--cc-text-primary)]">
-                    {generatedCode.substring(0, 500)}...
-                  </pre>
-                </div>
-              )}
+      {exportType === "code" ? (
+        <>
+          <ModalSection label="METHOD">
+            <div className="grid grid-cols-3 gap-2">
+              <ModalOption
+                active={codeFormat === "copy"}
+                onClick={() => setCodeFormat("copy")}
+                icon={<CopyIcon />}
+                label="COPY"
+              />
+              <ModalOption
+                active={codeFormat === "zip"}
+                onClick={() => setCodeFormat("zip")}
+                icon={<DownloadIcon />}
+                label="ZIP"
+              />
+              <ModalOption
+                active={codeFormat === "json"}
+                onClick={() => setCodeFormat("json")}
+                icon={<JsonIcon />}
+                label="JSON"
+              />
             </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Image Format */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[var(--cc-text-primary)]">
-                  Image Format
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setImageFormat("png")}
-                    className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
-                      imageFormat === "png"
-                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
-                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
-                    }`}
-                  >
-                    PNG
-                  </button>
-                  <button
-                    onClick={() => setImageFormat("svg")}
-                    className={`rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
-                      imageFormat === "svg"
-                        ? "border-[var(--cc-accent)] bg-[var(--cc-accent-bg-soft)] text-[var(--cc-text-primary)]"
-                        : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
-                    }`}
-                  >
-                    SVG
-                  </button>
-                </div>
-              </div>
+          </ModalSection>
 
-              {/* Quality Slider (only for PNG) */}
-              {imageFormat === "png" && (
-                <div>
-                  <label className="mb-2 flex items-center justify-between text-sm font-semibold text-[var(--cc-text-primary)]">
-                    <span>Quality</span>
-                    <span className="text-[var(--cc-accent)]">{quality}%</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="100"
-                    value={quality}
-                    onChange={(e) => setQuality(Number(e.target.value))}
-                    className="w-full accent-[var(--cc-accent)]"
-                  />
-                  <div className="mt-1 flex justify-between text-xs text-[var(--cc-text-secondary)]">
-                    <span>Low</span>
-                    <span>High</span>
-                  </div>
+          {generatedCode && codeFormat === "copy" && (
+            <ModalSection label="PREVIEW">
+              <div
+                className="text-[11px]"
+                style={{
+                  background: T_CANVAS.vellum,
+                  border: `1px solid ${T_CANVAS.rule}`,
+                }}
+              >
+                <style jsx global>{`
+                  .export-preview-scroll::-webkit-scrollbar-track {
+                    background: transparent;
+                  }
+                `}</style>
+                <div
+                  className="flex items-center justify-between border-b px-3 py-1.5 text-[10px] tracking-[0.14em] uppercase"
+                  style={{
+                    borderColor: T_CANVAS.rule,
+                    color: T_CANVAS.muted,
+                    fontFamily:
+                      "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                  }}
+                >
+                  <span>~/output.tsx</span>
+                  <span>{generatedCode.length} CHARS</span>
                 </div>
-              )}
-            </div>
+                <pre
+                  className="export-preview-scroll max-h-32 overflow-auto p-3 text-[11px] leading-normal"
+                  style={{
+                    color: T_CANVAS.graphite,
+                    scrollbarColor: `${T_CANVAS.graphite} transparent`,
+                    fontFamily:
+                      "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                  }}
+                >
+                  {generatedCode.substring(0, 500)}
+                  {generatedCode.length > 500 ? "..." : ""}
+                </pre>
+              </div>
+            </ModalSection>
           )}
-        </div>
-
-        {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-[var(--cc-border-subtle)] px-6 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-[var(--cc-border-subtle)] bg-transparent px-6 py-2.5 text-sm font-semibold text-[var(--cc-text-secondary)] transition-all hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)]"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleExport}
-            className="rounded-lg bg-[var(--cc-accent)] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_var(--cc-accent-glow-strong)] transition-all hover:shadow-[0_0_30px_var(--cc-accent-glow-strong)]"
-          >
-            <div className="flex items-center gap-2">
-              {copied ? (
-                <>
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    {codeFormat === "copy" ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    )}
-                  </svg>
-                  {codeFormat === "copy" ? "Copy to Clipboard" : "Export"}
-                </>
-              )}
+        </>
+      ) : (
+        <>
+          <ModalSection label="FORMAT">
+            <div className="grid grid-cols-2 gap-2">
+              <ModalOption
+                active={imageFormat === "png"}
+                onClick={() => setImageFormat("png")}
+                icon={<ImageIcon />}
+                label="PNG"
+                hint="Raster, includes background"
+              />
+              <ModalOption
+                active={imageFormat === "svg"}
+                onClick={() => setImageFormat("svg")}
+                icon={<VectorIcon />}
+                label="SVG"
+                hint="Vector, scales infinitely"
+              />
             </div>
-          </button>
-        </div>
-      </div>
-    </div>
+          </ModalSection>
+
+          {imageFormat === "png" && (
+            <ModalSection label="QUALITY">
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  value={quality}
+                  onChange={(e) => setQuality(Number(e.target.value))}
+                  className="h-px flex-1 cursor-pointer appearance-none"
+                  style={{
+                    background: `linear-gradient(to right, ${T_CANVAS.cobalt} 0%, ${T_CANVAS.cobalt} ${quality}%, ${T_CANVAS.rule} ${quality}%, ${T_CANVAS.rule} 100%)`,
+                  }}
+                />
+                <span
+                  className="w-12 text-right text-[10px] tabular-nums tracking-[0.06em]"
+                  style={{
+                    color: T_CANVAS.graphite,
+                    fontFamily:
+                      "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                  }}
+                >
+                  {quality}%
+                </span>
+              </div>
+            </ModalSection>
+          )}
+        </>
+      )}
+    </DraftingModal>
+  );
+}
+
+// ─── ICONS ──────────────────────────────────────────────────────────────────
+
+const ic = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.75,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  viewBox: "0 0 24 24",
+  className: "h-4 w-4",
+  "aria-hidden": true,
+};
+
+function CodeIcon() {
+  return (
+    <svg {...ic}>
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </svg>
+  );
+}
+function ImageIcon() {
+  return (
+    <svg {...ic}>
+      <rect x="3" y="3" width="18" height="18" rx="1" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  );
+}
+function CopyIcon() {
+  return (
+    <svg {...ic}>
+      <rect x="9" y="9" width="13" height="13" rx="1" />
+      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+    </svg>
+  );
+}
+function DownloadIcon() {
+  return (
+    <svg {...ic}>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+function JsonIcon() {
+  return (
+    <svg {...ic}>
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="9" y1="13" x2="15" y2="13" />
+      <line x1="9" y1="17" x2="15" y2="17" />
+    </svg>
+  );
+}
+function VectorIcon() {
+  return (
+    <svg {...ic}>
+      <polygon points="12 2 22 12 12 22 2 12" />
+    </svg>
+  );
+}
+function CheckIcon() {
+  return (
+    <svg {...ic}>
+      <path d="M5 13l4 4L19 7" />
+    </svg>
   );
 }

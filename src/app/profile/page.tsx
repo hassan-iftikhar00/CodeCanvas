@@ -9,6 +9,11 @@ import { DeleteAccountModal } from "@/components/profile/DeleteAccountModal";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ProfileSkeleton from "@/components/profile/ProfileSkeleton";
+import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
+
+const MONO = "var(--font-jetbrains-mono, ui-monospace, monospace)";
+const SANS = "var(--font-inter, ui-sans-serif, system-ui)";
+const SERIF = "var(--font-instrument-serif, ui-serif, Georgia, serif)";
 
 interface Profile {
   id: string;
@@ -234,10 +239,22 @@ export default function ProfilePage() {
           transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
         >
           <div className="mb-6">
-            <h1 className="text-[24px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
-              Profile settings
+            <div
+              className="text-[10px] tracking-[0.18em] uppercase"
+              style={{ color: T.muted, fontFamily: MONO }}
+            >
+              Account · Profile
+            </div>
+            <h1
+              className="mt-1 text-[36px] leading-[1.05] tracking-[-0.02em]"
+              style={{ color: T.graphite, fontFamily: SERIF, fontWeight: 400 }}
+            >
+              Profile.
             </h1>
-            <p className="mt-1 text-[13px] text-[var(--cc-text-secondary)]">
+            <p
+              className="mt-1.5 text-[13px] leading-[1.55]"
+              style={{ color: T.muted, fontFamily: SANS }}
+            >
               Manage your account information and preferences.
             </p>
           </div>
@@ -250,63 +267,72 @@ export default function ProfilePage() {
                 exit={{ opacity: 0, y: -4 }}
                 role="status"
                 aria-live="polite"
-                className={`mb-5 flex items-center gap-2.5 rounded-[var(--cc-radius-card)] border px-3.5 py-2.5 text-[13px] ${
-                  message.type === "success"
-                    ? "border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.08)] text-[var(--cc-success)]"
-                    : "border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.08)] text-[var(--cc-error)]"
-                }`}
+                className="mb-5 flex items-center gap-2.5 px-3.5 py-2 text-[12px]"
+                style={{
+                  border: `1px solid ${
+                    message.type === "success" ? T.success : T.error
+                  }`,
+                  background: `${
+                    message.type === "success" ? T.success : T.error
+                  }10`,
+                  color: message.type === "success" ? T.success : T.error,
+                  fontFamily: SANS,
+                }}
               >
-                {message.type === "success" ? (
-                  <svg
-                    className="h-4 w-4 flex-none"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                ) : (
-                  <svg
-                    className="h-4 w-4 flex-none"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                )}
-                <span className="font-medium">{message.text}</span>
+                <span
+                  className="px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
+                  style={{
+                    border: `1px solid currentColor`,
+                    fontFamily: MONO,
+                  }}
+                >
+                  {message.type === "success" ? "Success" : "Error"}
+                </span>
+                <span>{message.text}</span>
               </motion.div>
             )}
           </AnimatePresence>
 
           <div className="space-y-5">
             {/* Personal Information */}
-            <section className="rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-5">
-              <h2 className="mb-4 text-[14px] font-semibold text-[var(--cc-text-primary)]">
-                Personal information
-              </h2>
+            <section
+              style={{
+                background: T.paper,
+                border: `1px solid ${T.rule}`,
+              }}
+            >
+              <div
+                className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+                style={{
+                  background: T.vellum,
+                  borderColor: T.rule,
+                  color: T.muted,
+                  fontFamily: MONO,
+                }}
+              >
+                <span style={{ color: T.graphite }}>Personal information</span>
+                <span>Editable</span>
+              </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5">
                 {/* Avatar */}
                 <div className="flex items-start gap-4">
-                  <div className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden rounded-full bg-[var(--cc-accent)] text-[20px] font-semibold text-white">
+                  <div
+                    className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden text-[20px]"
+                    style={{
+                      background: T.graphite,
+                      color: T.paper,
+                      border: `1px solid ${T.rule}`,
+                      fontFamily: MONO,
+                      letterSpacing: "0.04em",
+                    }}
+                  >
                     {avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={avatarUrl}
                         alt=""
-                        className="h-16 w-16 rounded-full object-cover"
+                        className="h-16 w-16 object-cover"
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
                         }}
@@ -320,28 +346,49 @@ export default function ProfilePage() {
                     )}
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-[13px] font-semibold text-[var(--cc-text-primary)]">
+                    <div
+                      className="text-[10px] tracking-[0.16em] uppercase"
+                      style={{ color: T.muted, fontFamily: MONO }}
+                    >
                       Profile picture
-                    </h3>
-                    <p className="mt-0.5 text-[11px] text-[var(--cc-text-muted)]">
+                    </div>
+                    <p
+                      className="mt-0.5 text-[11px]"
+                      style={{ color: T.muted, fontFamily: SANS }}
+                    >
                       Max 5MB. JPEG, PNG, GIF or WebP.
                     </p>
                     <label
                       htmlFor="avatar-upload"
-                      className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-3 py-1.5 text-[12px] font-semibold text-[var(--cc-text-primary)] transition-colors hover:border-[var(--cc-border-emphasis)] focus-within:ring-2 focus-within:ring-[var(--cc-accent)]"
+                      className="mt-2 inline-flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                      style={{
+                        background: T.paper,
+                        border: `1px solid ${T.rule}`,
+                        color: T.graphite,
+                        fontFamily: MONO,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = T.graphite;
+                        e.currentTarget.style.color = T.paper;
+                        e.currentTarget.style.borderColor = T.graphite;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = T.paper;
+                        e.currentTarget.style.color = T.graphite;
+                        e.currentTarget.style.borderColor = T.rule;
+                      }}
                     >
                       <svg
-                        className="h-3.5 w-3.5"
+                        className="h-3 w-3"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
-                        strokeWidth={2}
+                        strokeWidth={1.75}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
+                        <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       {avatarFile ? avatarFile.name : "Choose image"}
                     </label>
@@ -365,7 +412,13 @@ export default function ProfilePage() {
                     id="email"
                     value={profile?.email || ""}
                     disabled
-                    className="w-full cursor-not-allowed rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2 text-[13px] text-[var(--cc-text-muted)]"
+                    className="w-full cursor-not-allowed px-3 py-2 text-[13px]"
+                    style={{
+                      background: T.vellum,
+                      border: `1px solid ${T.rule}`,
+                      color: T.muted,
+                      fontFamily: SANS,
+                    }}
                   />
                 </Field>
 
@@ -376,7 +429,15 @@ export default function ProfilePage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Enter your full name"
-                    className="w-full rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2 text-[13px] text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] transition-colors focus:border-[var(--cc-accent)] focus:outline-none focus:shadow-[0_0_0_3px_var(--cc-accent-glow)]"
+                    className="w-full px-3 py-2 text-[13px] transition-colors focus:outline-none"
+                    style={{
+                      background: T.paper,
+                      border: `1px solid ${T.rule}`,
+                      color: T.graphite,
+                      fontFamily: SANS,
+                    }}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = T.cobalt)}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = T.rule)}
                   />
                 </Field>
 
@@ -399,7 +460,17 @@ export default function ProfilePage() {
                     }}
                     placeholder="https://example.com/avatar.jpg"
                     disabled={!!avatarFile}
-                    className="w-full rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2 text-[13px] text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] transition-colors focus:border-[var(--cc-accent)] focus:outline-none focus:shadow-[0_0_0_3px_var(--cc-accent-glow)] disabled:opacity-50"
+                    className="w-full px-3 py-2 text-[13px] transition-colors focus:outline-none disabled:opacity-50"
+                    style={{
+                      background: T.paper,
+                      border: `1px solid ${T.rule}`,
+                      color: T.graphite,
+                      fontFamily: SANS,
+                    }}
+                    onFocus={(e) => {
+                      if (!avatarFile) e.currentTarget.style.borderColor = T.cobalt;
+                    }}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = T.rule)}
                   />
                 </Field>
 
@@ -408,35 +479,64 @@ export default function ProfilePage() {
                     whileTap={{ scale: 0.96 }}
                     type="submit"
                     disabled={saving || uploading}
-                    className="inline-flex items-center gap-1.5 rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-4 py-2 text-[13px] font-semibold text-white transition-all hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    style={{
+                      background: T.cobalt,
+                      color: T.paper,
+                      border: `1px solid ${T.cobalt}`,
+                      fontFamily: MONO,
+                      minHeight: 36,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (saving || uploading) return;
+                      e.currentTarget.style.background = T.cobaltInk;
+                      e.currentTarget.style.borderColor = T.cobaltInk;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = T.cobalt;
+                      e.currentTarget.style.borderColor = T.cobalt;
+                    }}
                   >
                     {saving || uploading ? (
                       <>
-                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        {uploading ? "Uploading..." : "Saving..."}
+                        <span
+                          className="h-3 w-3 animate-spin"
+                          style={{
+                            border: `1.5px solid ${T.paper}`,
+                            borderTopColor: "transparent",
+                            borderRadius: "50%",
+                          }}
+                        />
+                        {uploading ? "Uploading" : "Saving"}
                       </>
                     ) : (
                       <>
-                        <svg
-                          className="h-3.5 w-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                        Save changes
+                        Save changes →
                       </>
                     )}
                   </motion.button>
                   <Link
                     href="/dashboard"
-                    className="rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-4 py-2 text-[13px] font-semibold text-[var(--cc-text-primary)] transition-colors hover:border-[var(--cc-border-emphasis)]"
+                    className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                    style={{
+                      background: T.paper,
+                      border: `1px solid ${T.rule}`,
+                      color: T.graphite,
+                      fontFamily: MONO,
+                      minHeight: 36,
+                      display: "inline-flex",
+                      alignItems: "center",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = T.graphite;
+                      e.currentTarget.style.color = T.paper;
+                      e.currentTarget.style.borderColor = T.graphite;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = T.paper;
+                      e.currentTarget.style.color = T.graphite;
+                      e.currentTarget.style.borderColor = T.rule;
+                    }}
                   >
                     Cancel
                   </Link>
@@ -445,106 +545,161 @@ export default function ProfilePage() {
             </section>
 
             {/* Account Information */}
-            <section className="rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-5">
-              <h2 className="mb-3 text-[14px] font-semibold text-[var(--cc-text-primary)]">
-                Account information
-              </h2>
-              <dl className="space-y-2 text-[12px]">
-                <div className="flex justify-between">
-                  <dt className="text-[var(--cc-text-secondary)]">
-                    Account created
-                  </dt>
-                  <dd className="text-[var(--cc-text-primary)]">
-                    {profile?.created_at
+            <section
+              style={{
+                background: T.paper,
+                border: `1px solid ${T.rule}`,
+              }}
+            >
+              <div
+                className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+                style={{
+                  background: T.vellum,
+                  borderColor: T.rule,
+                  color: T.muted,
+                  fontFamily: MONO,
+                }}
+              >
+                <span style={{ color: T.graphite }}>Account information</span>
+                <span>Read only</span>
+              </div>
+              <dl
+                className="divide-y px-5"
+                style={{ borderColor: T.rule }}
+              >
+                <AccountRow
+                  label="Account created"
+                  value={
+                    profile?.created_at
                       ? new Date(profile.created_at).toLocaleDateString()
-                      : "N/A"}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-[var(--cc-text-secondary)]">
-                    Last updated
-                  </dt>
-                  <dd className="text-[var(--cc-text-primary)]">
-                    {profile?.updated_at
+                      : "N/A"
+                  }
+                />
+                <AccountRow
+                  label="Last updated"
+                  value={
+                    profile?.updated_at
                       ? new Date(profile.updated_at).toLocaleDateString()
-                      : "N/A"}
-                  </dd>
-                </div>
+                      : "N/A"
+                  }
+                />
               </dl>
             </section>
 
             {/* Danger Zone */}
-            <section className="rounded-[var(--cc-radius-card)] border border-[rgba(239,68,68,0.25)] bg-[rgba(239,68,68,0.04)] p-5">
-              <h2 className="mb-1 text-[14px] font-semibold text-[var(--cc-error)]">
-                Danger zone
-              </h2>
-              <p className="mb-4 text-[12px] text-[var(--cc-text-secondary)]">
-                These actions are permanent or affect your current session.
-              </p>
-
-              {/* Sign out */}
-              <div className="flex items-center justify-between gap-4 border-t border-[rgba(239,68,68,0.12)] pt-4">
-                <div>
-                  <p className="text-[12px] font-semibold text-[var(--cc-text-primary)]">
-                    Sign out
-                  </p>
-                  <p className="text-[11px] text-[var(--cc-text-muted)]">
-                    End your current session on this device.
-                  </p>
-                </div>
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  onClick={handleLogout}
-                  className="flex-none inline-flex items-center gap-1.5 rounded-[var(--cc-radius-button)] border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.08)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--cc-error)] transition-colors hover:bg-[rgba(239,68,68,0.16)]"
-                >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
-                  Sign out
-                </motion.button>
+            <section
+              style={{
+                background: T.paper,
+                border: `1px solid ${T.error}`,
+              }}
+            >
+              <div
+                className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+                style={{
+                  background: `${T.error}10`,
+                  borderColor: T.error,
+                  color: T.error,
+                  fontFamily: MONO,
+                }}
+              >
+                <span>Danger · Irreversible</span>
+                <span>Read carefully</span>
               </div>
 
-              {/* Delete account */}
-              <div className="mt-4 flex items-center justify-between gap-4 border-t border-[rgba(239,68,68,0.12)] pt-4">
-                <div>
-                  <p className="text-[12px] font-semibold text-[var(--cc-text-primary)]">
-                    Delete account
-                  </p>
-                  <p className="text-[11px] text-[var(--cc-text-muted)]">
-                    Permanently remove your account, all projects, and all data.
-                    This cannot be undone.
-                  </p>
-                </div>
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => setShowDeleteModal(true)}
-                  className="flex-none inline-flex items-center gap-1.5 rounded-[var(--cc-radius-button)] bg-red-600 px-3.5 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-red-700"
+              <div className="px-5">
+                {/* Sign out */}
+                <div
+                  className="flex items-center justify-between gap-4 py-4"
                 >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                  <div>
+                    <div
+                      className="text-[12px]"
+                      style={{
+                        color: T.graphite,
+                        fontFamily: SANS,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Sign out
+                    </div>
+                    <p
+                      className="mt-0.5 text-[11px]"
+                      style={{ color: T.muted, fontFamily: SANS }}
+                    >
+                      End your current session on this device.
+                    </p>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={handleLogout}
+                    className="flex-none inline-flex items-center gap-1.5 px-3.5 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                    style={{
+                      background: T.paper,
+                      border: `1px solid ${T.rule}`,
+                      color: T.graphite,
+                      fontFamily: MONO,
+                      minHeight: 36,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = T.graphite;
+                      e.currentTarget.style.color = T.paper;
+                      e.currentTarget.style.borderColor = T.graphite;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = T.paper;
+                      e.currentTarget.style.color = T.graphite;
+                      e.currentTarget.style.borderColor = T.rule;
+                    }}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                  Delete account
-                </motion.button>
+                    Sign out
+                  </motion.button>
+                </div>
+
+                {/* Delete account */}
+                <div
+                  className="flex items-center justify-between gap-4 border-t py-4"
+                  style={{ borderColor: T.rule }}
+                >
+                  <div>
+                    <div
+                      className="text-[12px]"
+                      style={{
+                        color: T.graphite,
+                        fontFamily: SANS,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Delete account
+                    </div>
+                    <p
+                      className="mt-0.5 text-[11px]"
+                      style={{ color: T.muted, fontFamily: SANS }}
+                    >
+                      Permanently remove your account, all projects, and all
+                      data. This cannot be undone.
+                    </p>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => setShowDeleteModal(true)}
+                    className="flex-none inline-flex items-center gap-1.5 px-3.5 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                    style={{
+                      background: T.error,
+                      color: T.paper,
+                      border: `1px solid ${T.error}`,
+                      fontFamily: MONO,
+                      minHeight: 36,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.opacity = "0.85")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.opacity = "1")
+                    }
+                  >
+                    Delete account →
+                  </motion.button>
+                </div>
               </div>
             </section>
           </div>
@@ -576,14 +731,39 @@ function Field({
     <div>
       <label
         htmlFor={id}
-        className="mb-1.5 block text-[12px] font-medium text-[var(--cc-text-secondary)]"
+        className="mb-1.5 block text-[10px] tracking-[0.16em] uppercase"
+        style={{ color: T.muted, fontFamily: MONO }}
       >
         {label}
       </label>
       {children}
       {hint && (
-        <p className="mt-1 text-[11px] text-[var(--cc-text-muted)]">{hint}</p>
+        <p
+          className="mt-1 text-[11px]"
+          style={{ color: T.muted, fontFamily: SANS }}
+        >
+          {hint}
+        </p>
       )}
+    </div>
+  );
+}
+
+function AccountRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between py-2.5">
+      <dt
+        className="text-[10px] tracking-[0.16em] uppercase"
+        style={{ color: T.muted, fontFamily: MONO }}
+      >
+        {label}
+      </dt>
+      <dd
+        className="text-[12px]"
+        style={{ color: T.graphite, fontFamily: SANS, fontWeight: 500 }}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

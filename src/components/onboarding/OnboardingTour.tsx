@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
+
+const MONO = "var(--font-jetbrains-mono, ui-monospace, monospace)";
+const SANS = "var(--font-inter, ui-sans-serif, system-ui)";
+const SERIF = "var(--font-instrument-serif, ui-serif, Georgia, serif)";
 
 export type OnboardingPlacement = "right" | "left" | "top" | "bottom" | "center";
 
@@ -226,7 +231,8 @@ export default function OnboardingTour({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/70"
+            className="absolute inset-0"
+            style={{ background: "rgba(14, 14, 15, 0.62)" }}
           />
         )}
 
@@ -235,8 +241,14 @@ export default function OnboardingTour({
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            className="absolute rounded-[16px] ring-2 ring-[#FF6B00] shadow-[0_0_0_9999px_rgba(0,0,0,0.72)]"
-            style={highlightStyle}
+            className="absolute"
+            style={{
+              ...highlightStyle,
+              border: `1px solid ${T.cobalt}`,
+              outline: `2px solid ${T.cobalt}`,
+              outlineOffset: 2,
+              boxShadow: "0 0 0 9999px rgba(14, 14, 15, 0.65)",
+            }}
           />
         ) : null}
 
@@ -245,29 +257,52 @@ export default function OnboardingTour({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
-          className="absolute w-[320px] max-w-[82vw] rounded-2xl border border-[#2E2E2E] bg-[#111111] p-4 text-white shadow-[0_25px_60px_-25px_rgba(0,0,0,0.8)]"
+          className="absolute w-[340px] max-w-[82vw] p-4"
           style={{
             top: tooltipPos?.top ?? "50%",
             left: tooltipPos?.left ?? "50%",
             transform: tooltipPos ? "none" : "translate(-50%, -50%)",
+            background: T.paper,
+            border: `1px solid ${T.rule}`,
+            color: T.graphite,
+            fontFamily: SANS,
           }}
         >
-          <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-[#7A7A7A]">
-            <span>
-              Step {stepIndex + 1} of {totalSteps}
+          <div
+            className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em]"
+            style={{
+              color: T.muted,
+              fontFamily: MONO,
+            }}
+          >
+            <span style={{ color: T.graphite }}>
+              ONBOARDING · STEP {stepIndex + 1} / {totalSteps}
             </span>
             <button
               type="button"
               onClick={onSkip}
-              className="text-[10px] font-semibold uppercase text-[#B0B0B0] transition-colors hover:text-white"
+              className="text-[10px] tracking-[0.16em] uppercase transition-colors"
+              style={{ color: T.muted }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = T.cobalt)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
             >
-              Skip
+              SKIP
             </button>
           </div>
-          <h3 className="mt-2 text-[18px] font-semibold text-white">
+          <h3
+            className="mt-3 text-[20px] tracking-[-0.01em]"
+            style={{
+              color: T.graphite,
+              fontFamily: SERIF,
+              fontWeight: 400,
+            }}
+          >
             {currentStep.title}
           </h3>
-          <p className="mt-2 text-[13px] text-[#B8B8B8]">
+          <p
+            className="mt-2 text-[12px] leading-[1.55]"
+            style={{ color: T.muted }}
+          >
             {currentStep.description}
           </p>
 
@@ -276,29 +311,41 @@ export default function OnboardingTour({
               type="button"
               onClick={onBack}
               disabled={stepIndex === 0}
-              className="rounded-[10px] border border-[#2E2E2E] px-3 py-1.5 text-[12px] font-semibold text-[#B0B0B0] transition-colors hover:border-[#3A3A3A] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              className="px-3 py-1.5 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                background: T.paper,
+                border: `1px solid ${T.rule}`,
+                color: T.muted,
+                fontFamily: MONO,
+              }}
+              onMouseEnter={(e) => {
+                if (stepIndex !== 0) e.currentTarget.style.color = T.graphite;
+              }}
+              onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
             >
-              Back
+              ← BACK
             </button>
-            <div className="flex items-center gap-2">
-              {isLastStep ? (
-                <button
-                  type="button"
-                  onClick={onFinish}
-                  className="rounded-[10px] bg-[#FF6B00] px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-[0_0_16px_rgba(255,107,0,0.35)] transition-transform hover:scale-[1.02]"
-                >
-                  Finish
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onNext}
-                  className="rounded-[10px] bg-[#FF6B00] px-3.5 py-1.5 text-[12px] font-semibold text-white shadow-[0_0_16px_rgba(255,107,0,0.35)] transition-transform hover:scale-[1.02]"
-                >
-                  Next
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={isLastStep ? onFinish : onNext}
+              className="px-3.5 py-1.5 text-[10px] tracking-[0.18em] uppercase transition-colors"
+              style={{
+                background: T.cobalt,
+                border: `1px solid ${T.cobalt}`,
+                color: T.paper,
+                fontFamily: MONO,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = T.cobaltInk;
+                e.currentTarget.style.borderColor = T.cobaltInk;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = T.cobalt;
+                e.currentTarget.style.borderColor = T.cobalt;
+              }}
+            >
+              {isLastStep ? "FINISH →" : "NEXT →"}
+            </button>
           </div>
         </motion.div>
       </motion.div>

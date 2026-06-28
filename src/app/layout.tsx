@@ -7,7 +7,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
 const inter = Inter({
-  variable: "--font-geist-sans",
+  variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
 });
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     "UI builder",
   ],
   icons: {
-    icon: "/logo.png",
+    icon: "/logo-black.svg",
   },
 };
 

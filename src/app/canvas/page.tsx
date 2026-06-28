@@ -15,7 +15,8 @@ import { createClient } from "@/lib/supabase/client";
 
 import { useHistory } from "@/hooks/useHistory";
 import ShortcutsPanel from "@/components/ShortcutsPanel";
-import LayerPanel, { type Layer } from "@/components/canvas/LayerPanel";
+import { SHORTCUTS_PANEL_EVENT } from "@/components/CommandPalette";
+import { type Layer } from "@/types/canvas";
 import ExportDialog, { type ExportOptions } from "@/components/ExportDialog";
 import TemplatesPanel from "@/components/canvas/TemplatesPanel";
 import ZoomPill from "@/components/canvas/ZoomPill";
@@ -23,7 +24,7 @@ import FloatingToolbar from "@/components/canvas/FloatingToolbar";
 import CanvasSurface from "@/components/canvas/CanvasSurface";
 import StyleRibbon from "@/components/canvas/StyleRibbon";
 import StatusBar from "@/components/canvas/StatusBar";
-import Navbar from "@/components/Navbar";
+import CanvasTopBar from "@/components/canvas/CanvasTopBar";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import OnboardingTour, {
   type OnboardingStep,
@@ -33,6 +34,8 @@ import {
   useAutoSave,
   type CanvasData,
 } from "@/hooks/useProjectSave";
+import { recordProjectActivity } from "@/lib/dashboard-projects";
+import { buildExportZip } from "@/lib/export-zip";
 import type { Template } from "@/data/templates";
 
 import MonacoCodeEditor from "@/components/canvas/MonacoCodeEditor";
@@ -40,6 +43,14 @@ import LivePreview from "@/components/canvas/LivePreview";
 import ChatInterface from "@/components/canvas/ChatInterface";
 import ComponentPalette from "@/components/canvas/ComponentPalette";
 import GenerationProgress from "@/components/canvas/GenerationProgress";
+import DraftingToolbox, {
+  type ToolboxTabId,
+} from "@/components/canvas/DraftingToolbox";
+import DraftingModal, { ModalButton } from "@/components/canvas/DraftingModal";
+import UploadSketchModal, {
+  type UploadDetectionPayload,
+} from "@/components/canvas/UploadSketchModal";
+import { T_CANVAS, T_DARK } from "@/components/canvas/canvasTokens";
 import { useVersionHistory } from "@/hooks/useVersionHistory";
 import { useToast } from "@/components/ui/Toast";
 import { registerCanvasCommands } from "@/components/CommandPalette";
@@ -51,18 +62,13 @@ import type {
   CodeViewMode,
 } from "@/types/canvas";
 import {
-  ZOOM_MIN,
-  ZOOM_MAX,
   ZOOM_DEFAULT,
   ZOOM_STEP,
   CODE_PANEL_MIN_HEIGHT,
   CODE_PANEL_MAX_HEIGHT,
+  clampZoom,
+  clampCodePanelHeight,
 } from "@/types/canvas";
-
-// Apply imported zoom + code-panel constants where bounds are enforced.
-const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
-const clampCodePanelHeight = (h: number) =>
-  Math.min(CODE_PANEL_MAX_HEIGHT, Math.max(CODE_PANEL_MIN_HEIGHT, h));
 
 const SketchCanvas = dynamic(
   () => import("@/components/canvas/SketchCanvasWithHistory"),
@@ -93,17 +99,58 @@ export default function CanvasPage() {
 function CanvasPageFallback() {
   return (
     <div
-      className="flex h-screen items-center justify-center bg-[var(--charcoal-black)]"
+      className="flex h-screen items-center justify-center"
       role="status"
       aria-live="polite"
       aria-busy="true"
+      style={{ background: "#FAFAF7" }}
     >
       <span className="sr-only">Loading canvas...</span>
       <div
         aria-hidden="true"
-        className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--orange-primary)] border-t-transparent"
+        className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+        style={{ borderColor: "#4A4B8C", borderTopColor: "transparent" }}
       />
     </div>
+  );
+}
+
+function DraftingToggle({
+  label,
+  enabled,
+  onToggle,
+}: {
+  label: string;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <label
+      className="flex items-center justify-between px-3 py-2 cursor-pointer"
+      style={{ background: T_CANVAS.vellum, border: `1px solid ${T_CANVAS.rule}` }}
+    >
+      <span className="text-[12px]" style={{ color: T_CANVAS.graphite }}>
+        {label}
+      </span>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={enabled}
+        className="relative h-5 w-9 transition-colors"
+        style={{
+          background: enabled ? T_CANVAS.cobalt : T_CANVAS.paper,
+          border: `1px solid ${enabled ? T_CANVAS.cobalt : T_CANVAS.rule}`,
+        }}
+      >
+        <span
+          className="absolute top-[1px] block h-3.5 w-3.5 transition-transform"
+          style={{
+            background: enabled ? T_CANVAS.paper : T_CANVAS.graphite,
+            transform: enabled ? "translateX(17px)" : "translateX(1px)",
+          }}
+        />
+      </button>
+    </label>
   );
 }
 
@@ -112,7 +159,10 @@ function CanvasPageInner() {
   // Ã¢â€â‚¬Ã¢â€â‚¬ Core state Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [currentTool, setCurrentTool] = useState<Tool>("pen");
   const [currentMode, setCurrentMode] = useState<Mode>("sketch");
-  const [rightPanel, setRightPanel] = useState<RightPanel>("chat");
+  // Default to PROPS because the initial tool is "pen" (a drawing tool) —
+  // we want users to discover style controls on first load. See the effect
+  // below that re-opens PROPS whenever any drawing tool is selected.
+  const [rightPanel, setRightPanel] = useState<RightPanel>("properties");
   const [showCodePanel, setShowCodePanel] = useState(false);
   const [codePanelHeight, setCodePanelHeight] = useState(350);
   const [splitRatio, setSplitRatio] = useState(0.5);
@@ -129,6 +179,7 @@ function CanvasPageInner() {
   const [showExport, setShowExport] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showComponents, setShowComponents] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const exportOpenedByTourRef = useRef(false);
@@ -203,6 +254,11 @@ function CanvasPageInner() {
   );
   const isSaving = isManualSaving || isAutoSaving;
   const versionHistory = useVersionHistory();
+  const [checkpointToDelete, setCheckpointToDelete] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const [isDeletingCheckpoint, setIsDeletingCheckpoint] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ Refs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -257,6 +313,18 @@ function CanvasPageInner() {
   // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
   // Effects
   // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+
+  // Auto-open PROPS tab when a drawing tool is selected so users discover
+  // the style controls (color / width / fill / opacity). Also un-collapses
+  // the toolbox if it was collapsed, since setting rightPanel to a non-null
+  // value implicitly expands it. Runs on mount too because the initial tool
+  // is "pen".
+  useEffect(() => {
+    const DRAWING_TOOLS: Tool[] = ["pen", "line", "rectangle", "arrow", "erase"];
+    if (DRAWING_TOOLS.includes(currentTool)) {
+      setRightPanel("properties");
+    }
+  }, [currentTool]);
 
   // Fetch user
   useEffect(() => {
@@ -382,6 +450,7 @@ function CanvasPageInner() {
           setCurrentProject({ id: project.id, name: project.title });
           setProjectName(project.title);
           setOriginalProjectName(project.title);
+          recordProjectActivity(project.id, "opened");
           if (project.canvas_data) {
             const cd = project.canvas_data as CanvasData;
             const hasContent =
@@ -443,6 +512,7 @@ function CanvasPageInner() {
           name: projectName || "Untitled Project",
         });
         window.history.replaceState({}, "", `/canvas?id=${newId}`);
+        recordProjectActivity(newId, "created");
       }
     }
   }, [currentProject, projectName, saveProject, updateProject, editedCode, generatedCode]);
@@ -459,6 +529,7 @@ function CanvasPageInner() {
       if (projectId) {
         setCurrentProject({ id: projectId, name: title });
         window.history.replaceState({}, "", `/canvas?id=${projectId}`);
+        recordProjectActivity(projectId, "created");
       }
 
       return projectId;
@@ -467,6 +538,15 @@ function CanvasPageInner() {
   );
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ Keyboard shortcuts Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // Listen for the command-palette redirect — when a user picks "Keyboard
+  // shortcuts" from Ctrl+K, the palette closes and asks us to open the
+  // migrated ShortcutsPanel (single source of truth, drafting room theme).
+  useEffect(() => {
+    const onOpen = () => setShowShortcuts(true);
+    window.addEventListener(SHORTCUTS_PANEL_EVENT, onOpen);
+    return () => window.removeEventListener(SHORTCUTS_PANEL_EVENT, onOpen);
+  }, []);
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
@@ -675,6 +755,20 @@ function CanvasPageInner() {
   const handleDeleteVersion = async (versionId: string) => {
     await versionHistory.deleteVersion(versionId);
   };
+  const confirmDeleteCheckpoint = async () => {
+    if (!checkpointToDelete || isDeletingCheckpoint) return;
+    setIsDeletingCheckpoint(true);
+    const ok = await versionHistory.deleteVersion(checkpointToDelete.id);
+    setIsDeletingCheckpoint(false);
+    if (ok) {
+      toast.success("Checkpoint deleted.", { title: "Removed" });
+      setCheckpointToDelete(null);
+    } else {
+      toast.error("Could not delete the checkpoint.", {
+        title: "Delete failed",
+      });
+    }
+  };
 
   const persistOnboardingCompletion = useCallback(async () => {
     if (!user?.id) return;
@@ -759,26 +853,88 @@ function CanvasPageInner() {
     setLayers((p) => p.map((l) => (l.id === id ? { ...l, name } : l)));
 
   // Export
-  const handleExport = (options: ExportOptions) => {
-    if (options.format === "png") {
-      const result = canvasRef.current?.exportAsPNG();
-      if (result?.dataURL) {
-        const a = document.createElement("a");
-        a.href = result.dataURL;
-        a.download = `${projectName || "canvas"}.png`;
-        a.click();
-      }
-      return;
-    }
-    if (options.format === "json") {
-      const code = generatedCode || "// No code generated yet";
-      const blob = new Blob([code], { type: "application/json" });
+  const handleExport = async (options: ExportOptions) => {
+    const baseName = projectName?.trim() || "canvas";
+    const code = editedCode || generatedCode || "";
+
+    const downloadBlob = (blob: Blob, filename: string) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "codecanvas-export.json";
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+    };
+
+    if (options.format === "png") {
+      const result = canvasRef.current?.exportAsPNG();
+      if (!result?.dataURL) {
+        toast.error("Could not capture the canvas image.", { title: "Export failed" });
+        return;
+      }
+      const a = document.createElement("a");
+      a.href = result.dataURL;
+      a.download = `${baseName}.png`;
+      a.click();
+      return;
+    }
+
+    if (options.format === "svg") {
+      // Konva does not emit native SVG, so wrap the PNG export inside an SVG
+      // envelope. Result is a valid .svg that opens in any viewer and scales
+      // without re-rasterising the wrapper (raster bitmap is still embedded).
+      const result = canvasRef.current?.exportAsPNG();
+      if (!result?.dataURL) {
+        toast.error("Could not capture the canvas image.", { title: "Export failed" });
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${img.width}" height="${img.height}" viewBox="0 0 ${img.width} ${img.height}"><image href="${result.dataURL}" width="${img.width}" height="${img.height}"/></svg>`;
+        downloadBlob(new Blob([svg], { type: "image/svg+xml" }), `${baseName}.svg`);
+      };
+      img.onerror = () => {
+        toast.error("Could not build the SVG file.", { title: "Export failed" });
+      };
+      img.src = result.dataURL;
+      return;
+    }
+
+    if (options.format === "json") {
+      const canvasData = canvasRef.current?.getCanvasData() ?? null;
+      const payload = {
+        projectName: baseName,
+        exportedAt: new Date().toISOString(),
+        framework: options.framework ?? null,
+        styling: options.styling ?? null,
+        code,
+        canvas: canvasData,
+      };
+      downloadBlob(
+        new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
+        `${baseName}.json`
+      );
+      return;
+    }
+
+    if (options.format === "zip") {
+      if (!code) {
+        toast.warning("Generate code first, then export.", { title: "Nothing to export" });
+        return;
+      }
+      try {
+        const blob = await buildExportZip({
+          code,
+          framework: options.framework ?? "react",
+          styling: options.styling ?? "tailwind",
+          projectName: baseName,
+        });
+        downloadBlob(blob, `${baseName}.zip`);
+      } catch (err) {
+        console.error("ZIP export failed:", err);
+        toast.error("Could not build the ZIP file.", { title: "Export failed" });
+      }
+      return;
     }
   };
 
@@ -801,32 +957,115 @@ function CanvasPageInner() {
   const handleFitToScreen = () => setZoom(100);
 
   // Detection / AI
+  //
+  // Shared generation routine. Both the canvas "Run detection" path and the
+  // image-upload path funnel through here so they hit the SAME detection ->
+  // Gemini pipeline. The only difference is the source of `sketchImage` and the
+  // `sketchSource` tag (which tells the backend whether to photo-normalize).
+  const runGeneration = useCallback(
+    async (opts: {
+      canvasData: CanvasData;
+      sketchImage?: string;
+      textAnnotations: TextAnnotation[];
+      sketchSource: "canvas" | "upload-photo" | "upload-clean";
+    }) => {
+      setIsGenerating(true);
+      setGeneratedCode("");
+      setDetectedElements([]);
+      setUsedFallback(false);
+      try {
+        const projectId = await ensureGenerationProject(opts.canvasData);
+        if (!projectId) {
+          throw new Error("Failed to create a project before generation");
+        }
+
+        const response = await fetch(GENERATE_CODE_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: "generate",
+            canvasData: opts.canvasData,
+            framework: "react",
+            styling: "tailwind",
+            description: "",
+            projectId,
+            sketchImage: opts.sketchImage,
+            textAnnotations: opts.textAnnotations,
+            sketchSource: opts.sketchSource,
+          }),
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || "Failed to generate code");
+        }
+        const result = await response.json();
+        setGeneratedCode(result.code);
+        setEditedCode(result.code);
+        setDetectedElements(result.detectedElements ?? result.elements ?? []);
+        setUsedFallback(Boolean(result.usedFallback));
+        setFallbackMessage(result.message ?? null);
+        setCurrentMode("preview");
+        setShowCodePanel(true);
+        // Persist generated code immediately so it survives a reload without
+        // requiring a manual Ctrl+S.
+        if (projectId) {
+          void updateProject(projectId, opts.canvasData, undefined, result.code);
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Failed to generate code. Please try again.";
+        toast.error(message, { title: "Generation failed" });
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [ensureGenerationProject, updateProject, toast]
+  );
+
+  // Upload path: the uploaded image IS the sketch. Send it straight through
+  // with a minimal empty canvasData (the backend requires canvasData and uses
+  // its width/height as an image-size fallback). No text annotations, since
+  // there are no canvas-drawn labels to map.
+  const handleUploadDetection = useCallback(
+    (payload: UploadDetectionPayload) => {
+      setShowUpload(false);
+      const emptyCanvas: CanvasData = {
+        lines: [],
+        shapes: [],
+        componentGroups: [],
+        width: payload.width,
+        height: payload.height,
+      } as CanvasData;
+      void runGeneration({
+        canvasData: emptyCanvas,
+        sketchImage: payload.dataUrl,
+        textAnnotations: [],
+        sketchSource: payload.source,
+      });
+    },
+    [runGeneration]
+  );
+
   const handleRunDetection = async () => {
     if (!canvasRef.current) return;
-    setIsGenerating(true);
-    setGeneratedCode("");
-    setDetectedElements([]);
-    setUsedFallback(false);
-    try {
-      const canvasData = canvasRef.current.getCanvasData();
-      const hasContent =
-        !!canvasData &&
-        ((canvasData.lines?.length ?? 0) > 0 ||
-          (canvasData.shapes?.length ?? 0) > 0 ||
-          (canvasData.componentGroups?.length ?? 0) > 0);
-      if (!hasContent) {
-        toast.warning(
-          "Draw or add something to the canvas before generating code.",
-          {
-            title: "Canvas is empty",
-          }
-        );
-        return;
-      }
-      const projectId = await ensureGenerationProject(canvasData);
-      if (!projectId) {
-        throw new Error("Failed to create a project before generation");
-      }
+    const canvasData = canvasRef.current.getCanvasData();
+    const hasContent =
+      !!canvasData &&
+      ((canvasData.lines?.length ?? 0) > 0 ||
+        (canvasData.shapes?.length ?? 0) > 0 ||
+        (canvasData.componentGroups?.length ?? 0) > 0);
+    if (!hasContent) {
+      toast.warning(
+        "Draw or add something to the canvas before generating code.",
+        {
+          title: "Canvas is empty",
+        }
+      );
+      return;
+    }
+    {
       const exportResult = canvasRef.current.exportAsPNG?.();
       const sketchImage = exportResult?.dataURL || undefined;
       // Transform that maps canvas-coords → exported-image pixel coords.
@@ -887,45 +1126,12 @@ function CanvasPageInner() {
         }
       }
 
-      const response = await fetch(GENERATE_CODE_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "generate",
-          canvasData,
-          framework: "react",
-          styling: "tailwind",
-          description: "",
-          projectId,
-          sketchImage,
-          textAnnotations,
-        }),
+      void runGeneration({
+        canvasData,
+        sketchImage,
+        textAnnotations,
+        sketchSource: "canvas",
       });
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Failed to generate code");
-      }
-      const result = await response.json();
-      setGeneratedCode(result.code);
-      setEditedCode(result.code);
-      setDetectedElements(result.detectedElements ?? result.elements ?? []);
-      setUsedFallback(Boolean(result.usedFallback));
-      setFallbackMessage(result.message ?? null);
-      setCurrentMode("preview");
-      setShowCodePanel(true);
-      // Persist generated code immediately so it survives a reload without
-      // requiring a manual Ctrl+S.
-      if (projectId) {
-        void updateProject(projectId, canvasData, undefined, result.code);
-      }
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Failed to generate code. Please try again.";
-      toast.error(message, { title: "Generation failed" });
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -945,10 +1151,9 @@ function CanvasPageInner() {
     const startH = codePanelHeightRef.current;
     // Bound max by viewport so the canvas can't be squeezed to nothing on
     // short screens, but otherwise let the preview panel grow large enough to
-    // actually be usable (BUG 1 - the previous cap of 600 was too tight on
-    // 1080p+ displays, leaving the preview thumbnail-sized).
-    // Floor: leave ~180px for the canvas area + status bar.
-    const CANVAS_MIN_HEIGHT = 180;
+    // be usable. Floor reduced to ~80px (one toolbar's worth) so the user can
+    // near-fullscreen the code panel when reviewing generated code.
+    const CANVAS_MIN_HEIGHT = 80;
     const dynMax = Math.min(
       CODE_PANEL_MAX_HEIGHT,
       Math.max(CODE_PANEL_MIN_HEIGHT, window.innerHeight - CANVAS_MIN_HEIGHT)
@@ -1063,6 +1268,14 @@ function CanvasPageInner() {
         onSelect: () => setShowComponents(true),
       },
       {
+        id: "canvas:upload-sketch",
+        title: "Upload a sketch",
+        subtitle: "Detect code from a photo of a sketch or a wireframe image",
+        keywords: "upload image photo sketch wireframe import scan",
+        group: "Canvas",
+        onSelect: () => setShowUpload(true),
+      },
+      {
         id: "canvas:export",
         title: "Export",
         subtitle: "Download canvas as PNG or generated code as JSON",
@@ -1145,9 +1358,9 @@ function CanvasPageInner() {
   // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 
   return (
-    <div className="flex h-screen flex-col bg-[var(--cc-bg-canvas)] overflow-hidden select-none">
+    <div className="flex h-screen flex-col overflow-hidden select-none" style={{ background: "#FAFAF7", color: "#0E0E0F" }}>
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Top Navbar Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-      <Navbar
+      <CanvasTopBar
         projectName={projectName}
         originalProjectName={originalProjectName}
         onProjectNameChange={setProjectName}
@@ -1161,13 +1374,13 @@ function CanvasPageInner() {
         onRunDetection={handleRunDetection}
         isGenerating={isGenerating}
         onExport={() => setShowExport(true)}
+        onUploadSketch={() => setShowUpload(true)}
         onTemplatesToggle={() => setShowTemplates(true)}
         onChatToggle={() =>
           setRightPanel(rightPanel === "chat" ? null : "chat")
         }
-        onHistoryToggle={() => {}}
+        onShortcutsToggle={() => setShowShortcuts((p) => !p)}
         isChatActive={rightPanel === "chat"}
-        isHistoryActive={false}
       />
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Main workspace Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
@@ -1182,7 +1395,8 @@ function CanvasPageInner() {
           {/* Ã¢â€â‚¬Ã¢â€â‚¬ Canvas area Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
           <main
             ref={mainRef}
-            className="relative flex-1 min-h-0 overflow-hidden bg-[var(--cc-bg-canvas)]"
+            className="relative flex-1 min-h-0 overflow-hidden"
+            style={{ background: "#FAFAF7" }}
           >
             <CanvasSurface
               isEmpty={
@@ -1241,22 +1455,9 @@ function CanvasPageInner() {
               />
             </ErrorBoundary>
 
-            {/* Floating bottom style ribbon - slides in/out per tool */}
-            <ErrorBoundary
-              variant="panel"
-              title="Style controls unavailable"
-              message="We could not load the styling controls."
-            >
-              <StyleRibbon
-                currentTool={currentTool}
-                strokeColor={strokeColor}
-                fillColor={fillColor}
-                strokeWidth={strokeWidth}
-                onStrokeColorChange={setStrokeColor}
-                onFillColorChange={setFillColor}
-                onStrokeWidthChange={setStrokeWidth}
-              />
-            </ErrorBoundary>
+            {/* StyleRibbon used to float here at bottom-left. It now lives
+                in the DraftingToolbox PROPS tab so it never blocks the
+                drawing area. See the tab content below. */}
 
             {/* Frosted-glass zoom pill */}
             <ErrorBoundary
@@ -1271,22 +1472,42 @@ function CanvasPageInner() {
               />
             </ErrorBoundary>
 
-            {/* Code panel toggle (when hidden) */}
+            {/* Code panel toggle (when hidden) — Drafting Room mono pill */}
             {!showCodePanel && (
               <button
                 onClick={() => setShowCodePanel(true)}
-                className="absolute bottom-4 right-4 z-30 flex items-center gap-2 rounded-[10px] border border-[var(--cc-border-subtle)] bg-gradient-to-b from-[var(--cc-bg-elevated)] to-[var(--cc-bg-surface)] px-3 py-2 text-xs font-medium text-[var(--cc-text-secondary)] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.6)] transition-all duration-150 hover:border-[var(--cc-accent)] hover:text-[var(--cc-text-primary)] hover:shadow-[0_12px_28px_-8px_var(--cc-accent-glow-strong)]"
+                className="absolute bottom-4 right-4 z-30 flex items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                style={{
+                  background: T_CANVAS.paper,
+                  border: `1px solid ${T_CANVAS.rule}`,
+                  color: T_CANVAS.muted,
+                  fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = T_CANVAS.graphite;
+                  e.currentTarget.style.color = T_CANVAS.paper;
+                  e.currentTarget.style.borderColor = T_CANVAS.graphite;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = T_CANVAS.paper;
+                  e.currentTarget.style.color = T_CANVAS.muted;
+                  e.currentTarget.style.borderColor = T_CANVAS.rule;
+                }}
+                title="Open code panel (Ctrl+E)"
               >
                 <svg
-                  className="h-4 w-4"
+                  className="h-3 w-3"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth={2}
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
                 </svg>
-                Code
+                CODE ↑
               </button>
             )}
           </main>
@@ -1311,10 +1532,14 @@ function CanvasPageInner() {
             <div
               ref={codePanelRef}
               data-onboarding="code-panel"
-              className="flex flex-col flex-shrink-0 border-t border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] will-change-[height]"
-              style={{ height: codePanelHeight }}
+              className="flex flex-col flex-shrink-0 border-t will-change-[height]"
+              style={{
+                height: codePanelHeight,
+                borderColor: T_CANVAS.rule,
+                background: T_DARK.bg,
+              }}
             >
-              {/* Drag handle - tactile, hover reveals an accented grip pill. */}
+              {/* Drag handle — dark slab grip, cobalt on hover. */}
               <div
                 onMouseDown={handleCodePanelDrag}
                 onDoubleClick={() => {
@@ -1322,49 +1547,90 @@ function CanvasPageInner() {
                   codePanelHeightRef.current = 350;
                 }}
                 title="Drag to resize · double-click to reset"
-                className="group relative flex h-2.5 shrink-0 cursor-row-resize items-center justify-center transition-colors hover:bg-[var(--cc-accent-glow)]"
+                className="group relative flex h-2.5 shrink-0 cursor-row-resize items-center justify-center transition-colors"
+                style={{ background: T_DARK.bgRaised }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = T_DARK.cobaltWash)}
+                onMouseLeave={(e) => (e.currentTarget.style.background = T_DARK.bgRaised)}
               >
-                <div className="h-1 w-10 rounded-full bg-[var(--cc-border-emphasis)] transition-all duration-150 group-hover:w-16 group-hover:bg-[var(--cc-accent)]" />
+                <div
+                  className="h-[2px] w-10 transition-all duration-150 group-hover:w-16"
+                  style={{ background: T_DARK.inkFaint }}
+                />
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col">
-                {/* Tab bar - VS Code-style segmented control on the left,
-                    actions on the right. */}
-                <div className="flex items-center justify-between border-b border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)]/40 px-2 py-1.5">
-                  <div className="flex items-center gap-0.5 rounded-[8px] bg-[var(--cc-bg-canvas)] p-0.5">
-                    {(["code", "preview", "split"] as const).map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => setCodeViewMode(mode)}
-                        className={`rounded-[6px] px-2.5 py-1 text-[11px] font-medium capitalize transition-all duration-150 ${
-                          codeViewMode === mode
-                            ? "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-primary)] shadow-[0_1px_2px_rgba(0,0,0,0.4)]"
-                            : "text-[var(--cc-text-secondary)] hover:bg-white/[0.04] hover:text-[var(--cc-text-primary)]"
-                        }`}
-                      >
-                        {mode}
-                      </button>
-                    ))}
+                {/* Tab bar — dark slab: paper-tinted hairlines, mono tabs,
+                    bright ink on active. */}
+                <div
+                  className="flex items-center justify-between border-b px-2 py-1.5"
+                  style={{
+                    borderColor: T_DARK.ruleSoft,
+                    background: T_DARK.bg,
+                    fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                  }}
+                >
+                  <div
+                    className="flex items-center"
+                    style={{ border: `1px solid ${T_DARK.rule}` }}
+                  >
+                    {(["code", "preview", "split"] as const).map((mode, i) => {
+                      const active = codeViewMode === mode;
+                      return (
+                        <button
+                          key={mode}
+                          onClick={() => setCodeViewMode(mode)}
+                          className="px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                          style={{
+                            background: active ? T_DARK.surfaceHover : "transparent",
+                            color: active ? T_DARK.inkBright : T_DARK.inkMuted,
+                            borderLeft: i > 0 ? `1px solid ${T_DARK.rule}` : undefined,
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!active) e.currentTarget.style.color = T_DARK.inkBright;
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!active) e.currentTarget.style.color = T_DARK.inkMuted;
+                          }}
+                        >
+                          {mode}
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={handleCopyCode}
                       disabled={!generatedCode && !editedCode}
-                      className="flex items-center gap-1.5 rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-2.5 py-1 text-[11px] font-medium text-[var(--cc-text-secondary)] transition-all duration-150 hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{
+                        background: codeCopied ? T_DARK.cobaltWash : T_DARK.surfaceSoft,
+                        border: `1px solid ${codeCopied ? T_DARK.cobalt : T_DARK.rule}`,
+                        color: codeCopied ? T_DARK.cobaltInk : T_DARK.inkMuted,
+                        fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!codeCopied && (generatedCode || editedCode))
+                          e.currentTarget.style.color = T_DARK.inkBright;
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!codeCopied) e.currentTarget.style.color = T_DARK.inkMuted;
+                      }}
                       title="Copy code to clipboard"
                     >
                       {codeCopied ? (
                         <>
                           <svg
-                            className="h-3 w-3 text-emerald-400"
+                            className="h-3 w-3"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
-                            strokeWidth={2.5}
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
                           >
                             <path d="M5 13l4 4L19 7" />
                           </svg>
-                          <span className="text-emerald-400">Copied</span>
+                          COPIED
                         </>
                       ) : (
                         <>
@@ -1373,26 +1639,74 @@ function CanvasPageInner() {
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
-                            strokeWidth={2}
+                            strokeWidth={1.75}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
                           >
-                            <rect x="9" y="9" width="13" height="13" rx="2" />
+                            <rect x="9" y="9" width="13" height="13" rx="1" />
                             <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                           </svg>
-                          Copy
+                          COPY
                         </>
                       )}
                     </button>
                     <button
-                      onClick={() => setShowCodePanel(false)}
-                      className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[var(--cc-text-secondary)] transition-colors hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
-                      title="Collapse code panel"
+                      onClick={() => {
+                        const fullH = window.innerHeight - 80;
+                        const isNearMax = codePanelHeight > fullH - 40;
+                        const next = isNearMax ? 350 : fullH;
+                        setCodePanelHeight(next);
+                        codePanelHeightRef.current = next;
+                      }}
+                      className="flex h-6 w-6 items-center justify-center transition-colors"
+                      style={{ color: T_DARK.inkMuted }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = T_DARK.inkBright;
+                        e.currentTarget.style.background = T_DARK.surfaceHover;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = T_DARK.inkMuted;
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                      title="Maximize / restore code panel"
                     >
                       <svg
-                        className="h-3.5 w-3.5"
+                        className="h-3 w-3"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
-                        strokeWidth={2}
+                        strokeWidth={1.75}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="4 14 4 20 10 20" />
+                        <polyline points="20 10 20 4 14 4" />
+                        <line x1="14" y1="10" x2="20" y2="4" />
+                        <line x1="4" y1="20" x2="10" y2="14" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setShowCodePanel(false)}
+                      className="flex h-6 w-6 items-center justify-center transition-colors"
+                      style={{ color: T_DARK.inkMuted }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = T_DARK.inkBright;
+                        e.currentTarget.style.background = T_DARK.surfaceHover;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = T_DARK.inkMuted;
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                      title="Collapse code panel"
+                    >
+                      <svg
+                        className="h-3 w-3"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.75}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
                         <path d="M19 9l-7 7-7-7" />
                       </svg>
@@ -1400,46 +1714,34 @@ function CanvasPageInner() {
                   </div>
                 </div>
 
-                {/* Detection summary bar */}
+                {/* Detection summary bar — dark slab mono strip */}
                 {(generatedCode || editedCode) &&
                   (usedFallback || detectedElements.length > 0) && (
                     <div
-                      className={`flex items-center gap-2 border-b px-3 py-1.5 text-[11px] ${
-                        usedFallback
-                          ? "border-yellow-500/30 bg-yellow-500/5 text-yellow-300"
-                          : "border-[#1E1E1E] bg-[#0A0A0A] text-[#A0A0A0]"
-                      }`}
+                      className="flex items-center gap-2 border-b px-3 py-1.5 text-[10px] tracking-[0.14em] uppercase"
+                      style={{
+                        borderColor: T_DARK.ruleSoft,
+                        background: usedFallback ? T_DARK.warningWash : T_DARK.bgRaised,
+                        color: usedFallback ? T_DARK.warning : T_DARK.inkMuted,
+                        fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                      }}
                     >
                       {usedFallback ? (
                         <>
-                          <svg
-                            className="h-3.5 w-3.5 shrink-0"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                          </svg>
-                          <span>
+                          <span className="font-bold" aria-hidden="true">[!]</span>
+                          <span style={{ textTransform: "none", letterSpacing: 0 }}>
                             {fallbackMessage ??
                               "No UI elements detected. Showing a default template. Try drawing larger, clearer boxes."}
                           </span>
                         </>
                       ) : (
                         <>
-                          <svg
-                            className="h-3.5 w-3.5 shrink-0 text-[#FF6B00]"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span className="font-medium text-[#D0D0D0]">
-                            Detected:
-                          </span>
+                          <span
+                            className="inline-block h-1.5 w-1.5"
+                            style={{ background: T_DARK.cobalt }}
+                            aria-hidden="true"
+                          />
+                          <span style={{ color: T_DARK.inkBright }}>DETECTED ·</span>
                           <span>
                             {Object.entries(
                               detectedElements.reduce<Record<string, number>>(
@@ -1522,10 +1824,20 @@ function CanvasPageInner() {
                           <div
                             onMouseDown={handleSplitDrag}
                             onDoubleClick={() => setSplitRatio(0.5)}
-                            className="group relative flex w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-[#1E1E1E] hover:bg-[#FF6B00]/40"
+                            className="group relative flex w-px shrink-0 cursor-col-resize items-center justify-center"
+                            style={{ background: T_DARK.rule }}
                             title="Drag to resize · double-click to reset"
                           >
-                            <div className="h-8 w-0.5 rounded-full bg-[#3E3E3E] transition-colors group-hover:bg-[#FF6B00]" />
+                            {/* Wider invisible hit-target so the 1px rule is
+                                still easy to grab; the rule itself stays a
+                                hairline so the divider doesn't dominate the
+                                composition. Cobalt washes the rule on hover. */}
+                            <div
+                              aria-hidden="true"
+                              className="absolute inset-y-0 -left-1 -right-1 transition-colors"
+                              onMouseEnter={(e) => (e.currentTarget.style.background = `${T_DARK.cobalt}33`)}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                            />
                           </div>
                           <div className="h-full flex-1 overflow-hidden">
                             <ErrorBoundary
@@ -1546,27 +1858,59 @@ function CanvasPageInner() {
                   ) : isGenerating ? (
                     <GenerationProgress isGenerating hasPriorCode={false} />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-[#999]">
+                    <div
+                      className="flex h-full items-center justify-center"
+                      style={{ background: T_DARK.bg }}
+                    >
                       <div className="text-center">
-                        <svg
-                          className="mx-auto mb-2 h-10 w-10 opacity-40"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
+                        <span
+                          className="mx-auto mb-3 flex h-12 w-12 items-center justify-center"
+                          style={{
+                            background: T_DARK.surfaceSoft,
+                            border: `1px solid ${T_DARK.rule}`,
+                            color: T_DARK.cobalt,
+                          }}
                         >
-                          <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                        </svg>
-                        <p className="text-xs">
-                          Draw on the canvas and click &quot;Run Detection&quot;
-                          to generate code
+                          <svg
+                            className="h-5 w-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.4}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <polyline points="16 18 22 12 16 6" />
+                            <polyline points="8 6 2 12 8 18" />
+                          </svg>
+                        </span>
+                        <p
+                          className="text-[11px] tracking-[0.16em] uppercase"
+                          style={{
+                            color: T_DARK.inkBright,
+                            fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                          }}
+                        >
+                          AWAITING SKETCH
+                        </p>
+                        <p
+                          className="mt-1 text-[10px] tracking-[0.14em] uppercase"
+                          style={{
+                            color: T_DARK.inkFaint,
+                            fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                          }}
+                        >
+                          DRAW + RUN DETECTION TO GENERATE CODE
                         </p>
                       </div>
                     </div>
                   )}
 
                   {isGenerating && (generatedCode || editedCode) && (
-                    <div className="absolute inset-0 z-10 bg-[#0A0A0A]/85 backdrop-blur-sm">
+                    <div
+                      className="absolute inset-0 z-10 backdrop-blur-sm"
+                      style={{ background: "rgba(14, 14, 15, 0.85)" }}
+                    >
                       <GenerationProgress isGenerating hasPriorCode />
                     </div>
                   )}
@@ -1577,174 +1921,138 @@ function CanvasPageInner() {
         </div>
 
         {/* Ã¢â€â‚¬Ã¢â€â‚¬ Right panel Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-        {rightPanel && (
-          <aside className="w-72 overflow-y-auto border-l border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)]">
-            {/* Properties panel */}
-            {rightPanel === "properties" && (
-              <div className="p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#888]">
-                    Properties
-                  </h2>
-                  <button
-                    onClick={() => setRightPanel(null)}
-                    className="rounded p-1 text-[#999] hover:bg-[#1E1E1E] hover:text-white"
-                  >
-                    <svg
-                      className="h-3.5 w-3.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Grid Settings */}
-                <div className="mb-4">
-                  <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wider text-[#999]">
-                    Canvas
-                  </label>
-                  <div className="space-y-2">
-                    <label className="flex items-center justify-between rounded-lg bg-[#0A0A0A] px-3 py-2">
-                      <span className="text-xs text-[#A0A0A0]">Show Grid</span>
-                      <button
-                        onClick={() => setGridEnabled(!gridEnabled)}
-                        className={`relative h-5 w-9 rounded-full transition-colors ${gridEnabled ? "bg-[#FF6B00]" : "bg-[#2E2E2E]"}`}
-                      >
-                        <span
-                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${gridEnabled ? "translate-x-[18px]" : "translate-x-0.5"}`}
-                        />
-                      </button>
-                    </label>
-                    <label className="flex items-center justify-between rounded-lg bg-[#0A0A0A] px-3 py-2">
-                      <span className="text-xs text-[#A0A0A0]">
-                        Snap to Grid
-                      </span>
-                      <button
-                        onClick={() => setSnapEnabled(!snapEnabled)}
-                        className={`relative h-5 w-9 rounded-full transition-colors ${snapEnabled ? "bg-[#FF6B00]" : "bg-[#2E2E2E]"}`}
-                      >
-                        <span
-                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${snapEnabled ? "translate-x-[18px]" : "translate-x-0.5"}`}
-                        />
-                      </button>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Version Checkpoints */}
-                <div className="mt-6">
-                  <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#999]">
-                    Checkpoints
-                  </h3>
-                  <button
-                    onClick={handleCreateCheckpoint}
-                    className="w-full rounded-lg border border-dashed border-[#2E2E2E] bg-[#0A0A0A] px-3 py-2 text-xs text-[#A0A0A0] transition-all hover:border-[#FF6B00] hover:text-[#FF6B00]"
-                  >
-                    + Create Checkpoint
-                  </button>
-                  {versionHistory.versions.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {versionHistory.versions.slice(0, 3).map((v) => (
-                        <div
-                          key={v.id}
-                          className="flex items-center justify-between rounded-lg bg-[#0A0A0A] px-3 py-1.5"
-                        >
-                          <span className="truncate text-xs text-[#A0A0A0]">
-                            {v.description || "Checkpoint"}
-                          </span>
-                          <button
-                            onClick={() => handleRestoreVersion(v.id)}
-                            className="ml-2 text-[10px] text-[#FF6B00] hover:underline"
-                          >
-                            Restore
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Layers panel */}
-            {rightPanel === "layers" && (
-              <div className="p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[#888]">
-                    Layers
-                  </h2>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        const newLayer: Layer = {
-                          id: `layer-${Date.now()}`,
-                          name: `Layer ${layers.length + 1}`,
-                          type: "pen",
-                          visible: true,
-                          locked: false,
-                          opacity: 1,
-                        };
-                        setLayers((prev) => [...prev, newLayer]);
-                        setSelectedLayerId(newLayer.id);
-                      }}
-                      className="rounded p-1 text-[#999] hover:bg-[#1E1E1E] hover:text-white"
-                      title="Add Layer"
-                    >
-                      <svg
-                        className="h-3.5 w-3.5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => setRightPanel(null)}
-                      className="rounded p-1 text-[#999] hover:bg-[#1E1E1E] hover:text-white"
-                    >
-                      <svg
-                        className="h-3.5 w-3.5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="M18 6L6 18M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                <LayerPanel
-                  layers={layers}
-                  selectedLayerId={selectedLayerId}
-                  onSelectLayer={handleSelectLayer}
-                  onToggleVisibility={handleToggleVisibility}
-                  onToggleLock={handleToggleLock}
-                  onDeleteLayer={handleDeleteLayer}
-                  onDuplicateLayer={handleDuplicateLayer}
-                  onRenameLayer={handleRenameLayer}
+        {/* ── Drafting Toolbox (right rail) ───────────────────────── */}
+        <DraftingToolbox
+          activeTab={(rightPanel ?? "chat") as ToolboxTabId}
+          onTabChange={(id) => setRightPanel(id as typeof rightPanel)}
+          collapsed={rightPanel === null}
+          onCollapsedChange={(c) => setRightPanel(c ? null : (rightPanel ?? "chat"))}
+          tabs={[
+            {
+              id: "chat",
+              label: "CHAT",
+              shortcut: "Ctrl+/",
+              icon: (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                </svg>
+              ),
+              content: (
+                <ChatInterface
+                  key={currentProject?.id ?? "no-project"}
+                  onSendMessage={handleChatMessage}
+                  isProcessing={isGenerating}
+                  hasCode={!!(editedCode || generatedCode)}
+                  projectId={currentProject?.id}
                 />
-              </div>
-            )}
+              ),
+            },
+            {
+              id: "properties",
+              label: "PROPS",
+              icon: (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                </svg>
+              ),
+              content: (
+                <div className="h-full overflow-y-auto p-4 space-y-5" style={{ background: T_CANVAS.paper, fontFamily: "var(--font-inter, ui-sans-serif, system-ui)" }}>
+                  {/* STYLE — color / width / fill / opacity for the current drawing tool */}
+                  <StyleRibbon
+                    currentTool={currentTool}
+                    strokeColor={strokeColor}
+                    fillColor={fillColor}
+                    strokeWidth={strokeWidth}
+                    onStrokeColorChange={setStrokeColor}
+                    onFillColorChange={setFillColor}
+                    onStrokeWidthChange={setStrokeWidth}
+                  />
 
-            {/* Chat panel - sketch-first workflow: hasCode gates chat input */}
-            {rightPanel === "chat" && (
-              <ChatInterface
-                key={currentProject?.id ?? "no-project"}
-                onSendMessage={handleChatMessage}
-                isProcessing={isGenerating}
-                hasCode={!!(editedCode || generatedCode)}
-                projectId={currentProject?.id}
-              />
-            )}
-          </aside>
-        )}
+                  <div>
+                    <div
+                      className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+                      style={{ color: T_CANVAS.muted, fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)" }}
+                    >
+                      CANVAS
+                    </div>
+                    <div className="space-y-2">
+                      <DraftingToggle label="Show grid" enabled={gridEnabled} onToggle={() => setGridEnabled(!gridEnabled)} />
+                      <DraftingToggle label="Snap to grid" enabled={snapEnabled} onToggle={() => setSnapEnabled(!snapEnabled)} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div
+                      className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+                      style={{ color: T_CANVAS.muted, fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)" }}
+                    >
+                      CHECKPOINTS
+                    </div>
+                    <button
+                      onClick={handleCreateCheckpoint}
+                      className="w-full px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                      style={{
+                        background: T_CANVAS.paper,
+                        border: `1px dashed ${T_CANVAS.rule}`,
+                        color: T_CANVAS.muted,
+                        fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = T_CANVAS.cobalt;
+                        e.currentTarget.style.borderColor = T_CANVAS.cobalt;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = T_CANVAS.muted;
+                        e.currentTarget.style.borderColor = T_CANVAS.rule;
+                      }}
+                    >
+                      + CREATE CHECKPOINT
+                    </button>
+                    {versionHistory.versions.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {versionHistory.versions.slice(0, 5).map((v) => (
+                          <div
+                            key={v.id}
+                            className="flex items-center justify-between px-3 py-1.5 text-[11px]"
+                            style={{ background: T_CANVAS.vellum, border: `1px solid ${T_CANVAS.rule}`, color: T_CANVAS.graphite }}
+                          >
+                            <span className="truncate">{v.description || "Checkpoint"}</span>
+                            <div className="ml-2 flex flex-shrink-0 items-center gap-2">
+                              <button
+                                onClick={() => handleRestoreVersion(v.id)}
+                                className="text-[10px] tracking-[0.14em] uppercase"
+                                style={{ color: T_CANVAS.cobalt, fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)" }}
+                              >
+                                RESTORE
+                              </button>
+                              <span aria-hidden="true" style={{ color: T_CANVAS.rule }}>
+                                ·
+                              </span>
+                              <button
+                                onClick={() =>
+                                  setCheckpointToDelete({
+                                    id: v.id,
+                                    label: v.description || "Checkpoint",
+                                  })
+                                }
+                                className="text-[10px] tracking-[0.14em] uppercase"
+                                style={{ color: T_CANVAS.error, fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)" }}
+                              >
+                                DELETE
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ),
+            },
+          ]}
+        />
+
       </div>
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Code panel toggle (when hidden) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
@@ -1767,57 +2075,136 @@ function CanvasPageInner() {
       )}
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Welcome dialog Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-      {showWelcomeDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-[#2E2E2E] bg-[#1A1A1A] p-6 shadow-2xl">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="rounded-full bg-[#FF6B00]/20 p-3">
-                <svg
-                  className="h-6 w-6 text-[#FF6B00]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-white">Design Imported!</h2>
-            </div>
-            <p className="mb-6 text-[#A0A0A0]">
-              Your sketch from the mini canvas has been imported. What would you
-              like to do?
-            </p>
-            <div className="space-y-3">
-              <button
+      {/* Delete checkpoint confirmation */}
+      <DraftingModal
+        open={checkpointToDelete !== null}
+        onClose={() => {
+          if (!isDeletingCheckpoint) setCheckpointToDelete(null);
+        }}
+        slug="Danger · Delete checkpoint"
+        title="Delete this checkpoint?"
+        subtitle="This removes the saved snapshot. The action cannot be undone."
+        maxWidth={460}
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <ModalButton
+              variant="ghost"
+              onClick={() => setCheckpointToDelete(null)}
+              disabled={isDeletingCheckpoint}
+            >
+              Cancel
+            </ModalButton>
+            <ModalButton
+              variant="danger"
+              onClick={confirmDeleteCheckpoint}
+              disabled={isDeletingCheckpoint}
+            >
+              {isDeletingCheckpoint ? "Deleting" : "Delete checkpoint"}
+            </ModalButton>
+          </div>
+        }
+      >
+        <div
+          className="px-3 py-2.5"
+          style={{
+            background: T_CANVAS.vellum,
+            border: `1px solid ${T_CANVAS.rule}`,
+          }}
+        >
+          <div
+            className="text-[10px] tracking-[0.16em] uppercase"
+            style={{
+              color: T_CANVAS.muted,
+              fontFamily:
+                "var(--font-jetbrains-mono, ui-monospace, monospace)",
+            }}
+          >
+            Checkpoint
+          </div>
+          <div
+            className="mt-1 truncate text-[13px]"
+            style={{
+              color: T_CANVAS.graphite,
+              fontFamily:
+                "var(--font-inter, ui-sans-serif, system-ui, sans-serif)",
+            }}
+          >
+            {checkpointToDelete?.label}
+          </div>
+        </div>
+      </DraftingModal>
+
+      <DraftingModal
+        open={showWelcomeDialog}
+        onClose={() => setShowWelcomeDialog(false)}
+        slug="CANVAS · IMPORT"
+        title="Design imported."
+        subtitle="Your sketch from the mini canvas has been loaded. Choose how to proceed."
+        maxWidth={440}
+        footer={
+          <div className="flex flex-col gap-2">
+            <ModalButton
+              variant="primary"
+              onClick={() => {
+                setShowWelcomeDialog(false);
+                setCurrentMode("detect");
+              }}
+            >
+              Analyze design →
+            </ModalButton>
+            <div className="flex gap-2">
+              <ModalButton
+                variant="ghost"
                 onClick={() => setShowWelcomeDialog(false)}
-                className="w-full rounded-lg border border-[#2E2E2E] bg-[#2E2E2E] px-6 py-3 font-semibold text-white transition-all hover:bg-[#3E3E3E]"
               >
-                Continue Designing
-              </button>
-              <button
-                onClick={() => {
-                  setShowWelcomeDialog(false);
-                  setCurrentMode("detect");
-                }}
-                className="w-full rounded-lg bg-[#FF6B00]/20 border border-[#FF6B00]/50 px-6 py-3 font-semibold text-white transition-all hover:bg-[#FF6B00]/30 hover:shadow-[0_0_20px_rgba(255,107,0,0.4)]"
-              >
-                Analyze Design
-              </button>
-              <button
+                Continue designing
+              </ModalButton>
+              <ModalButton
+                variant="ghost"
                 onClick={() => {
                   setShowWelcomeDialog(false);
                   setImportedDesign(null);
                   localStorage.removeItem("miniCanvasDesign");
                 }}
-                className="w-full rounded-lg border border-[#2E2E2E] bg-transparent px-6 py-3 text-sm text-[#A0A0A0] transition-all hover:bg-[#2E2E2E] hover:text-white"
               >
-                Start Fresh
-              </button>
+                Start fresh
+              </ModalButton>
             </div>
           </div>
+        }
+      >
+        <div className="pt-2 pb-1">
+          <div
+            className="flex items-center gap-3 px-3 py-2.5"
+            style={{
+              background: T_CANVAS.vellum,
+              border: `1px solid ${T_CANVAS.rule}`,
+            }}
+          >
+            <svg
+              className="h-4 w-4 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ color: T_CANVAS.cobalt }}
+            >
+              <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+            <span
+              className="text-[11px] tracking-[0.12em] uppercase"
+              style={{
+                color: T_CANVAS.muted,
+                fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+              }}
+            >
+              Mini canvas sketch ready
+            </span>
+          </div>
         </div>
-      )}
+      </DraftingModal>
 
       <OnboardingTour
         isOpen={showOnboarding}
@@ -1850,6 +2237,12 @@ function CanvasPageInner() {
         isOpen={showComponents}
         onClose={() => setShowComponents(false)}
         onInsertComponent={handleInsertComponent}
+      />
+      <UploadSketchModal
+        open={showUpload}
+        onClose={() => setShowUpload(false)}
+        onDetect={handleUploadDetection}
+        isGenerating={isGenerating}
       />
       {/* Duplicate floating save indicator removed (BUG 3) - the header's
           single save-dot in <Navbar /> is now the only save-status surface. */}

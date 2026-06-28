@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
 
 export type ErrorBoundaryVariant = "page" | "panel" | "inline";
 
@@ -31,6 +32,10 @@ interface ErrorFallbackProps {
 const defaultTitle = "Something went wrong";
 const defaultMessage = "We could not load this section.";
 
+const MONO = "var(--font-jetbrains-mono, ui-monospace, monospace)";
+const SANS = "var(--font-inter, ui-sans-serif, system-ui)";
+const SERIF = "var(--font-instrument-serif, ui-serif, Georgia, serif)";
+
 function ErrorFallback({
   title,
   message,
@@ -38,50 +43,176 @@ function ErrorFallback({
   onRefresh,
   variant,
 }: ErrorFallbackProps) {
+  // Inline: thin banner, no sheet, no refresh button
+  if (variant === "inline") {
+    return (
+      <div
+        role="alert"
+        aria-live="polite"
+        className="flex items-center gap-3 px-3 py-2 text-[12px]"
+        style={{
+          background: `${T.error}10`,
+          border: `1px solid ${T.error}`,
+          color: T.error,
+          fontFamily: SANS,
+        }}
+      >
+        <span
+          className="px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
+          style={{
+            border: `1px solid currentColor`,
+            fontFamily: MONO,
+          }}
+        >
+          Error
+        </span>
+        <span className="flex-1 truncate">{message}</span>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="px-2 py-1 text-[10px] tracking-[0.18em] uppercase transition-colors"
+          style={{
+            background: T.paper,
+            border: `1px solid ${T.error}`,
+            color: T.error,
+            fontFamily: MONO,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = T.error;
+            e.currentTarget.style.color = T.paper;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = T.paper;
+            e.currentTarget.style.color = T.error;
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Page + panel both use the paper-sheet treatment, sized to context.
   const containerClassName =
-    variant === "page"
-      ? "min-h-screen"
-      : "h-full min-h-[220px]";
+    variant === "page" ? "min-h-screen" : "h-full min-h-[260px]";
 
   return (
     <div
-      className={`${containerClassName} w-full bg-[var(--cc-bg-canvas)] p-6 flex items-center justify-center`}
+      className={`${containerClassName} flex w-full items-center justify-center p-6`}
       role="alert"
       aria-live="polite"
+      style={{ background: T.paper }}
     >
-      <div className="w-full max-w-md rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-6 text-center shadow-[0_20px_40px_-20px_rgba(0,0,0,0.6)]">
-        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-muted)]">
-          <svg
-            className="h-5 w-5"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-          </svg>
+      <div
+        className="w-full max-w-md"
+        style={{
+          background: T.paper,
+          border: `1px solid ${T.error}`,
+        }}
+      >
+        {/* Title strip */}
+        <div
+          className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+          style={{
+            background: `${T.error}10`,
+            borderColor: T.error,
+            color: T.error,
+            fontFamily: MONO,
+          }}
+        >
+          <span>Error · Boundary caught</span>
+          <span>{variant === "page" ? "PAGE" : "PANEL"}</span>
         </div>
-        <h2 className="text-[16px] font-semibold text-[var(--cc-text-primary)]">
-          {title}
-        </h2>
-        <p className="mt-1 text-[12px] text-[var(--cc-text-secondary)]">
-          {message}
-        </p>
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-4 py-2 text-[12px] font-semibold text-white transition-all hover:shadow-[0_0_16px_var(--cc-accent-glow-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+
+        {/* Body */}
+        <div className="px-6 pt-5 pb-2 text-center sm:text-left">
+          <div className="mb-4 inline-flex h-10 w-10 items-center justify-center"
+            style={{
+              border: `1px solid ${T.error}`,
+              color: T.error,
+              background: `${T.error}10`,
+            }}
           >
-            Retry
-          </button>
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+            </svg>
+          </div>
+          <h2
+            className="text-[26px] leading-[1.1] tracking-[-0.01em]"
+            style={{ color: T.graphite, fontFamily: SERIF, fontWeight: 400 }}
+          >
+            {title}
+          </h2>
+          <p
+            className="mt-1.5 text-[12px] leading-[1.55]"
+            style={{ color: T.muted, fontFamily: SANS }}
+          >
+            {message}
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div
+          className="flex flex-col-reverse gap-2 border-t px-6 py-3.5 sm:flex-row sm:justify-end"
+          style={{
+            background: T.vellum,
+            borderColor: T.rule,
+          }}
+        >
           <button
             type="button"
             onClick={onRefresh}
-            className="rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-4 py-2 text-[12px] font-semibold text-[var(--cc-text-primary)] transition-colors hover:border-[var(--cc-border-emphasis)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+            className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+            style={{
+              background: T.paper,
+              border: `1px solid ${T.rule}`,
+              color: T.graphite,
+              fontFamily: MONO,
+              minHeight: 36,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = T.graphite;
+              e.currentTarget.style.color = T.paper;
+              e.currentTarget.style.borderColor = T.graphite;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = T.paper;
+              e.currentTarget.style.color = T.graphite;
+              e.currentTarget.style.borderColor = T.rule;
+            }}
           >
-            Refresh Page
+            Refresh page
+          </button>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+            style={{
+              background: T.cobalt,
+              border: `1px solid ${T.cobalt}`,
+              color: T.paper,
+              fontFamily: MONO,
+              minHeight: 36,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = T.cobaltInk;
+              e.currentTarget.style.borderColor = T.cobaltInk;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = T.cobalt;
+              e.currentTarget.style.borderColor = T.cobalt;
+            }}
+          >
+            Retry →
           </button>
         </div>
       </div>

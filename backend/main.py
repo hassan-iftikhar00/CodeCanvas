@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
+import math
 import os
 import re
 import urllib.error
@@ -35,6 +37,7 @@ from app.models.inference import (
 def _debug_ai_enabled() -> bool:
     return os.getenv("DEBUG_AI_PROMPT", "").lower() in ("1", "true", "yes", "on")
 from app.utils.preprocessing import preprocess_canvas_data
+from app.utils.rate_limit import SlidingWindowRateLimiter
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -48,6 +51,56 @@ FREE_MODELS = [
 ]
 
 _MAX_BODY_BYTES = 20 * 1024 * 1024  # 20 MB
+
+# Gemini code-gen ceiling. When the Pro key is on its daily-quota cooldown, every
+# request falls back to Flash; a cold Flash call occasionally crosses 90s, which
+# used to 504 even though the result was about to arrive. 110s gives that tail
+# room while staying under the Next.js proxy ceiling (FASTAPI_PROXY_TIMEOUT_MS,
+# default 120s). Override per-deploy via env. Keep proxy > this value.
+GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "110"))
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+# Rate limiting for /api/predict (B7). The endpoint is expensive (Roboflow +
+# Gemini, or OpenRouter for chat) and would otherwise let a single user burn the
+# shared API quota — especially relevant while Roboflow is credit-capped. Keyed
+# on the authenticated user id the proxy stamps in (see _rate_limit_key). Defaults
+# allow normal interactive use; override per-deploy via env. Set
+# RATE_LIMIT_ENABLED=false to disable (e.g. for load tests / automated QA).
+RATE_LIMIT_ENABLED = _env_flag("RATE_LIMIT_ENABLED", True)
+RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", "20"))
+RATE_LIMIT_WINDOW_SECONDS = float(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60"))
+
+ai_rate_limiter: Optional[SlidingWindowRateLimiter] = (
+    SlidingWindowRateLimiter(RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_SECONDS)
+    if RATE_LIMIT_ENABLED
+    else None
+)
+
+
+def _client_ip(http_request: Request) -> str:
+    """Best-effort client IP for the rate-limit fallback key. Only used when the
+    authenticated user id is missing (shouldn't happen via the real proxy, which
+    always stamps user.id). X-Forwarded-For is honoured for a real reverse proxy;
+    it is spoofable by direct callers, which is acceptable for a fallback bucket."""
+    forwarded = http_request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    client = http_request.client
+    return client.host if client else "unknown"
+
+
+def _rate_limit_key(request: "GenerateCodeRequest", http_request: Request) -> str:
+    user_id = (request.userId or "").strip()
+    if user_id:
+        return f"user:{user_id}"
+    return f"ip:{_client_ip(http_request)}"
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
@@ -113,6 +166,9 @@ class GenerateCodeRequest(BaseModel):
     useMockModelOutput: bool = False
     sketchImage: Optional[str] = None
     textAnnotations: Optional[List[TextAnnotation]] = None
+    # Where sketchImage came from. Absent/"canvas" = Konva export (unchanged path);
+    # "upload-photo"/"upload-clean" = uploaded image routed through photo normalization.
+    sketchSource: Optional[str] = None
 
 
 class DetectedElement(BaseModel):
@@ -386,31 +442,76 @@ def _synthesize_missing_containers(
     """
     Recovery synthesizer for missed navbar / footer containers.
 
-    Fires ONLY when there are text annotations in the top/bottom band that
-    don't fit inside any detected element (i.e., the user typed nav-link
-    or footer-link labels but the model never detected the navbar/footer
-    rectangle to hold them). In that case, we synthesize a thin container
-    so the text-attachment matcher has somewhere to drop the labels.
+    Two stages:
 
-    Previously this also fired on clusters of detected `card` elements,
-    which over-triggered: a row of action buttons in a dialog (e.g.
-    Yes / No) falsely became a "footer". Cards are content; only
-    standalone unattached labels signal an unrendered container.
+    1. Reclassify misplaced containers. The detector sometimes flips wide-thin
+       horizontal bars: returns a `footer` at y=0 (clearly a navbar) or a
+       `navbar` at the bottom (clearly a footer). We relabel these to match
+       their band so downstream logic and Gemini see them in the right slot.
+       Only relabels when the correctly-placed slot isn't already filled, to
+       avoid creating duplicates.
 
-    New entries are marked with `attributes["synthetic"] = True` so the
-    prompt can flag them to Gemini.
+    2. Synthesize a thin container in the top/bottom band when the band has
+       2+ unattached text annotations OR 2+ orphan cards (cards not contained
+       by any non-card element). Orphan cards in the band are a strong signal
+       the user drew a footer/navbar row of items but the detector missed the
+       enclosing rectangle. The synthesized container's bounds grow to wrap
+       the orphan cards too, so Gemini's "card inside container → child"
+       inference puts them inside.
+
+    New entries are marked with `attributes["synthetic"] = True` so the prompt
+    can flag them to Gemini.
     """
     from app.models.inference import ExternalModelElement  # local import to avoid cycles
 
-    if not annotations:
-        return elements
+    x_min, y_min, x_max, y_max = _infer_canvas_extents(elements, annotations, canvas_size)
+    canvas_h = max(y_max - y_min, 1.0)
+    canvas_w = max(x_max - x_min, 1.0)
+    top_band_y = y_min + canvas_h * _TOP_BAND_RATIO
+    bottom_band_y = y_max - canvas_h * _BOTTOM_BAND_RATIO
+
+    def _centroid_y(elem: Any) -> float:
+        b = getattr(elem, "bounds", None) or {}
+        try:
+            return float(b.get("y", 0)) + float(b.get("height", 0)) / 2.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    # ── Stage 1: reclassify misplaced top/bottom-band containers ─────────────
+    real_navbar_exists = any(
+        (getattr(e, "type", "") or "").lower() == "navbar" and _centroid_y(e) <= top_band_y
+        for e in elements
+    )
+    real_footer_exists = any(
+        (getattr(e, "type", "") or "").lower() == "footer" and _centroid_y(e) >= bottom_band_y
+        for e in elements
+    )
+    for elem in elements:
+        etype = (getattr(elem, "type", "") or "").lower()
+        cy = _centroid_y(elem)
+        if etype == "footer" and cy <= top_band_y and not real_navbar_exists:
+            elem.type = "navbar"
+            attrs = getattr(elem, "attributes", None) or {}
+            attrs["reclassified_from"] = "footer"
+            elem.attributes = attrs
+            real_navbar_exists = True
+            if debug:
+                print(f"[debug] reclassified misplaced footer at y_center={cy:.0f} -> navbar")
+        elif etype == "navbar" and cy >= bottom_band_y and not real_footer_exists:
+            elem.type = "footer"
+            attrs = getattr(elem, "attributes", None) or {}
+            attrs["reclassified_from"] = "navbar"
+            elem.attributes = attrs
+            real_footer_exists = True
+            if debug:
+                print(f"[debug] reclassified misplaced navbar at y_center={cy:.0f} -> footer")
 
     has_navbar = any((getattr(e, "type", "") or "").lower() == "navbar" for e in elements)
     has_footer = any((getattr(e, "type", "") or "").lower() == "footer" for e in elements)
     if has_navbar and has_footer:
         return elements
 
-    # Identify annotations that don't already fit inside any detected element.
+    # ── Stage 2: synthesize from unattached anns and/or orphan cards ─────────
     # Same overlap rule as `_attach_text_annotations` so the two stay in sync.
     def _is_attached(ann: TextAnnotation) -> bool:
         for elem in elements:
@@ -433,15 +534,38 @@ def _synthesize_missing_containers(
                     return True
         return False
 
-    unattached_anns = [a for a in annotations if not _is_attached(a)]
-    if not unattached_anns:
-        return elements
+    unattached_anns = [a for a in (annotations or []) if not _is_attached(a)]
 
-    x_min, y_min, x_max, y_max = _infer_canvas_extents(elements, annotations, canvas_size)
-    canvas_h = max(y_max - y_min, 1.0)
-    canvas_w = max(x_max - x_min, 1.0)
-    top_band_y = y_min + canvas_h * _TOP_BAND_RATIO
-    bottom_band_y = y_max - canvas_h * _BOTTOM_BAND_RATIO
+    def _is_orphan_card(card: Any) -> bool:
+        if (getattr(card, "type", "") or "").lower() != "card":
+            return False
+        cb = getattr(card, "bounds", None) or {}
+        try:
+            cx = float(cb.get("x", 0)); cy = float(cb.get("y", 0))
+            cw = float(cb.get("width", 0)); ch = float(cb.get("height", 0))
+        except (TypeError, ValueError):
+            return False
+        if cw <= 0 or ch <= 0:
+            return False
+        for other in elements:
+            if other is card:
+                continue
+            otype = (getattr(other, "type", "") or "").lower()
+            if otype == "card":
+                continue
+            ob = getattr(other, "bounds", None) or {}
+            try:
+                ox = float(ob.get("x", 0)); oy = float(ob.get("y", 0))
+                ow = float(ob.get("width", 0)); oh = float(ob.get("height", 0))
+            except (TypeError, ValueError):
+                continue
+            if ow <= 0 or oh <= 0:
+                continue
+            if _bbox_overlap_ratio(cx, cy, cw, ch, ox, oy, ow, oh) >= 0.5:
+                return False
+        return True
+
+    orphan_cards = [e for e in elements if _is_orphan_card(e)]
 
     def _ann_center(ann: TextAnnotation) -> tuple:
         cx = float(ann.x) + max(float(ann.width), 1.0) / 2.0
@@ -451,12 +575,30 @@ def _synthesize_missing_containers(
     ann_centers: List[tuple] = [_ann_center(a) for a in unattached_anns]
     new_elements: List[Any] = list(elements)
 
+    def _card_bbox(card: Any) -> tuple:
+        b = getattr(card, "bounds", None) or {}
+        bx = float(b.get("x", 0)); by = float(b.get("y", 0))
+        bw = float(b.get("width", 0)); bh = float(b.get("height", 0))
+        return bx, by, bx + bw, by + bh
+
     if not has_navbar:
         top_centers = [c for c in ann_centers if c[1] <= top_band_y]
-        if len(top_centers) >= 2:
+        top_orphan_cards = [c for c in orphan_cards if _centroid_y(c) <= top_band_y]
+        trigger_count = len(top_centers) + len(top_orphan_cards)
+        if trigger_count >= 2:
             band_top = y_min
-            band_bottom = max(c[1] for c in top_centers) + canvas_h * 0.03
-            band_bottom = min(band_bottom, top_band_y + canvas_h * 0.04)
+            # Anns expand the strip slightly past the deepest center; orphan
+            # cards expand it to fully cover the card's bottom edge.
+            candidates: List[float] = [c[1] + canvas_h * 0.03 for c in top_centers]
+            for oc in top_orphan_cards:
+                _, _, _, oy2 = _card_bbox(oc)
+                candidates.append(oy2 + canvas_h * 0.005)
+            band_bottom = max(candidates) if candidates else top_band_y + canvas_h * 0.04
+            # Clamp to a thin strip ONLY when no orphan cards are forcing the
+            # navbar to grow; cards must end up inside the synthesized bounds
+            # so Gemini's nesting heuristic picks them up.
+            if not top_orphan_cards:
+                band_bottom = min(band_bottom, top_band_y + canvas_h * 0.06)
             navbar_elem = ExternalModelElement(
                 id="synthetic-navbar",
                 type="navbar",
@@ -470,22 +612,35 @@ def _synthesize_missing_containers(
                 },
                 attributes={
                     "synthetic": True,
-                    "reason": f"no navbar detected; inferred from {len(top_centers)} unattached top-band text label(s)",
+                    "reason": (
+                        f"no navbar detected; inferred from {len(top_centers)} unattached "
+                        f"top-band text label(s) and {len(top_orphan_cards)} orphan card(s)"
+                    ),
                 },
             )
             new_elements.append(navbar_elem)
             if debug:
                 print(
-                    f"[debug] synthesized navbar from {len(top_centers)} unattached top-band annotation(s) "
+                    f"[debug] synthesized navbar from {len(top_centers)} unattached "
+                    f"annotation(s) + {len(top_orphan_cards)} orphan card(s) "
                     f"y in [{band_top:.0f},{band_bottom:.0f}]"
                 )
 
     if not has_footer:
         bottom_centers = [c for c in ann_centers if c[1] >= bottom_band_y]
-        if len(bottom_centers) >= 2:
-            band_top = min(c[1] for c in bottom_centers) - canvas_h * 0.03
-            band_top = max(band_top, bottom_band_y - canvas_h * 0.04)
+        bottom_orphan_cards = [c for c in orphan_cards if _centroid_y(c) >= bottom_band_y]
+        trigger_count = len(bottom_centers) + len(bottom_orphan_cards)
+        if trigger_count >= 2:
             band_bottom = y_max
+            candidates: List[float] = [c[1] - canvas_h * 0.03 for c in bottom_centers]
+            for oc in bottom_orphan_cards:
+                _, oy1, _, _ = _card_bbox(oc)
+                candidates.append(oy1 - canvas_h * 0.005)
+            band_top = min(candidates) if candidates else bottom_band_y - canvas_h * 0.04
+            # Same clamp logic as navbar: only restrict to a thin strip when no
+            # orphan cards need to fit inside.
+            if not bottom_orphan_cards:
+                band_top = max(band_top, bottom_band_y - canvas_h * 0.06)
             footer_elem = ExternalModelElement(
                 id="synthetic-footer",
                 type="footer",
@@ -499,13 +654,17 @@ def _synthesize_missing_containers(
                 },
                 attributes={
                     "synthetic": True,
-                    "reason": f"no footer detected; inferred from {len(bottom_centers)} unattached bottom-band text label(s)",
+                    "reason": (
+                        f"no footer detected; inferred from {len(bottom_centers)} unattached "
+                        f"bottom-band text label(s) and {len(bottom_orphan_cards)} orphan card(s)"
+                    ),
                 },
             )
             new_elements.append(footer_elem)
             if debug:
                 print(
-                    f"[debug] synthesized footer from {len(bottom_centers)} unattached bottom-band annotation(s) "
+                    f"[debug] synthesized footer from {len(bottom_centers)} unattached "
+                    f"annotation(s) + {len(bottom_orphan_cards)} orphan card(s) "
                     f"y in [{band_top:.0f},{band_bottom:.0f}]"
                 )
 
@@ -695,6 +854,7 @@ async def resolve_external_model_output(
                 detect_with_roboflow,
                 request.sketchImage,
                 canvas_size,
+                sketch_source=request.sketchSource,
             ),
             timeout=60.0,
         )
@@ -747,6 +907,17 @@ async def resolve_external_model_output(
     image_h = float(meta.get("image_height") or canvas_size[1])
     inferred_canvas_size = (image_w, image_h)
 
+    # For uploads, hand the processed sketch to Gemini so it can READ the text
+    # baked into the pixels (the detector only returns boxes). Pop it out of the
+    # metadata so the base64 blob never travels back to the browser in the response.
+    gemini_image_bytes: Optional[bytes] = None
+    processed_b64 = (roboflow_output.metadata or {}).pop("processed_image_b64", None)
+    if processed_b64 and request.sketchSource in ("upload-photo", "upload-clean"):
+        try:
+            gemini_image_bytes = base64.b64decode(processed_b64)
+        except Exception as decode_error:
+            print(f"[trace] could not decode processed upload image for Gemini: {decode_error}")
+
     annotations = request.textAnnotations or []
     if debug and annotations:
         print(
@@ -774,6 +945,7 @@ async def resolve_external_model_output(
             request.styling,
             request.description,
             extra_text=extra_text or None,
+            has_image=gemini_image_bytes is not None,
         )
         print("[debug] Gemini prompt:")
         print("-" * 70)
@@ -789,11 +961,12 @@ async def resolve_external_model_output(
                 request.styling,
                 request.description,
                 extra_text=extra_text or None,
+                image_bytes=gemini_image_bytes,
             ),
-            timeout=90.0,
+            timeout=GEMINI_TIMEOUT_SECONDS,
         )
     except asyncio.TimeoutError:
-        print("[error] Gemini call timed out after 90s")
+        print(f"[error] Gemini call timed out after {GEMINI_TIMEOUT_SECONDS:.0f}s")
         raise HTTPException(
             status_code=504,
             detail="Code generation timed out — Gemini did not respond in time. Please try again.",
@@ -919,7 +1092,7 @@ async def health_check():
 
 
 @app.post("/api/predict", response_model=GenerateCodeResponse)
-async def predict(request: GenerateCodeRequest):
+async def predict(request: GenerateCodeRequest, http_request: Request):
     """
     Main endpoint for sketch-to-code generation using custom trained models
 
@@ -931,6 +1104,29 @@ async def predict(request: GenerateCodeRequest):
     5. Return generated code
     """
     try:
+        # Rate limit the expensive AI pipeline per authenticated user, BEFORE any
+        # DB load / Roboflow / Gemini work, so abuse is cheap to reject. The proxy
+        # stamps the trusted user id into request.userId; we key on that (every
+        # request shares the proxy IP, so IP keying would pool all users together).
+        if ai_rate_limiter is not None:
+            allowed, retry_after, _ = ai_rate_limiter.check(
+                _rate_limit_key(request, http_request)
+            )
+            if not allowed:
+                retry_secs = max(1, math.ceil(retry_after))
+                print(
+                    f"[rate-limit] 429: over {RATE_LIMIT_MAX_REQUESTS} req / "
+                    f"{RATE_LIMIT_WINDOW_SECONDS:.0f}s; retry in {retry_secs}s"
+                )
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "You're sending requests too quickly. "
+                        f"Please wait {retry_secs}s and try again."
+                    ),
+                    headers={"Retry-After": str(retry_secs)},
+                )
+
         print(f"Received prediction request for project: {request.projectId}")
 
         supabase = create_supabase_client()

@@ -2,6 +2,86 @@ import numpy as np
 import cv2
 from typing import Dict, List, Any, Tuple
 
+
+def preprocess_uploaded_photo(img_rgb: np.ndarray, *, binarize: bool) -> np.ndarray:
+    """
+    Normalize an uploaded image so it reaches the Roboflow model looking like the
+    clean line-art-on-white the model was trained on.
+
+    The detector was trained without noise/blur/contrast augmentation, so it is
+    brittle to real-world capture conditions (phone-photo lighting, shadows,
+    off-white paper). For a photo we binarize to crisp black-on-white; for a clean
+    digital wireframe we skip binarization (it erodes thin crisp strokes) and only
+    crop. In both cases we crop to the drawn content to remove desk/margin around
+    the sketch, which also reduces the 640x640 stretch distortion.
+
+    Args:
+        img_rgb: HxWx3 uint8 RGB array (alpha already composited onto white).
+        binarize: True for photos (threshold to black/white), False for clean
+            digital wireframes (skip threshold, crop only).
+
+    Returns:
+        HxWx3 uint8 RGB array, white background, ready to hand to Roboflow.
+    """
+    if img_rgb is None or img_rgb.size == 0:
+        return img_rgb
+
+    # Tolerate grayscale / RGBA inputs defensively.
+    if img_rgb.ndim == 2:
+        img_rgb = cv2.cvtColor(img_rgb, cv2.COLOR_GRAY2RGB)
+    elif img_rgb.shape[2] == 4:
+        img_rgb = cv2.cvtColor(img_rgb, cv2.COLOR_RGBA2RGB)
+
+    gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
+
+    if binarize:
+        # Median blur kills JPEG/paper speckle without smearing strokes the way a
+        # Gaussian would. Adaptive threshold handles uneven lighting across the
+        # page far better than a single global cutoff.
+        denoised = cv2.medianBlur(gray, 3)
+        binary = cv2.adaptiveThreshold(
+            denoised,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            blockSize=35,
+            C=10,
+        )
+        # Drop specks of inverse noise (isolated dark pixels) via a light open.
+        kernel = np.ones((2, 2), np.uint8)
+        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+        work_gray = binary
+        rgb_out = cv2.cvtColor(binary, cv2.COLOR_GRAY2RGB)
+    else:
+        # Clean wireframe: keep tonal detail, just use a generous Otsu mask to find
+        # where the drawing is for cropping.
+        _, work_gray = cv2.threshold(
+            gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+        )
+        rgb_out = img_rgb
+
+    # Content crop: ink is dark (low value). Find the bbox of non-white pixels and
+    # crop to it with a small margin so the model sees the sketch, not the desk.
+    ink_mask = work_gray < 250
+    ys, xs = np.where(ink_mask)
+    if ys.size == 0 or xs.size == 0:
+        # Nothing detectable to crop to — return as-is and let detection decide.
+        return rgb_out
+
+    h, w = work_gray.shape[:2]
+    margin = max(8, int(0.02 * max(h, w)))
+    y0 = max(0, int(ys.min()) - margin)
+    y1 = min(h, int(ys.max()) + 1 + margin)
+    x0 = max(0, int(xs.min()) - margin)
+    x1 = min(w, int(xs.max()) + 1 + margin)
+
+    # Guard against a degenerate crop (e.g. a near-blank image) collapsing the frame.
+    if (y1 - y0) < 16 or (x1 - x0) < 16:
+        return rgb_out
+
+    return rgb_out[y0:y1, x0:x1]
+
+
 def preprocess_canvas_data(canvas_data: Dict[str, Any], target_size: Tuple[int, int] = (256, 256)) -> np.ndarray:
     """
     Convert canvas JSON data to image format for CNN input

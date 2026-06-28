@@ -47,8 +47,14 @@ export async function POST(request: Request) {
 
     const requestBody = await request.json();
 
+    // Outermost ceiling for the whole detect + generate call. Must stay ABOVE the
+    // backend's GEMINI_TIMEOUT_SECONDS (default 110s) so the backend returns its
+    // own clean error/result before this aborts. Override via FASTAPI_PROXY_TIMEOUT_MS.
+    const PROXY_TIMEOUT_MS = Number(
+      process.env.FASTAPI_PROXY_TIMEOUT_MS ?? 120_000
+    );
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 100_000);
+    const timeoutId = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
 
     let response: Response;
     try {

@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { T_CANVAS } from "./canvasTokens";
 
 interface LivePreviewProps {
   code: string;
   language?: "html" | "react";
 }
 
-type DeviceType = "fit" | "desktop" | "laptop" | "tablet" | "mobile";
+type DeviceType = "fit" | "desktop" | "mobile";
 type Orientation = "portrait" | "landscape";
 
 const DEVICE_PRESETS: Record<
@@ -16,8 +17,6 @@ const DEVICE_PRESETS: Record<
 > = {
   fit: { width: 0, height: 0, label: "Fit" },
   desktop: { width: 1920, height: 1080, label: "Desktop" },
-  laptop: { width: 1440, height: 900, label: "Laptop" },
-  tablet: { width: 768, height: 1024, label: "Tablet" },
   mobile: { width: 375, height: 667, label: "Mobile" },
 };
 
@@ -34,12 +33,29 @@ const DEVICE_PRESETS: Record<
  *     the component name is left as a top-level binding, then mounting it via
  *     ReactDOM.createRoot.
  */
+/**
+ * Gemini sometimes wraps its answer in a markdown code fence (```jsx ... ```)
+ * or prefixes a line of prose. Extract the fenced body so we never feed a
+ * stray ``` into Babel (which would throw a syntax error). No-op when there
+ * is no fence.
+ */
+function stripCodeFences(raw: string): string {
+  const fenceMatch = raw.match(/```(?:[\w-]*)?\s*\n([\s\S]*?)```/);
+  if (fenceMatch) return fenceMatch[1];
+  // Defensive: a lone leading/trailing fence with no closing pair.
+  return raw.replace(/^\s*```[\w-]*\s*$/gm, "");
+}
+
 function buildReactDocument(rawCode: string, parentOrigin: string): string {
-  let code = rawCode;
+  let code = stripCodeFences(rawCode);
 
   // Remove import/require lines - Babel-standalone runs in classic-script mode
   // and can't resolve them. React/ReactDOM are exposed as globals below.
-  code = code.replace(/^\s*import\s+[^;]+;?\s*$/gm, "");
+  // Negative lookahead (?!\bfrom\b) prevents the binding group from swallowing
+  // the word "from", which broke the old [\w\s,]+ approach.
+  code = code.replace(/\bimport\b\s+(?:type\s+)?(?:(?!\bfrom\b)[\s\S])*?\bfrom\s+['"][^'"]*['"]\s*;?/g, "");
+  // Bare side-effect imports: import 'module'
+  code = code.replace(/\bimport\s+['"][^'"]+['"]\s*;?/g, "");
   code = code.replace(/^\s*const\s+\w+\s*=\s*require\([^)]+\);?\s*$/gm, "");
 
   // Find the default-exported component name and strip the `export default`
@@ -66,6 +82,12 @@ function buildReactDocument(rawCode: string, parentOrigin: string): string {
     );
   }
 
+  // Embed the JSX source as a JS string literal so we can compile it at runtime
+  // with Babel's CLASSIC runtime. Escaping `</` prevents a literal `</script>`
+  // inside the generated code from prematurely closing the inline <script>.
+  const sourceLiteral = JSON.stringify(code).replace(/<\//g, "<\\/");
+  const nameLiteral = JSON.stringify(componentName);
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -75,7 +97,10 @@ function buildReactDocument(rawCode: string, parentOrigin: string): string {
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Pinned: an unpinned URL silently jumped to Babel 8 (automatic JSX runtime)
+       and broke the preview. Bump deliberately, and re-test the classic-runtime
+       transform below if you do. -->
+  <script src="https://unpkg.com/@babel/standalone@8.0.1/babel.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
@@ -97,26 +122,39 @@ function buildReactDocument(rawCode: string, parentOrigin: string): string {
       return false;
     };
   </script>
-  <script type="text/babel" data-presets="env,react">
-    ${code}
-    try {
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(React.createElement(${componentName}));
-    } catch (err) {
-      document.getElementById('root').innerHTML =
-        '<pre style="color:#b00;padding:16px;white-space:pre-wrap;font-family:monospace;">' +
-        'Render error: ' + (err && err.message ? err.message : String(err)) +
-        '</pre>';
-      window.parent.postMessage({ type: 'error', data: String(err) }, '${parentOrigin}');
-    }
+  <script>
+    (function () {
+      // Babel 8 (loaded from CDN) defaults preset-react to the AUTOMATIC JSX
+      // runtime, which injects \`import { jsx } from "react/jsx-runtime"\` into
+      // its output. With React loaded as a UMD global and no module resolver,
+      // that import fails ("Cannot use import statement outside a module").
+      // Forcing the CLASSIC runtime makes Babel emit React.createElement(...)
+      // against the global React instead — no imports in the output.
+      try {
+        var compiled = Babel.transform(${sourceLiteral}, {
+          presets: [['react', { runtime: 'classic' }]],
+          filename: 'preview.jsx'
+        }).code;
+        var factory = new Function('React', 'ReactDOM', compiled + '\\nreturn ' + ${nameLiteral} + ';');
+        var Component = factory(React, ReactDOM);
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Component));
+      } catch (err) {
+        document.getElementById('root').innerHTML =
+          '<pre style="color:#b00;padding:16px;white-space:pre-wrap;font-family:monospace;">' +
+          'Render error: ' + (err && err.message ? err.message : String(err)) +
+          '</pre>';
+        window.parent.postMessage({ type: 'error', data: String(err) }, '${parentOrigin}');
+      }
+    })();
   </script>
 </body>
 </html>`;
 }
 
 function buildHtmlDocument(rawCode: string, parentOrigin: string): string {
-  if (rawCode.includes("<!DOCTYPE") || rawCode.includes("<html")) {
-    return rawCode;
+  const cleaned = stripCodeFences(rawCode);
+  if (cleaned.includes("<!DOCTYPE") || cleaned.includes("<html")) {
+    return cleaned;
   }
   return `<!DOCTYPE html>
 <html lang="en">
@@ -134,7 +172,7 @@ function buildHtmlDocument(rawCode: string, parentOrigin: string): string {
   </style>
 </head>
 <body>
-${rawCode}
+${cleaned}
 <script>
   const originalLog = console.log;
   console.log = function(...args) {
@@ -234,7 +272,11 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
     iframeDoc.open();
     iframeDoc.write(htmlContent);
     iframeDoc.close();
-  }, [code, language, refreshTick]);
+    // `device` and `orientation` belong here: switching device modes swaps
+    // between the fit-branch and the device-frame-branch in the JSX, which
+    // unmounts the old iframe and mounts a new one. The new iframe is blank
+    // until we re-write into it - so the dep array has to track that swap.
+  }, [code, language, refreshTick, device, orientation]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -257,49 +299,78 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
   };
 
   const handleOpenInNewWindow = () => {
-    const newWindow = window.open("", "_blank", "noopener,noreferrer");
-    if (!newWindow) return;
+    // Window.open with `noopener` returns null in many browsers, which is why
+    // writing to the new document failed silently before. Use a Blob URL for
+    // the HTML so the new tab can load it directly — no document.write needed.
     const htmlContent =
-      language === "react" ? buildReactDocument(code, window.location.origin) : buildHtmlDocument(code, window.location.origin);
-    newWindow.document.open();
-    newWindow.document.write(htmlContent);
-    newWindow.document.close();
+      language === "react"
+        ? buildReactDocument(code, window.location.origin)
+        : buildHtmlDocument(code, window.location.origin);
+    const blob = new Blob([htmlContent], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const newWindow = window.open(url, "_blank");
+    if (!newWindow) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+    // Revoke the URL after the new window has had time to load it.
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
   };
 
   return (
-    <div className="flex h-full flex-col bg-[var(--cc-bg-canvas)]">
-      <div className="flex items-center justify-between border-b border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] px-3 py-1.5">
-        {/* Segmented device picker. Inactive tabs now keep a visible chip
-            background so they read as buttons against the dark chrome. */}
-        <div className="flex items-center gap-0.5 rounded-[8px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)]/60 p-0.5">
-          {Object.entries(DEVICE_PRESETS).map(([key, preset]) => (
-            <button
-              key={key}
-              onClick={() => selectDevice(key as DeviceType)}
-              className={`rounded-[6px] px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
-                device === key
-                  ? "bg-[var(--cc-accent)] text-white shadow-[0_2px_6px_-2px_var(--cc-accent-glow-strong)]"
-                  : "text-[var(--cc-text-primary)] hover:bg-white/[0.07]"
-              }`}
-              title={`${preset.label} (${preset.width}x${preset.height})`}
-            >
-              {preset.label}
-            </button>
-          ))}
+    <div
+      className="flex h-full flex-col"
+      style={{
+        background: T_CANVAS.paper,
+        fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+      }}
+    >
+      <div
+        className="flex items-center justify-between border-b px-3 py-1.5"
+        style={{ borderColor: T_CANVAS.rule, background: T_CANVAS.vellum }}
+      >
+        {/* DEVICE picker — Drafting Room mono tabs */}
+        <div className="flex items-center" style={{ border: `1px solid ${T_CANVAS.rule}` }}>
+          {Object.entries(DEVICE_PRESETS).map(([key, preset], i) => {
+            const active = device === key;
+            return (
+              <button
+                key={key}
+                onClick={() => selectDevice(key as DeviceType)}
+                className="px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                style={{
+                  background: active ? T_CANVAS.graphite : T_CANVAS.paper,
+                  color: active ? T_CANVAS.paper : T_CANVAS.muted,
+                  borderLeft: i > 0 ? `1px solid ${T_CANVAS.rule}` : undefined,
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) e.currentTarget.style.color = T_CANVAS.graphite;
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.color = T_CANVAS.muted;
+                }}
+                title={`${preset.label} (${preset.width}x${preset.height})`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
 
           {device !== "desktop" && device !== "fit" && (
             <button
               onClick={toggleOrientation}
-              className="ml-1 flex h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] transition-all hover:bg-white/[0.07] hover:text-[var(--cc-text-primary)]"
+              className="flex h-6 w-7 items-center justify-center transition-colors"
+              style={{
+                background: T_CANVAS.paper,
+                color: T_CANVAS.muted,
+                borderLeft: `1px solid ${T_CANVAS.rule}`,
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
               title="Toggle Orientation"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
           )}
@@ -308,86 +379,100 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowConsole(!showConsole)}
-            className={`rounded-[6px] border px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
-              showConsole
-                ? "border-[var(--cc-accent-glow-strong)] bg-[var(--cc-accent-glow)] text-[var(--cc-accent)]"
-                : "border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
-            }`}
+            className="px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+            style={{
+              background: showConsole ? T_CANVAS.cobaltWash : T_CANVAS.paper,
+              border: `1px solid ${showConsole ? T_CANVAS.cobalt : T_CANVAS.rule}`,
+              color: showConsole ? T_CANVAS.cobaltInk : T_CANVAS.muted,
+            }}
           >
-            Console {consoleOutput.length > 0 && `(${consoleOutput.length})`}
+            CONSOLE {consoleOutput.length > 0 && `(${consoleOutput.length})`}
           </button>
 
           <button
             onClick={handleRefresh}
-            className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] transition-all hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
+            className="flex h-6 w-6 items-center justify-center transition-colors"
+            style={{
+              background: T_CANVAS.paper,
+              border: `1px solid ${T_CANVAS.rule}`,
+              color: T_CANVAS.muted,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
             title="Refresh Preview"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
 
           <button
             onClick={handleOpenInNewWindow}
-            className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] transition-all hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
+            className="flex h-6 w-6 items-center justify-center transition-colors"
+            style={{
+              background: T_CANVAS.paper,
+              border: `1px solid ${T_CANVAS.rule}`,
+              color: T_CANVAS.muted,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
             title="Open in New Window"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-              />
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </button>
 
-          <div className="ml-1 flex items-center gap-0.5 rounded-[6px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-1 py-0.5">
+          <div className="ml-1 flex items-center" style={{ border: `1px solid ${T_CANVAS.rule}`, background: T_CANVAS.paper }}>
             <button
               onClick={() =>
-                setManualZoom((z) =>
-                  Math.max(0.1, +((z ?? autoScale) - 0.1).toFixed(2))
-                )
+                setManualZoom((z) => Math.max(0.1, +((z ?? autoScale) - 0.1).toFixed(2)))
               }
-              className="flex h-5 w-5 items-center justify-center rounded text-[var(--cc-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
+              className="flex h-5 w-5 items-center justify-center transition-colors"
+              style={{ color: T_CANVAS.muted }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
               title="Zoom out"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" className="h-3 w-3">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" className="h-3 w-3">
                 <path d="M5 12h14" />
               </svg>
             </button>
-            <span className="min-w-[42px] text-center text-[11px] font-medium tabular-nums text-[var(--cc-text-primary)]">
+            <span
+              className="min-w-[40px] text-center text-[10px] tracking-[0.06em] tabular-nums"
+              style={{ color: T_CANVAS.graphite }}
+            >
               {Math.round(scale * 100)}%
             </span>
             <button
               onClick={() =>
-                setManualZoom((z) =>
-                  Math.min(2, +((z ?? autoScale) + 0.1).toFixed(2))
-                )
+                setManualZoom((z) => Math.min(2, +((z ?? autoScale) + 0.1).toFixed(2)))
               }
-              className="flex h-5 w-5 items-center justify-center rounded text-[var(--cc-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)]"
+              className="flex h-5 w-5 items-center justify-center transition-colors"
+              style={{ color: T_CANVAS.muted }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
               title="Zoom in"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" className="h-3 w-3">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" className="h-3 w-3">
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </button>
             {manualZoom !== null && (
               <button
                 onClick={() => setManualZoom(null)}
-                className="ml-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--cc-accent)] hover:bg-white/[0.06]"
+                className="ml-0.5 px-1.5 py-0.5 text-[9px] tracking-[0.16em] uppercase"
+                style={{ color: T_CANVAS.cobalt }}
                 title="Reset to auto-fit"
               >
-                Auto
+                AUTO
               </button>
             )}
           </div>
-          <span className="ml-1 text-[10px] font-mono tabular-nums text-[var(--cc-text-muted)]">
+          <span
+            className="ml-1 text-[10px] tabular-nums tracking-[0.04em]"
+            style={{ color: T_CANVAS.muted }}
+          >
             {Math.round(dimensions.width)} × {Math.round(dimensions.height)}
           </span>
         </div>
@@ -395,10 +480,32 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
 
       <div
         ref={containerRef}
-        className={`flex-1 overflow-auto bg-[#0A0A0A] ${
-          device === "fit" ? "p-0" : "p-6"
-        }`}
+        className={`d5-preview-scroll flex-1 overflow-auto ${device === "fit" ? "p-0" : "p-6"}`}
+        style={{
+          background: T_CANVAS.paper,
+        }}
       >
+        <style jsx>{`
+          .d5-preview-scroll {
+            scrollbar-color: ${T_CANVAS.tick} ${T_CANVAS.paper};
+            scrollbar-width: thin;
+          }
+          .d5-preview-scroll::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+            background: ${T_CANVAS.paper};
+          }
+          .d5-preview-scroll::-webkit-scrollbar-thumb {
+            background: ${T_CANVAS.tick};
+            border: 2px solid ${T_CANVAS.paper};
+          }
+          .d5-preview-scroll::-webkit-scrollbar-thumb:hover {
+            background: ${T_CANVAS.muted};
+          }
+          .d5-preview-scroll::-webkit-scrollbar-corner {
+            background: ${T_CANVAS.paper};
+          }
+        `}</style>
         {device === "fit" ? (
           /* Fit: the white card fills the container entirely. Manual zoom
              scales the iframe content, not the wrapper - eliminates the
@@ -418,58 +525,83 @@ export default function LivePreview({ code, language = "html" }: LivePreviewProp
             />
           </div>
         ) : (
-          /* Device-frame mode. Three constraints we need at once:
-             1. The white card must clip its iframe so a desktop-width layout
-                doesn't bleed past the frame edge and show a horizontal
-                scrollbar inside the "phone" (what the user reported).
-             2. The iframe's *viewport* must match the device width so
-                Tailwind / media queries actually behave like the device.
-             3. Then the whole frame is scaled-to-fit the container. */
+          /* Device-frame mode. We wrap the scaled device-card in a size-matching
+             outer box so the layout flow knows the true visual extent — without
+             this wrapper the device-card occupies its UNSCALED dimensions in
+             flow (1920x1080 for desktop), leaving a huge ghost area below it. */
           <div
-            className="mx-auto overflow-hidden bg-white shadow-[0_24px_60px_-20px_rgba(0,0,0,0.8)] ring-1 ring-black/40"
+            className="mx-auto"
             style={{
-              width: dimensions.width,
-              height: dimensions.height,
-              transform: `scale(${scale})`,
-              transformOrigin: "top center",
-              borderRadius:
-                device === "mobile" ? 28 : device === "tablet" ? 18 : 8,
+              width: dimensions.width * scale,
+              height: dimensions.height * scale,
             }}
           >
-            <iframe
-              ref={iframeRef}
-              title="Live Preview"
-              sandbox="allow-scripts allow-same-origin allow-forms"
-              className="h-full w-full border-0"
+            <div
+              className="overflow-hidden bg-white"
               style={{
-                // Match the iframe's own viewport to the device size - keeps
-                // breakpoint-aware layouts honest at mobile/tablet widths.
                 width: dimensions.width,
                 height: dimensions.height,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+                border: `1px solid ${T_CANVAS.rule}`,
+                borderRadius: device === "mobile" ? 24 : 0,
               }}
-            />
+            >
+              <iframe
+                ref={iframeRef}
+                title="Live Preview"
+                sandbox="allow-scripts allow-same-origin allow-forms"
+                className="h-full w-full border-0"
+                style={{
+                  width: dimensions.width,
+                  height: dimensions.height,
+                }}
+              />
+            </div>
           </div>
         )}
       </div>
 
       {showConsole && (
-        <div className="border-t border-[#2E2E2E] bg-[#1A1A1A] p-4">
+        <div
+          className="border-t p-3"
+          style={{
+            borderColor: T_CANVAS.rule,
+            background: T_CANVAS.vellum,
+            fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+          }}
+        >
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-white">Console Output</h3>
+            <h3
+              className="text-[10px] tracking-[0.18em] uppercase"
+              style={{ color: T_CANVAS.graphite }}
+            >
+              CONSOLE OUTPUT
+            </h3>
             <button
               onClick={() => setConsoleOutput([])}
-              className="text-xs text-[#A0A0A0] hover:text-white"
+              className="text-[10px] tracking-[0.14em] uppercase transition-colors"
+              style={{ color: T_CANVAS.muted }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.cobalt)}
+              onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
             >
-              Clear
+              CLEAR
             </button>
           </div>
-          <div className="max-h-32 overflow-auto rounded-lg bg-[#0A0A0A] p-3 font-mono text-xs text-white">
+          <div
+            className="max-h-32 overflow-auto p-2.5 text-[11px] leading-[1.5]"
+            style={{
+              background: T_CANVAS.paper,
+              border: `1px solid ${T_CANVAS.rule}`,
+              color: T_CANVAS.graphite,
+            }}
+          >
             {consoleOutput.length === 0 ? (
-              <div className="text-[#666666]">No console output</div>
+              <div style={{ color: T_CANVAS.muted }}>NO CONSOLE OUTPUT</div>
             ) : (
               consoleOutput.map((output, i) => (
-                <div key={i} className="py-1">
-                  &gt; {output}
+                <div key={i} className="py-0.5" style={{ color: T_CANVAS.graphite }}>
+                  <span style={{ color: T_CANVAS.cobalt }}>›</span> {output}
                 </div>
               ))
             )}

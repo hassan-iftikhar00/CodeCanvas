@@ -8,7 +8,8 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { openCommandPalette } from "@/components/CommandPalette";
-import ThemeToggle from "@/components/theme/ThemeToggle";
+import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
+import { DraftingMark } from "@/lib/drafting-room/marks";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -18,6 +19,9 @@ interface UserProfile {
   full_name: string | null;
   avatar_url: string | null;
 }
+
+const MONO = "var(--font-jetbrains-mono, ui-monospace, monospace)";
+const SANS = "var(--font-inter, ui-sans-serif, system-ui)";
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
@@ -53,7 +57,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     getUser();
   }, [router, supabase]);
 
-  // Close user menu on outside click
   useEffect(() => {
     if (!showUserMenu) return;
     const handleClick = (e: MouseEvent) => {
@@ -75,59 +78,98 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const initials =
     (userProfile?.full_name || user?.email)?.[0]?.toUpperCase() || "U";
 
+  const displayName = userProfile?.full_name || user?.email || "User";
+
   return (
-    <div className="flex min-h-screen bg-[var(--cc-bg-canvas)] text-[var(--cc-text-primary)] lg:h-screen">
+    <div
+      className="flex min-h-screen lg:h-screen"
+      style={{
+        background: T.paper,
+        color: T.graphite,
+        fontFamily: SANS,
+      }}
+    >
       {/* Mobile overlay */}
       <div
-        className={`fixed inset-0 z-30 bg-black/60 backdrop-blur-[2px] transition-opacity lg:hidden ${
+        className={`fixed inset-0 z-30 transition-opacity lg:hidden ${
           isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
+        style={{ background: "rgba(14, 14, 15, 0.55)" }}
         onClick={() => setIsSidebarOpen(false)}
       />
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] transition-transform duration-200 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r transition-transform duration-200 lg:static lg:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{
+          background: T.paper,
+          borderColor: T.rule,
+        }}
       >
-        <div className="flex h-12 items-center justify-between gap-2 border-b border-[var(--cc-border-subtle)] px-4">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="" className="h-6 w-6" />
-            <span className="text-[14px] font-semibold tracking-tight">
+        {/* Logo title block */}
+        <div
+          className="flex h-12.5 items-center justify-between gap-2 border-b px-4"
+          style={{
+            background: T.vellum,
+            borderColor: T.rule,
+            fontFamily: MONO,
+          }}
+        >
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2"
+            style={{ color: T.graphite }}
+          >
+            <DraftingMark size={20} color={T.graphite} />
+            <span
+              className="text-[11px] tracking-[0.18em] uppercase"
+              style={{ color: T.graphite }}
+            >
               CodeCanvas
             </span>
           </Link>
           <button
             type="button"
             onClick={() => setIsSidebarOpen(false)}
-            className="rounded-[var(--cc-radius-button)] p-1 text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)] lg:hidden"
+            className="flex h-7 w-7 items-center justify-center transition-colors lg:hidden"
+            style={{ color: T.muted, border: `1px solid ${T.rule}` }}
             aria-label="Close sidebar"
           >
             <svg
-              className="h-4 w-4"
+              className="h-3.5 w-3.5"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <nav className="flex-1 space-y-0.5 p-2">
+        {/* Section slug */}
+        <div
+          className="px-4 pt-4 pb-1 text-[10px] tracking-[0.18em] uppercase"
+          style={{ color: T.muted, fontFamily: MONO }}
+        >
+          Navigate
+        </div>
+
+        <nav className="flex-1 space-y-0.5 px-2 pt-1">
           <NavItem
             href="/dashboard"
-            label="Projects"
+            label="PROJECTS"
             active={pathname === "/dashboard"}
             onNavigate={() => setIsSidebarOpen(false)}
             icon={
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={1.8}
+                strokeWidth={1.75}
                 d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
               />
             }
@@ -135,13 +177,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           <NavItem
             href="/canvas"
-            label="Canvas"
+            label="CANVAS"
+            active={pathname === "/canvas"}
             onNavigate={() => setIsSidebarOpen(false)}
             icon={
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={1.8}
+                strokeWidth={1.75}
                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             }
@@ -149,14 +192,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           <NavItem
             href="/profile"
-            label="Profile"
+            label="PROFILE"
             active={pathname === "/profile"}
             onNavigate={() => setIsSidebarOpen(false)}
             icon={
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={1.8}
+                strokeWidth={1.75}
                 d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
               />
             }
@@ -164,11 +207,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </nav>
 
         {/* User card */}
-        <div className="border-t border-[var(--cc-border-subtle)] p-2">
+        <div
+          className="border-t px-2 py-2"
+          style={{
+            background: T.vellum,
+            borderColor: T.rule,
+          }}
+        >
           <Link
             href="/profile"
             onClick={() => setIsSidebarOpen(false)}
-            className="flex items-center gap-2.5 rounded-[var(--cc-radius-button)] px-2 py-2 transition-colors hover:bg-[var(--cc-bg-elevated)]"
+            className="flex items-center gap-2.5 px-2 py-2 transition-colors"
+            style={{ color: T.graphite }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = T.paper)}
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "transparent")
+            }
           >
             <Avatar
               size={28}
@@ -176,10 +230,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               initials={initials}
             />
             <div className="flex-1 overflow-hidden">
-              <p className="truncate text-[12px] font-medium text-[var(--cc-text-primary)]">
-                {userProfile?.full_name || user?.email || "User"}
+              <p
+                className="truncate text-[12px]"
+                style={{ color: T.graphite, fontFamily: SANS }}
+              >
+                {displayName}
               </p>
-              <p className="text-[11px] text-[var(--cc-text-muted)]">
+              <p
+                className="text-[10px] tracking-[0.14em] uppercase"
+                style={{ color: T.muted, fontFamily: MONO }}
+              >
                 View profile
               </p>
             </div>
@@ -190,63 +250,105 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               router.push("/");
               setIsSidebarOpen(false);
             }}
-            className="mt-1 w-full rounded-[var(--cc-radius-button)] px-2 py-1.5 text-left text-[11px] text-[var(--cc-text-muted)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+            className="mt-1 w-full px-2 py-1.5 text-left text-[10px] tracking-[0.16em] uppercase transition-colors"
+            style={{ color: T.muted, fontFamily: MONO }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = T.error)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
           >
             Sign out
           </button>
         </div>
       </aside>
 
-      {/* Main */}
+      {/* Main column */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex min-h-[3rem] items-center justify-between gap-2 border-b border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] px-3 sm:px-4">
+        <header
+          className="flex min-h-12.5 items-center justify-between gap-2 border-b px-3 py-2 sm:px-4"
+          style={{
+            background: T.paper,
+            borderColor: T.rule,
+            fontFamily: MONO,
+          }}
+          role="banner"
+        >
           <div className="flex flex-1 items-center gap-2">
             <button
               type="button"
               onClick={() => setIsSidebarOpen(true)}
-              className="flex h-8 w-8 items-center justify-center rounded-[var(--cc-radius-button)] text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)] lg:hidden"
+              className="flex h-8 w-8 items-center justify-center transition-colors lg:hidden"
+              style={{
+                color: T.muted,
+                border: `1px solid ${T.rule}`,
+              }}
               aria-label="Open sidebar"
             >
               <svg
-                className="h-4 w-4"
+                className="h-3.5 w-3.5"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth={2}
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
                 <path d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
+
             <button
               onClick={openCommandPalette}
               aria-label="Open command palette"
-              className="flex w-full items-center gap-2 rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-1.5 text-[12px] text-[var(--cc-text-secondary)] transition-colors hover:border-[var(--cc-border-emphasis)] hover:text-[var(--cc-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] sm:w-auto"
+              className="group flex h-8 w-full items-center gap-2 px-3 text-[11px] tracking-[0.04em] transition-colors focus-visible:outline-none sm:w-auto sm:min-w-[280px]"
+              style={{
+                background: T.vellum,
+                border: `1px solid ${T.rule}`,
+                color: T.muted,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = T.cobalt;
+                e.currentTarget.style.color = T.graphite;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = T.rule;
+                e.currentTarget.style.color = T.muted;
+              }}
             >
               <svg
                 className="h-3.5 w-3.5"
-                fill="none"
                 viewBox="0 0 24 24"
+                fill="none"
                 stroke="currentColor"
-                strokeWidth={2}
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ color: T.cobalt }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.35-4.35" />
               </svg>
-              <span className="hidden sm:inline">
+              <span className="hidden sm:inline" style={{ fontFamily: SANS }}>
                 Search projects and commands
               </span>
-              <kbd className="hidden rounded-[var(--cc-radius-tag)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--cc-text-muted)] md:inline-flex">
-                Ctrl K
-              </kbd>
+              <span
+                className="ml-auto hidden items-center gap-1 md:inline-flex"
+                style={{ color: T.muted }}
+              >
+                <kbd
+                  className="px-1.5 py-0.5 text-[9px] tracking-[0.1em]"
+                  style={{
+                    background: T.paper,
+                    border: `1px solid ${T.rule}`,
+                    color: T.graphite,
+                  }}
+                >
+                  Ctrl K
+                </kbd>
+              </span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
+          <div className="flex items-center gap-1">
             {user && (
               <div className="relative" ref={userMenuRef}>
                 <motion.button
@@ -254,7 +356,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   onClick={() => setShowUserMenu((v) => !v)}
                   aria-label="Open profile menu"
                   aria-expanded={showUserMenu}
-                  className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[var(--cc-accent)] text-[12px] font-semibold text-white transition-shadow hover:shadow-[0_0_0_2px_var(--cc-accent-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+                  className="flex h-7 w-7 items-center justify-center overflow-hidden text-[10px] tracking-[0.12em] uppercase"
+                  style={{
+                    background: T.graphite,
+                    color: T.paper,
+                    border: `1px solid ${T.rule}`,
+                  }}
                 >
                   <Avatar
                     size={28}
@@ -266,38 +373,73 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <AnimatePresence>
                   {showUserMenu && (
                     <motion.div
-                      initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                      transition={{
-                        duration: 0.15,
-                        ease: [0.22, 0.9, 0.28, 1],
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.14 }}
+                      className="absolute right-0 top-full z-50 mt-2 w-60"
+                      style={{
+                        background: T.paper,
+                        border: `1px solid ${T.rule}`,
                       }}
-                      className="absolute right-0 top-full z-50 mt-1.5 w-56 overflow-hidden rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] shadow-[0_20px_40px_-12px_rgba(0,0,0,0.7)]"
                       role="menu"
                     >
-                      <div className="border-b border-[var(--cc-border-subtle)] px-3 py-2.5">
-                        <div className="text-[12px] font-medium text-[var(--cc-text-primary)]">
-                          {userProfile?.full_name || user?.email || "User"}
+                      <div
+                        className="border-b px-3 py-2.5"
+                        style={{ borderColor: T.rule }}
+                      >
+                        <div
+                          className="truncate text-[12px]"
+                          style={{ color: T.graphite, fontFamily: SANS }}
+                        >
+                          {displayName}
                         </div>
-                        <div className="mt-0.5 truncate text-[11px] text-[var(--cc-text-muted)]">
+                        <div
+                          className="mt-0.5 truncate text-[10px] tracking-[0.04em]"
+                          style={{ color: T.muted, fontFamily: MONO }}
+                        >
                           {user?.email}
                         </div>
                       </div>
 
                       <div className="py-1">
-                        <MenuItem
-                          href="/dashboard"
-                          label="Dashboard"
-                          icon="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                        />
-                        <MenuItem
-                          href="/profile"
-                          label="Profile"
-                          icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
+                        <MenuLink href="/dashboard" label="DASHBOARD">
+                          <svg
+                            className="h-3.5 w-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.75}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <rect x="3" y="3" width="7" height="9" />
+                            <rect x="14" y="3" width="7" height="5" />
+                            <rect x="14" y="12" width="7" height="9" />
+                            <rect x="3" y="16" width="7" height="5" />
+                          </svg>
+                        </MenuLink>
+                        <MenuLink href="/profile" label="PROFILE">
+                          <svg
+                            className="h-3.5 w-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.75}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                          </svg>
+                        </MenuLink>
 
-                        <div className="my-1 h-px bg-[var(--cc-border-subtle)]" />
+                        <div
+                          className="my-1 mx-2 h-px"
+                          style={{ background: T.rule, opacity: 0.4 }}
+                        />
 
                         <button
                           onClick={async () => {
@@ -305,22 +447,30 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             router.push("/");
                           }}
                           role="menuitem"
-                          className="flex w-full items-center gap-2.5 px-3 py-2 text-[12px] text-[var(--cc-error)] transition-colors hover:bg-[var(--cc-bg-elevated)]"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                          style={{ color: T.error, fontFamily: MONO }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.opacity = "0.75")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.opacity = "1")
+                          }
                         >
                           <svg
                             className="h-3.5 w-3.5"
-                            fill="none"
                             viewBox="0 0 24 24"
+                            fill="none"
                             stroke="currentColor"
-                            strokeWidth={2}
+                            strokeWidth={1.75}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                            />
+                            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
                           </svg>
-                          Sign out
+                          LOG OUT
                         </button>
                       </div>
                     </motion.div>
@@ -331,7 +481,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-[var(--cc-bg-canvas)]">
+        <main
+          className="flex-1 overflow-y-auto"
+          style={{ background: T.vellum }}
+        >
           <ErrorBoundary
             variant="panel"
             title="Dashboard issue"
@@ -362,12 +515,26 @@ function NavItem({
     <Link
       href={href}
       onClick={onNavigate}
-      className={`flex items-center gap-2.5 rounded-[var(--cc-radius-button)] px-2.5 py-2 text-[13px] font-medium transition-colors ${
-        active
-          ? "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-primary)]"
-          : "text-[var(--cc-text-secondary)] hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
-      }`}
+      className="group relative flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-[0.16em] uppercase transition-colors"
+      style={{
+        background: active ? T.vellum : "transparent",
+        color: active ? T.graphite : T.muted,
+        fontFamily: MONO,
+      }}
+      onMouseEnter={(e) => {
+        if (!active) e.currentTarget.style.color = T.graphite;
+      }}
+      onMouseLeave={(e) => {
+        if (!active) e.currentTarget.style.color = T.muted;
+      }}
     >
+      {active && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 w-[2px]"
+          style={{ background: T.cobalt }}
+        />
+      )}
       <svg
         className="h-4 w-4"
         fill="none"
@@ -382,30 +549,27 @@ function NavItem({
   );
 }
 
-function MenuItem({
+function MenuLink({
   href,
   label,
-  icon,
+  children,
 }: {
   href: string;
   label: string;
-  icon: string;
+  children: React.ReactNode;
 }) {
   return (
     <Link
       href={href}
       role="menuitem"
-      className="flex items-center gap-2.5 px-3 py-2 text-[12px] text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
+      className="flex items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+      style={{ color: T.muted, fontFamily: MONO }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = T.graphite)}
+      onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
     >
-      <svg
-        className="h-3.5 w-3.5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
-      </svg>
+      <span className="flex h-4 w-4 items-center justify-center">
+        {children}
+      </span>
       {label}
     </Link>
   );
@@ -424,11 +588,15 @@ function Avatar({
 
   return (
     <div
-      className="flex flex-none items-center justify-center overflow-hidden rounded-full bg-[var(--cc-accent)] font-semibold text-white"
+      className="flex flex-none items-center justify-center overflow-hidden"
       style={{
         width: size,
         height: size,
         fontSize: size <= 24 ? 10 : size <= 32 ? 11 : 14,
+        background: T.graphite,
+        color: T.paper,
+        fontFamily: MONO,
+        letterSpacing: "0.06em",
       }}
     >
       {avatarUrl && !imgError ? (
@@ -437,7 +605,7 @@ function Avatar({
           src={avatarUrl}
           alt=""
           referrerPolicy="no-referrer"
-          className="h-full w-full rounded-full object-cover"
+          className="h-full w-full object-cover"
           onError={() => setImgError(true)}
         />
       ) : (

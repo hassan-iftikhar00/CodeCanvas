@@ -26,6 +26,12 @@ import {
   type DashboardProject,
   type RecentProjectActivity,
 } from "@/lib/dashboard-projects";
+import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
+import type { CanvasData } from "@/hooks/useProjectSave";
+
+const MONO = "var(--font-jetbrains-mono, ui-monospace, monospace)";
+const SANS = "var(--font-inter, ui-sans-serif, system-ui)";
+const SERIF = "var(--font-instrument-serif, ui-serif, Georgia, serif)";
 
 type SortOption = "recent" | "oldest" | "alphabetical";
 type DateFilter = "all" | "7d" | "30d";
@@ -43,6 +49,7 @@ type ProjectCardProject = {
   description?: string | null;
   framework: string;
   thumbnailUrl?: string | null;
+  canvasData?: CanvasData | null;
   updated_at: string;
 };
 
@@ -535,13 +542,6 @@ export default function DashboardPage() {
     });
 
     result.sort((left, right) => {
-      const leftStarred = starredProjectIds.includes(left.id) ? 1 : 0;
-      const rightStarred = starredProjectIds.includes(right.id) ? 1 : 0;
-
-      if (leftStarred !== rightStarred) {
-        return rightStarred - leftStarred;
-      }
-
       if (sortBy === "alphabetical") {
         return left.title.localeCompare(right.title);
       }
@@ -563,7 +563,6 @@ export default function DashboardPage() {
     projects,
     searchQuery,
     sortBy,
-    starredProjectIds,
   ]);
 
   const recentProjectCards = useMemo(() => {
@@ -602,122 +601,198 @@ export default function DashboardPage() {
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-[24px] font-semibold tracking-tight text-[var(--cc-text-primary)]">
-              Projects
+            <div
+              className="text-[10px] tracking-[0.18em] uppercase"
+              style={{ color: T.muted, fontFamily: MONO }}
+            >
+              Workspace · Projects
+            </div>
+            <h1
+              className="mt-1 text-[36px] leading-[1.05] tracking-[-0.02em]"
+              style={{
+                color: T.graphite,
+                fontFamily: SERIF,
+                fontWeight: 400,
+              }}
+            >
+              Projects.
             </h1>
-            <p className="mt-1 text-[13px] text-[var(--cc-text-secondary)]">
+            <p
+              className="mt-1.5 text-[13px] leading-[1.55]"
+              style={{ color: T.muted, fontFamily: SANS }}
+            >
               Search, organize, and jump back into your sketch-to-code work.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <StatPill label="Total" value={String(projects.length)} />
             <StatPill label="Starred" value={String(starredCount)} />
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              ref={newProjectButtonRef}
+            <NewProjectButton
+              forwardRef={newProjectButtonRef}
               onClick={handleCreateProject}
-              className="flex w-full items-center justify-center gap-1.5 rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-3.5 py-2 text-[13px] font-semibold text-white transition-all hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cc-bg-canvas)] sm:w-auto"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              New project
-            </motion.button>
+            />
           </div>
         </div>
 
-        <section className="rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-5">
-          <div className="mb-4">
-            <h2 className="text-[14px] font-semibold text-[var(--cc-text-primary)]">
-              Recent activity
-            </h2>
-            <p className="text-[12px] text-[var(--cc-text-muted)]">
-              Your latest opened and newly created projects.
-            </p>
+        <section
+          style={{
+            background: T.paper,
+            border: `1px solid ${T.rule}`,
+          }}
+        >
+          <div
+            className="flex items-center justify-between gap-2 border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
+            style={{
+              background: T.vellum,
+              borderColor: T.rule,
+              color: T.muted,
+              fontFamily: MONO,
+            }}
+          >
+            <span style={{ color: T.graphite }}>Recent activity</span>
+            <span>Latest opens · creations</span>
           </div>
 
-          {recentProjectCards.length === 0 ? (
-            <div className="rounded-[var(--cc-radius-card)] border border-dashed border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-4 py-8 text-center text-[12px] text-[var(--cc-text-muted)]">
-              Open a project or create one from the dashboard to build your
-              recent activity feed.
-            </div>
-          ) : (
-            <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-              {recentProjectCards.map(({ entry, project }) => (
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  transition={{
-                    duration: 0.18,
-                    ease: [0.22, 0.9, 0.28, 1],
-                  }}
-                  key={`${entry.projectId}-${entry.timestamp}`}
-                  onClick={() => {
-                    setRecentActivity(
-                      recordProjectActivity(project.id, "opened")
-                    );
-                    router.push(`/canvas?id=${project.id}`);
-                  }}
-                  className="rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] p-3.5 text-left transition-colors hover:border-[var(--cc-border-emphasis)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="rounded-[var(--cc-radius-tag)] bg-[var(--cc-accent-glow)] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-[var(--cc-accent)]">
-                      {entry.type}
-                    </span>
-                    <span className="text-[10px] text-[var(--cc-text-muted)]">
-                      {formatDistanceToNow(new Date(entry.timestamp), {
+          <div className="p-4">
+            {recentProjectCards.length === 0 ? (
+              <div
+                className="px-4 py-8 text-center text-[12px]"
+                style={{
+                  border: `1px dashed ${T.rule}`,
+                  background: T.paper,
+                  color: T.muted,
+                  fontFamily: SANS,
+                }}
+              >
+                Open a project or create one from the dashboard to build your
+                recent activity feed.
+              </div>
+            ) : (
+              <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+                {recentProjectCards.map(({ entry, project }) => (
+                  <motion.button
+                    whileHover={{ y: -2 }}
+                    transition={{
+                      duration: 0.18,
+                      ease: [0.22, 0.9, 0.28, 1],
+                    }}
+                    key={`${entry.projectId}-${entry.timestamp}`}
+                    onClick={() => {
+                      setRecentActivity(
+                        recordProjectActivity(project.id, "opened")
+                      );
+                      router.push(`/canvas?id=${project.id}`);
+                    }}
+                    className="group p-3 text-left transition-colors"
+                    style={{
+                      background: T.paper,
+                      border: `1px solid ${T.rule}`,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.borderColor = T.cobalt)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.borderColor = T.rule)
+                    }
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className="px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
+                        style={{
+                          background: T.cobaltWash,
+                          color: T.cobaltInk,
+                          border: `1px solid ${T.cobalt}`,
+                          fontFamily: MONO,
+                        }}
+                      >
+                        {entry.type}
+                      </span>
+                      <span
+                        className="text-[10px] tracking-[0.14em] uppercase"
+                        style={{ color: T.muted, fontFamily: MONO }}
+                      >
+                        {formatDistanceToNow(new Date(entry.timestamp), {
+                          addSuffix: true,
+                        })}
+                      </span>
+                    </div>
+                    <div
+                      className="mt-3 truncate text-[14px] leading-tight"
+                      style={{
+                        color: T.graphite,
+                        fontFamily: SANS,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {project.title}
+                    </div>
+                    <div
+                      className="mt-1 truncate text-[10px] tracking-[0.14em] uppercase"
+                      style={{ color: T.muted, fontFamily: MONO }}
+                    >
+                      {project.framework.toUpperCase()} · Updated{" "}
+                      {formatDistanceToNow(new Date(project.updatedAt), {
                         addSuffix: true,
                       })}
-                    </span>
-                  </div>
-                  <div className="mt-3 truncate text-[13px] font-semibold text-[var(--cc-text-primary)]">
-                    {project.title}
-                  </div>
-                  <div className="mt-0.5 truncate text-[11px] text-[var(--cc-text-secondary)]">
-                    {project.framework.toUpperCase()} · Updated{" "}
-                    {formatDistanceToNow(new Date(project.updatedAt), {
-                      addSuffix: true,
-                    })}
-                  </div>
-                </motion.button>
-              ))}
-            </div>
-          )}
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
 
-        <section className="rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-4">
-          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,0.6fr))]">
-            <label className="flex items-center gap-2.5 rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2.5 transition-colors focus-within:border-[var(--cc-accent)] focus-within:shadow-[0_0_0_3px_var(--cc-accent-glow)]">
+        <section
+          style={{
+            background: T.paper,
+            border: `1px solid ${T.rule}`,
+          }}
+        >
+          <div
+            className="flex items-center justify-between border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
+            style={{
+              background: T.vellum,
+              borderColor: T.rule,
+              color: T.muted,
+              fontFamily: MONO,
+            }}
+          >
+            <span style={{ color: T.graphite }}>Filter · Sort</span>
+            <span>{filteredProjects.length} shown · {projects.length} total</span>
+          </div>
+
+          <div className="grid gap-px lg:grid-cols-[minmax(0,1.8fr)_repeat(3,minmax(0,1fr))]"
+            style={{ background: T.rule }}
+          >
+            <label
+              className="flex items-center gap-2.5 px-4 py-2.5 transition-colors"
+              style={{ background: T.paper }}
+            >
               <svg
-                className="h-4 w-4 flex-none text-[var(--cc-text-muted)]"
+                className="h-3.5 w-3.5 flex-none"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={2}
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                strokeLinejoin="round"
                 aria-hidden="true"
+                style={{ color: T.cobalt }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m21 21-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.35-4.35" />
               </svg>
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search by title, framework, or description"
                 aria-label="Search projects"
-                className="w-full bg-transparent text-[13px] text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] focus:outline-none"
+                className="w-full bg-transparent text-[13px] focus:outline-none"
+                style={{
+                  color: T.graphite,
+                  fontFamily: SANS,
+                }}
               />
             </label>
 
@@ -762,21 +837,41 @@ export default function DashboardPage() {
             animate={{ opacity: 1, y: 0 }}
             role="alert"
             aria-live="polite"
-            className="rounded-[var(--cc-radius-card)] border border-[rgba(239,68,68,0.35)] bg-[rgba(239,68,68,0.08)] px-4 py-3 text-[13px] text-[var(--cc-error)]"
+            className="px-4 py-3 text-[12px]"
+            style={{
+              border: `1px solid ${T.error}`,
+              background: `${T.error}10`,
+              color: T.error,
+              fontFamily: SANS,
+            }}
           >
             {deleteError}
           </motion.div>
         )}
 
         {filteredProjects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-[var(--cc-radius-card)] border border-dashed border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)]/50 py-20 text-center">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] text-[var(--cc-text-muted)]">
+          <div
+            className="flex flex-col items-center justify-center py-20 text-center"
+            style={{
+              border: `1px dashed ${T.rule}`,
+              background: T.paper,
+            }}
+          >
+            <div
+              className="mb-5 flex h-10 w-10 items-center justify-center"
+              style={{
+                border: `1px solid ${T.rule}`,
+                color: T.muted,
+                background: T.vellum,
+              }}
+            >
               <svg
-                className="h-5 w-5"
+                className="h-4 w-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
                 strokeWidth={1.5}
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -785,14 +880,26 @@ export default function DashboardPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-[14px] font-semibold text-[var(--cc-text-primary)]">
+            <div
+              className="text-[10px] tracking-[0.18em] uppercase"
+              style={{ color: T.muted, fontFamily: MONO }}
+            >
+              {projects.length === 0 ? "Nothing here yet" : "No matches"}
+            </div>
+            <h3
+              className="mt-1 text-[24px] leading-tight"
+              style={{ color: T.graphite, fontFamily: SERIF, fontWeight: 400 }}
+            >
               {projects.length === 0
-                ? "No projects yet"
-                : "No projects match these filters"}
+                ? "Start your first sketch."
+                : "Nothing matches those filters."}
             </h3>
-            <p className="mt-1 text-[12px] text-[var(--cc-text-secondary)]">
+            <p
+              className="mt-1.5 text-[12px]"
+              style={{ color: T.muted, fontFamily: SANS }}
+            >
               {projects.length === 0
-                ? "Create your first project to get started."
+                ? "Open the canvas to draw a UI and let the model generate the code."
                 : "Try another search term, framework, or date range."}
             </p>
             <button
@@ -806,9 +913,37 @@ export default function DashboardPage() {
                       setSortBy("recent");
                     }
               }
-              className="mt-5 rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--cc-text-primary)] transition-colors hover:border-[var(--cc-border-emphasis)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+              className="mt-5 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+              style={{
+                background: projects.length === 0 ? T.cobalt : T.paper,
+                color: projects.length === 0 ? T.paper : T.graphite,
+                border: `1px solid ${
+                  projects.length === 0 ? T.cobalt : T.rule
+                }`,
+                fontFamily: MONO,
+              }}
+              onMouseEnter={(e) => {
+                if (projects.length === 0) {
+                  e.currentTarget.style.background = T.cobaltInk;
+                  e.currentTarget.style.borderColor = T.cobaltInk;
+                } else {
+                  e.currentTarget.style.background = T.graphite;
+                  e.currentTarget.style.color = T.paper;
+                  e.currentTarget.style.borderColor = T.graphite;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (projects.length === 0) {
+                  e.currentTarget.style.background = T.cobalt;
+                  e.currentTarget.style.borderColor = T.cobalt;
+                } else {
+                  e.currentTarget.style.background = T.paper;
+                  e.currentTarget.style.color = T.graphite;
+                  e.currentTarget.style.borderColor = T.rule;
+                }
+              }}
             >
-              {projects.length === 0 ? "Create project" : "Clear filters"}
+              {projects.length === 0 ? "Create project →" : "Clear filters"}
             </button>
           </div>
         ) : (
@@ -822,6 +957,7 @@ export default function DashboardPage() {
                   description: project.description,
                   framework: project.framework,
                   thumbnailUrl: project.thumbnailUrl,
+                  canvasData: (project.raw.canvas_data as CanvasData | null | undefined) ?? null,
                   updated_at: project.updatedAt,
                 }}
                 onRequestDelete={handleRequestDelete}
@@ -843,7 +979,11 @@ export default function DashboardPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-[4px]"
+              className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+              style={{
+                background: "rgba(14, 14, 15, 0.55)",
+                backdropFilter: "blur(4px)",
+              }}
               onClick={() => {
                 if (!deletingProjectId) {
                   closeDeleteDialog();
@@ -863,51 +1003,136 @@ export default function DashboardPage() {
                 tabIndex={-1}
                 onClick={(event) => event.stopPropagation()}
                 onKeyDown={handleDeleteDialogKeyDown}
-                className="w-full max-w-md rounded-[12px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-5 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.8)]"
+                className="w-full max-w-md"
+                style={{
+                  background: T.paper,
+                  border: `1px solid ${T.rule}`,
+                }}
               >
-                <div className="flex items-start gap-3.5">
-                  <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[var(--cc-radius-button)] bg-[rgba(239,68,68,0.12)] text-[var(--cc-error)]">
+                <div
+                  className="flex items-center justify-between border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                  style={{
+                    background: T.vellum,
+                    borderColor: T.rule,
+                    color: T.muted,
+                    fontFamily: MONO,
+                  }}
+                >
+                  <span style={{ color: T.graphite }}>
+                    Confirm · Delete project
+                  </span>
+                  <button
+                    type="button"
+                    onClick={closeDeleteDialog}
+                    disabled={Boolean(deletingProjectId)}
+                    aria-label="Close"
+                    className="flex h-5 w-5 items-center justify-center transition-colors disabled:opacity-40"
+                    style={{ color: T.muted }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.color = T.graphite)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.color = T.muted)
+                    }
+                  >
                     <svg
-                      className="h-5 w-5"
-                      fill="none"
+                      className="h-3 w-3"
                       viewBox="0 0 24 24"
+                      fill="none"
                       stroke="currentColor"
-                      strokeWidth={2}
+                      strokeWidth={1.75}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-                      />
+                      <path d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2
-                      id="delete-project-title"
-                      className="text-[15px] font-semibold text-[var(--cc-text-primary)]"
-                    >
-                      Delete project?
-                    </h2>
-                    <p
-                      id="delete-project-description"
-                      className="mt-1 text-[12px] text-[var(--cc-text-secondary)]"
-                    >
-                      Are you sure you want to delete this project? This action
-                      cannot be undone.
-                    </p>
-                    <p className="mt-2 truncate text-[12px] font-medium text-[var(--cc-text-primary)]">
-                      {deleteDialogProject.title}
-                    </p>
+                  </button>
+                </div>
+
+                <div className="px-6 pt-5 pb-4">
+                  <h2
+                    id="delete-project-title"
+                    className="text-[26px] leading-[1.1] tracking-[-0.01em]"
+                    style={{
+                      color: T.graphite,
+                      fontFamily: SERIF,
+                      fontWeight: 400,
+                    }}
+                  >
+                    Delete this project?
+                  </h2>
+                  <p
+                    id="delete-project-description"
+                    className="mt-2 text-[12px] leading-[1.55]"
+                    style={{ color: T.muted, fontFamily: SANS }}
+                  >
+                    This action cannot be undone. The project and all its
+                    iterations will be removed.
+                  </p>
+                  <div
+                    className="mt-4 flex items-start gap-2.5 px-3 py-2"
+                    style={{
+                      background: T.vellum,
+                      border: `1px solid ${T.rule}`,
+                    }}
+                  >
+                    <span
+                      className="mt-[2px] inline-block h-1.5 w-1.5"
+                      style={{ background: T.error }}
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div
+                        className="text-[10px] tracking-[0.16em] uppercase"
+                        style={{ color: T.muted, fontFamily: MONO }}
+                      >
+                        Target
+                      </div>
+                      <div
+                        className="mt-0.5 truncate text-[13px]"
+                        style={{
+                          color: T.graphite,
+                          fontFamily: SANS,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {deleteDialogProject.title}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <div
+                  className="flex flex-col-reverse gap-2 border-t px-6 py-3.5 sm:flex-row sm:justify-end"
+                  style={{
+                    background: T.vellum,
+                    borderColor: T.rule,
+                  }}
+                >
                   <button
                     ref={deleteCancelRef}
                     type="button"
                     onClick={closeDeleteDialog}
                     disabled={Boolean(deletingProjectId)}
-                    className="rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-3.5 py-2 text-[13px] font-semibold text-[var(--cc-text-primary)] transition-colors hover:border-[var(--cc-border-emphasis)] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+                    className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{
+                      background: T.paper,
+                      border: `1px solid ${T.rule}`,
+                      color: T.graphite,
+                      fontFamily: MONO,
+                      minHeight: 36,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (deletingProjectId) return;
+                      e.currentTarget.style.background = T.graphite;
+                      e.currentTarget.style.color = T.paper;
+                      e.currentTarget.style.borderColor = T.graphite;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = T.paper;
+                      e.currentTarget.style.color = T.graphite;
+                      e.currentTarget.style.borderColor = T.rule;
+                    }}
                   >
                     Cancel
                   </button>
@@ -916,15 +1141,36 @@ export default function DashboardPage() {
                     onClick={handleConfirmDelete}
                     disabled={Boolean(deletingProjectId)}
                     aria-busy={Boolean(deletingProjectId)}
-                    className="cc-danger inline-flex items-center justify-center gap-2 rounded-[var(--cc-radius-button)] bg-[var(--cc-error)] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--cc-error)] disabled:cursor-not-allowed disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-error)]"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-70"
+                    style={{
+                      background: T.error,
+                      border: `1px solid ${T.error}`,
+                      color: T.paper,
+                      fontFamily: MONO,
+                      minHeight: 36,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (deletingProjectId) return;
+                      e.currentTarget.style.opacity = "0.85";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = "1";
+                    }}
                   >
                     {deletingProjectId ? (
                       <>
-                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        Deleting...
+                        <span
+                          className="h-3 w-3 animate-spin"
+                          style={{
+                            border: `1.5px solid ${T.paper}`,
+                            borderTopColor: "transparent",
+                            borderRadius: "50%",
+                          }}
+                        />
+                        Deleting
                       </>
                     ) : (
-                      "Delete"
+                      "Delete →"
                     )}
                   </button>
                 </div>
@@ -939,7 +1185,11 @@ export default function DashboardPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-[4px]"
+              className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+              style={{
+                background: "rgba(14, 14, 15, 0.55)",
+                backdropFilter: "blur(4px)",
+              }}
             >
               <motion.div
                 initial={{ opacity: 0, scale: 0.96, y: 10 }}
@@ -950,55 +1200,98 @@ export default function DashboardPage() {
                 aria-modal="true"
                 aria-labelledby="onboarding-title"
                 aria-describedby="onboarding-description"
-                className="w-full max-w-md rounded-[16px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] p-5 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.8)]"
+                className="w-full max-w-md"
+                style={{
+                  background: T.paper,
+                  border: `1px solid ${T.rule}`,
+                }}
               >
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 flex-none items-center justify-center rounded-[var(--cc-radius-button)] bg-[rgba(255,107,0,0.14)] text-[var(--cc-accent)]">
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h2
-                      id="onboarding-title"
-                      className="text-[16px] font-semibold text-[var(--cc-text-primary)]"
-                    >
-                      Start the guided walkthrough?
-                    </h2>
-                    <p
-                      id="onboarding-description"
-                      className="mt-1 text-[12px] text-[var(--cc-text-secondary)]"
-                    >
-                      We will walk you through Draw, Generate, and Export in the
-                      canvas so you can get productive fast.
-                    </p>
-                  </div>
+                <div
+                  className="border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                  style={{
+                    background: T.vellum,
+                    borderColor: T.rule,
+                    color: T.graphite,
+                    fontFamily: MONO,
+                  }}
+                >
+                  Welcome · Quick tour
                 </div>
 
-                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <div className="px-6 pt-5 pb-4">
+                  <h2
+                    id="onboarding-title"
+                    className="text-[26px] leading-[1.1] tracking-[-0.01em]"
+                    style={{
+                      color: T.graphite,
+                      fontFamily: SERIF,
+                      fontWeight: 400,
+                    }}
+                  >
+                    First time here?
+                  </h2>
+                  <p
+                    id="onboarding-description"
+                    className="mt-2 text-[12px] leading-[1.55]"
+                    style={{ color: T.muted, fontFamily: SANS }}
+                  >
+                    We will walk you through Draw, Generate, and Export in the
+                    canvas so you can get productive fast.
+                  </p>
+                </div>
+
+                <div
+                  className="flex flex-col-reverse gap-2 border-t px-6 py-3.5 sm:flex-row sm:justify-end"
+                  style={{
+                    background: T.vellum,
+                    borderColor: T.rule,
+                  }}
+                >
                   <button
                     type="button"
                     onClick={handleSkipOnboarding}
-                    className="rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-3.5 py-2 text-[13px] font-semibold text-[var(--cc-text-primary)] transition-colors hover:border-[var(--cc-border-emphasis)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+                    className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                    style={{
+                      background: T.paper,
+                      border: `1px solid ${T.rule}`,
+                      color: T.graphite,
+                      fontFamily: MONO,
+                      minHeight: 36,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = T.graphite;
+                      e.currentTarget.style.color = T.paper;
+                      e.currentTarget.style.borderColor = T.graphite;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = T.paper;
+                      e.currentTarget.style.color = T.graphite;
+                      e.currentTarget.style.borderColor = T.rule;
+                    }}
                   >
                     Skip
                   </button>
                   <button
                     type="button"
                     onClick={handleStartOnboarding}
-                    className="inline-flex items-center justify-center gap-2 rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:shadow-[0_0_20px_var(--cc-accent-glow-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                    style={{
+                      background: T.cobalt,
+                      border: `1px solid ${T.cobalt}`,
+                      color: T.paper,
+                      fontFamily: MONO,
+                      minHeight: 36,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = T.cobaltInk;
+                      e.currentTarget.style.borderColor = T.cobaltInk;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = T.cobalt;
+                      e.currentTarget.style.borderColor = T.cobalt;
+                    }}
                   >
-                    Start walkthrough
+                    Start walkthrough →
                   </button>
                 </div>
               </motion.div>
@@ -1013,14 +1306,74 @@ export default function DashboardPage() {
 
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-surface)] px-3 py-2">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--cc-text-muted)]">
+    <div
+      className="flex items-center gap-2 px-3 py-1.5"
+      style={{
+        background: T.paper,
+        border: `1px solid ${T.rule}`,
+        fontFamily: MONO,
+        minHeight: 36,
+      }}
+    >
+      <span
+        className="text-[10px] tracking-[0.16em] uppercase"
+        style={{ color: T.muted }}
+      >
         {label}
       </span>
-      <span className="text-[14px] font-semibold text-[var(--cc-text-primary)]">
+      <span
+        className="text-[14px]"
+        style={{ color: T.graphite, fontWeight: 500 }}
+      >
         {value}
       </span>
     </div>
+  );
+}
+
+function NewProjectButton({
+  forwardRef,
+  onClick,
+}: {
+  forwardRef: React.Ref<HTMLButtonElement>;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.96 }}
+      ref={forwardRef}
+      onClick={onClick}
+      className="flex items-center gap-2 px-3.5 text-[10px] tracking-[0.18em] uppercase transition-colors"
+      style={{
+        background: T.cobalt,
+        color: T.paper,
+        border: `1px solid ${T.cobalt}`,
+        fontFamily: MONO,
+        minHeight: 36,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = T.cobaltInk;
+        e.currentTarget.style.borderColor = T.cobaltInk;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = T.cobalt;
+        e.currentTarget.style.borderColor = T.cobalt;
+      }}
+    >
+      <svg
+        className="h-3.5 w-3.5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      New project
+    </motion.button>
   );
 }
 
@@ -1036,25 +1389,50 @@ function FilterSelect({
   options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <label className="rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2 transition-colors focus-within:border-[var(--cc-accent)] focus-within:shadow-[0_0_0_3px_var(--cc-accent-glow)]">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-[var(--cc-text-muted)]">
+    <label
+      className="relative flex flex-col px-4 py-2 transition-colors"
+      style={{ background: T.paper }}
+    >
+      <div
+        className="text-[10px] tracking-[0.16em] uppercase"
+        style={{ color: T.muted, fontFamily: MONO }}
+      >
         {label}
       </div>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-0.5 w-full bg-transparent text-[13px] text-[var(--cc-text-primary)] focus:outline-none"
-      >
-        {options.map((option) => (
-          <option
-            key={option.value}
-            value={option.value}
-            className="bg-[var(--cc-bg-surface)]"
-          >
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <div className="relative mt-0.5 flex items-center">
+        <select
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="w-full appearance-none bg-transparent pr-5 text-[13px] focus:outline-none"
+          style={{
+            color: T.graphite,
+            fontFamily: SANS,
+          }}
+        >
+          {options.map((option) => (
+            <option
+              key={option.value}
+              value={option.value}
+              style={{ background: T.paper, color: T.graphite }}
+            >
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <svg
+          className="pointer-events-none absolute right-0 h-3 w-3"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.75}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          style={{ color: T.muted }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
     </label>
   );
 }

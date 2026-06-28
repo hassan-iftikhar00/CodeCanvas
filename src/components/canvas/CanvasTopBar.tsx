@@ -7,13 +7,12 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { createClient } from "@/lib/supabase/client";
-import ThemeToggle from "@/components/theme/ThemeToggle";
+import { T_CANVAS, CanvasMark } from "./canvasTokens";
 
-interface NavbarProps {
+interface CanvasTopBarProps {
   projectName?: string;
   originalProjectName?: string;
   onProjectNameChange?: (name: string) => void;
@@ -29,11 +28,11 @@ interface NavbarProps {
   onRunDetection?: () => void;
   isGenerating?: boolean;
   onExport?: () => void;
+  onUploadSketch?: () => void;
   onChatToggle?: () => void;
-  onHistoryToggle?: () => void;
   onTemplatesToggle?: () => void;
+  onShortcutsToggle?: () => void;
   isChatActive?: boolean;
-  isHistoryActive?: boolean;
 
   showBackButton?: boolean;
   backButtonHref?: string;
@@ -57,7 +56,7 @@ interface ProfileState {
   username?: string;
 }
 
-export default function Navbar({
+export default function CanvasTopBar({
   projectName,
   originalProjectName,
   onProjectNameChange,
@@ -71,14 +70,15 @@ export default function Navbar({
   onRunDetection,
   isGenerating,
   onExport,
+  onUploadSketch,
   onChatToggle,
-  onHistoryToggle,
   onTemplatesToggle,
+  onShortcutsToggle,
   isChatActive,
   showBackButton = true,
   backButtonHref = "/dashboard",
   showLogo = true,
-}: NavbarProps) {
+}: CanvasTopBarProps) {
   const router = useRouter();
   const supabase = createClient();
   const [user, setUser] = useState<UserState | null>(null);
@@ -92,9 +92,7 @@ export default function Navbar({
   useEffect(() => {
     const getUser = async () => {
       try {
-        const {
-          data: { user: u },
-        } = await supabase.auth.getUser();
+        const { data: { user: u } } = await supabase.auth.getUser();
         if (u) {
           setUser({
             id: u.id,
@@ -115,14 +113,10 @@ export default function Navbar({
     getUser();
   }, [supabase]);
 
-  // Close user menu on outside click
   useEffect(() => {
     if (!showUserMenu) return;
     const onClick = (e: MouseEvent) => {
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(e.target as Node)
-      ) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setShowUserMenu(false);
       }
     };
@@ -130,7 +124,6 @@ export default function Navbar({
     return () => document.removeEventListener("mousedown", onClick);
   }, [showUserMenu]);
 
-  // Focus name input on edit
   useEffect(() => {
     if (editingName) {
       nameInputRef.current?.focus();
@@ -166,7 +159,6 @@ export default function Navbar({
     }
   };
 
-  // Save dot state
   type SaveState = "idle" | "saving" | "saved" | "error";
   const saveState: SaveState = saveError
     ? "error"
@@ -177,17 +169,17 @@ export default function Navbar({
         : "idle";
 
   const dotColor: Record<SaveState, string> = {
-    idle: "bg-[var(--cc-text-muted)]",
-    saving: "bg-[var(--cc-success)] cc-dot-pulse",
-    saved: "bg-[var(--cc-success)]",
-    error: "bg-[var(--cc-error)]",
+    idle: T_CANVAS.muted,
+    saving: T_CANVAS.cobalt,
+    saved: T_CANVAS.success,
+    error: T_CANVAS.error,
   };
 
   const saveLabel: Record<SaveState, string> = {
-    idle: "Not saved",
-    saving: "Saving...",
-    saved: lastSaved ? `Saved · ${formatRelative(lastSaved)}` : "Saved",
-    error: "Save failed",
+    idle: "NOT SAVED",
+    saving: "SAVING",
+    saved: lastSaved ? `SAVED · ${formatRelative(lastSaved)}` : "SAVED",
+    error: "SAVE FAILED",
   };
 
   const displayName =
@@ -208,31 +200,35 @@ export default function Navbar({
   const avatarUrl =
     profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? null;
 
-  // Reset error state when the URL we're trying to load changes,
-  // so a fresh URL gets a fresh chance before we fall back to the letter.
   useEffect(() => {
     setAvatarError(false);
   }, [avatarUrl]);
 
   return (
     <header
-      className="flex min-h-[3rem] flex-wrap items-center justify-between gap-2 border-b border-[#1e1e1e] bg-[var(--cc-bg-surface)] px-2 sm:px-3"
+      className="flex min-h-[3rem] items-center justify-between gap-2 border-b px-3 py-2 sm:px-4"
+      style={{
+        background: T_CANVAS.paper,
+        borderColor: T_CANVAS.rule,
+        fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+      }}
       role="banner"
     >
-      {/* Left cluster - back, logo, project name + save dot */}
+      {/* LEFT — back · logo · project name · save dot */}
       <div className="flex min-w-0 items-center gap-2">
         {showBackButton && (
           <Link
             href={backButtonHref}
             aria-label="Back to dashboard"
-            className="flex h-8 w-8 items-center justify-center rounded-[var(--cc-radius-button)] text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+            className="flex h-8 w-8 items-center justify-center transition-colors"
+            style={{ color: T_CANVAS.muted, border: `1px solid ${T_CANVAS.rule}` }}
           >
             <svg
-              className="h-4 w-4"
+              className="h-3.5 w-3.5"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={1.75}
               strokeLinecap="round"
               strokeLinejoin="round"
             >
@@ -244,68 +240,75 @@ export default function Navbar({
         {showLogo && (
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 text-[13px] font-semibold text-[var(--cc-text-primary)] transition-colors hover:text-[var(--cc-accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] rounded-[var(--cc-radius-button)] px-1"
+            className="flex items-center gap-2 px-1"
+            style={{ color: T_CANVAS.graphite }}
           >
-            <Image
-              src="/logo.png"
-              alt=""
-              aria-hidden="true"
-              width={20}
-              height={20}
-              className="h-5 w-5"
-            />
-            <span className="hidden sm:inline">CodeCanvas</span>
+            <CanvasMark size={20} color={T_CANVAS.graphite} />
+            <span
+              className="hidden text-[11px] tracking-[0.18em] uppercase sm:inline"
+              style={{ color: T_CANVAS.graphite }}
+            >
+              CodeCanvas
+            </span>
           </Link>
         )}
 
-        {/* Divider */}
-        {projectName !== undefined ? (
-          <span
-            aria-hidden="true"
-            className="mx-1 h-4 w-px bg-[var(--cc-border-subtle)]"
-          />
-        ) : null}
+        {projectName !== undefined && (
+          <>
+            <span
+              aria-hidden="true"
+              className="mx-1 h-3 w-px"
+              style={{ background: T_CANVAS.rule, opacity: 0.4 }}
+            />
 
-        {/* Project name - double-click to edit */}
-        {projectName !== undefined && onProjectNameChange ? (
-          <div className="flex min-w-0 items-center gap-2">
-            {editingName ? (
-              <input
-                ref={nameInputRef}
-                type="text"
-                value={projectName}
-                onChange={(e) => onProjectNameChange(e.target.value)}
-                onBlur={commitNameEdit}
-                onKeyDown={onNameKey}
-                aria-label="Project name"
-                className="h-7 min-w-[120px] max-w-[200px] rounded-[var(--cc-radius-button)] border border-[var(--cc-accent)] bg-[var(--cc-bg-elevated)] px-2 text-[12px] font-medium text-[var(--cc-text-primary)] outline-none ring-2 ring-[var(--cc-accent-glow)] sm:min-w-[140px] sm:max-w-[280px] sm:text-[13px]"
-              />
-            ) : (
-              <button
-                type="button"
-                onDoubleClick={() => setEditingName(true)}
-                onClick={() => setEditingName(true)}
-                title="Double-click to rename"
-                className="group flex h-7 max-w-[200px] items-center gap-1 truncate rounded-[var(--cc-radius-button)] px-2 text-[12px] font-medium text-[var(--cc-text-primary)] transition-colors hover:bg-[var(--cc-bg-elevated)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] sm:max-w-[280px] sm:text-[13px]"
-              >
-                <span className="truncate">{projectName || "Untitled"}</span>
-                <svg
-                  className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-60"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+            {onProjectNameChange ? (
+              editingName ? (
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => onProjectNameChange(e.target.value)}
+                  onBlur={commitNameEdit}
+                  onKeyDown={onNameKey}
+                  aria-label="Project name"
+                  className="h-7 min-w-[140px] max-w-[260px] px-2 text-[12px] outline-none"
+                  style={{
+                    background: T_CANVAS.vellum,
+                    border: `1px solid ${T_CANVAS.cobalt}`,
+                    color: T_CANVAS.graphite,
+                    fontFamily: "var(--font-inter, ui-sans-serif, system-ui)",
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onDoubleClick={() => setEditingName(true)}
+                  onClick={() => setEditingName(true)}
+                  title="Double-click to rename"
+                  className="group flex h-7 max-w-[280px] items-center gap-1.5 truncate px-2 text-[12px] tracking-[0.04em] transition-colors"
+                  style={{
+                    color: T_CANVAS.graphite,
+                    fontFamily: "var(--font-inter, ui-sans-serif, system-ui)",
+                  }}
                 >
-                  <path d="M12 20h9" />
-                  <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
-                </svg>
-              </button>
-            )}
+                  <span className="truncate">{projectName || "Untitled"}</span>
+                  <svg
+                    className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-50"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+                  </svg>
+                </button>
+              )
+            ) : null}
 
-            {/* Auto-save dot */}
             <span
               className="flex items-center gap-1.5"
               role="status"
@@ -314,100 +317,127 @@ export default function Navbar({
             >
               <span
                 aria-hidden="true"
-                className={`h-1.5 w-1.5 rounded-full ${dotColor[saveState]}`}
+                className="inline-block h-1.5 w-1.5"
+                style={{
+                  background: dotColor[saveState],
+                  animation:
+                    saveState === "saving"
+                      ? "ct-pulse 1.4s ease-in-out infinite"
+                      : undefined,
+                }}
               />
-              <span className="hidden text-[11px] text-[var(--cc-text-secondary)] xl:inline">
+              <span
+                className="hidden text-[10px] tracking-[0.16em] uppercase xl:inline"
+                style={{ color: T_CANVAS.muted }}
+              >
                 {saveLabel[saveState]}
               </span>
               {isSavingName ? (
-                <span className="text-[11px] text-[var(--cc-accent)]">·</span>
+                <span className="text-[11px]" style={{ color: T_CANVAS.cobalt }}>
+                  ·
+                </span>
               ) : null}
             </span>
-          </div>
-        ) : null}
+          </>
+        )}
       </div>
 
-      {/* Right cluster - actions */}
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
-        <ThemeToggle />
+      {/* RIGHT — actions cluster */}
+      <div className="flex flex-wrap items-center justify-end gap-1">
+        {onUploadSketch ? (
+          <ToolbarButton onClick={onUploadSketch} label="UPLOAD" hideLabelBelow="lg">
+            <UploadIcon />
+          </ToolbarButton>
+        ) : null}
+
         {onTemplatesToggle ? (
-          <HeaderButton
-            onClick={onTemplatesToggle}
-            label="Templates"
-            hideLabelBelow="lg"
-          >
+          <ToolbarButton onClick={onTemplatesToggle} label="TEMPLATES" hideLabelBelow="lg">
             <TemplatesIcon />
-          </HeaderButton>
+          </ToolbarButton>
         ) : null}
 
         {onSave ? (
-          <HeaderButton
+          <ToolbarButton
             onClick={onSave}
             disabled={isSaving}
-            label="Save"
+            label="SAVE"
             shortcut="Ctrl+S"
             hideLabelBelow="lg"
           >
             <SaveIcon />
-          </HeaderButton>
+          </ToolbarButton>
         ) : null}
 
         {onExport ? (
-          <HeaderButton
+          <ToolbarButton
             onClick={onExport}
-            label="Export"
+            label="EXPORT"
             hideLabelBelow="xl"
             dataOnboardingId="export-action"
           >
             <ExportIcon />
-          </HeaderButton>
+          </ToolbarButton>
         ) : null}
 
         {onChatToggle ? (
-          <HeaderButton
+          <ToolbarButton
             onClick={onChatToggle}
-            label="Chat"
+            label="CHAT"
             hideLabelBelow="xl"
             active={isChatActive}
           >
             <ChatIcon />
-          </HeaderButton>
+          </ToolbarButton>
         ) : null}
 
-        {onHistoryToggle ? (
-          <HeaderButton
-            onClick={onHistoryToggle}
-            label="History"
+        {onShortcutsToggle ? (
+          <ToolbarButton
+            onClick={onShortcutsToggle}
+            label="SHORTCUTS"
+            shortcut="?"
             hideLabelBelow="xl"
           >
-            <HistoryIcon />
-          </HeaderButton>
+            <KeyboardIcon />
+          </ToolbarButton>
         ) : null}
 
-        {/* Run Detection - primary accent */}
         {onRunDetection ? (
           <button
             onClick={onRunDetection}
             disabled={isGenerating}
             data-onboarding="generate-action"
-            className="group ml-1 flex h-8 items-center gap-1.5 rounded-[var(--cc-radius-button)] bg-[var(--cc-accent)] px-3 text-[12px] font-medium text-white transition-all duration-150 hover:shadow-[0_0_18px_var(--cc-accent-glow-strong)] active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--cc-bg-surface)] focus-visible:ring-[var(--cc-accent)]"
+            className="ml-1 flex h-8 items-center gap-1.5 px-3 text-[11px] tracking-[0.16em] uppercase transition-colors"
+            style={{
+              background: isGenerating ? T_CANVAS.cobaltInk : T_CANVAS.cobalt,
+              border: `1px solid ${isGenerating ? T_CANVAS.cobaltInk : T_CANVAS.cobalt}`,
+              color: T_CANVAS.paper,
+              cursor: isGenerating ? "not-allowed" : "pointer",
+              opacity: isGenerating ? 0.85 : 1,
+            }}
             title="Run detection (generate code)"
           >
             {isGenerating ? (
               <>
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                <span className="hidden md:inline">Detecting...</span>
+                <span
+                  className="h-3 w-3"
+                  style={{
+                    border: `1.5px solid ${T_CANVAS.paper}`,
+                    borderTopColor: "transparent",
+                    borderRadius: "50%",
+                    animation: "ct-spin 0.9s linear infinite",
+                  }}
+                />
+                <span className="hidden md:inline">DETECTING</span>
               </>
             ) : (
               <>
                 <SparkleIcon />
-                <span className="hidden md:inline">Run Detection</span>
+                <span className="hidden md:inline">RUN DETECTION →</span>
               </>
             )}
           </button>
         ) : null}
 
-        {/* Avatar */}
         {user ? (
           <div ref={userMenuRef} className="relative ml-1">
             <button
@@ -415,7 +445,12 @@ export default function Navbar({
               aria-label="User menu"
               aria-expanded={showUserMenu}
               aria-haspopup="menu"
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] text-[11px] font-semibold text-white transition-all hover:ring-2 hover:ring-[var(--cc-accent-glow-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+              className="flex h-7 w-7 items-center justify-center text-[10px] tracking-[0.12em] uppercase"
+              style={{
+                background: T_CANVAS.graphite,
+                color: T_CANVAS.paper,
+                border: `1px solid ${T_CANVAS.rule}`,
+              }}
             >
               {avatarUrl && !avatarError ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -425,7 +460,7 @@ export default function Navbar({
                   width={28}
                   height={28}
                   referrerPolicy="no-referrer"
-                  className="h-7 w-7 rounded-full object-cover"
+                  className="h-7 w-7 object-cover"
                   onError={() => setAvatarError(true)}
                 />
               ) : (
@@ -437,28 +472,47 @@ export default function Navbar({
               {showUserMenu ? (
                 <motion.div
                   role="menu"
-                  initial={{ opacity: 0, y: -4, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                  transition={{ duration: 0.16, ease: [0.22, 0.9, 0.28, 1] }}
-                  className="absolute right-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-[var(--cc-radius-card)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.6)]"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.14 }}
+                  className="absolute right-0 top-full z-50 mt-2 w-60"
+                  style={{
+                    background: T_CANVAS.paper,
+                    border: `1px solid ${T_CANVAS.rule}`,
+                  }}
                 >
-                  <div className="border-b border-[var(--cc-border-subtle)] px-3 py-3">
-                    <div className="text-[13px] font-medium text-[var(--cc-text-primary)] truncate">
+                  <div
+                    className="border-b px-3 py-2.5"
+                    style={{ borderColor: T_CANVAS.rule }}
+                  >
+                    <div
+                      className="truncate text-[12px]"
+                      style={{
+                        color: T_CANVAS.graphite,
+                        fontFamily: "var(--font-inter, ui-sans-serif, system-ui)",
+                      }}
+                    >
                       {displayName}
                     </div>
-                    <div className="text-[11px] text-[var(--cc-text-secondary)] truncate">
+                    <div
+                      className="truncate text-[10px] tracking-[0.04em]"
+                      style={{ color: T_CANVAS.muted }}
+                    >
                       {user.email}
                     </div>
                   </div>
                   <div className="py-1">
-                    <MenuLink href="/dashboard" label="Dashboard">
+                    <MenuLink href="/dashboard" label="DASHBOARD">
                       <DashboardIcon />
                     </MenuLink>
-                    <MenuLink href="/profile" label="Profile">
+                    <MenuLink href="/profile" label="PROFILE">
                       <ProfileIcon />
                     </MenuLink>
-                    <div className="my-1 mx-2 h-px bg-[var(--cc-border-subtle)]" />
+                    <div
+                      className="my-1 mx-2 h-px"
+                      style={{ background: T_CANVAS.rule, opacity: 0.4 }}
+                    />
                     <button
                       type="button"
                       onClick={() => {
@@ -466,10 +520,11 @@ export default function Navbar({
                         handleLogout();
                       }}
                       role="menuitem"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-[var(--cc-error)] transition-colors hover:bg-[var(--cc-bg-canvas)]"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors hover:opacity-80"
+                      style={{ color: T_CANVAS.error }}
                     >
                       <LogoutIcon />
-                      Log out
+                      LOG OUT
                     </button>
                   </div>
                 </motion.div>
@@ -478,13 +533,32 @@ export default function Navbar({
           </div>
         ) : null}
       </div>
+
+      <style jsx>{`
+        @keyframes ct-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        @keyframes ct-pulse {
+          0%,
+          100% {
+            opacity: 0.4;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.4);
+          }
+        }
+      `}</style>
     </header>
   );
 }
 
 // ───────────────────────── Subcomponents ─────────────────────────
 
-interface HeaderButtonProps {
+interface ToolbarButtonProps {
   children: React.ReactNode;
   label: string;
   shortcut?: string;
@@ -495,7 +569,7 @@ interface HeaderButtonProps {
   dataOnboardingId?: string;
 }
 
-function HeaderButton({
+function ToolbarButton({
   children,
   label,
   shortcut,
@@ -504,7 +578,7 @@ function HeaderButton({
   hideLabelBelow = "lg",
   onClick,
   dataOnboardingId,
-}: HeaderButtonProps) {
+}: ToolbarButtonProps) {
   const labelHide = hideLabelBelow === "xl" ? "xl:inline" : "lg:inline";
   return (
     <button
@@ -513,15 +587,24 @@ function HeaderButton({
       disabled={disabled}
       title={shortcut ? `${label} (${shortcut})` : label}
       data-onboarding={dataOnboardingId}
-      className={`flex h-8 items-center gap-1.5 rounded-[var(--cc-radius-button)] px-2.5 text-[12px] font-medium transition-all duration-150 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] ${
-        active
-          ? "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-primary)]"
-          : "text-[var(--cc-text-secondary)] hover:bg-[var(--cc-bg-elevated)] hover:text-[var(--cc-text-primary)]"
-      }`}
+      className="flex h-8 items-center gap-1.5 px-2 text-[10px] tracking-[0.16em] uppercase transition-colors disabled:opacity-50"
+      style={{
+        background: active ? T_CANVAS.graphite : "transparent",
+        color: active ? T_CANVAS.paper : T_CANVAS.muted,
+        border: `1px solid ${active ? T_CANVAS.graphite : "transparent"}`,
+      }}
+      onMouseEnter={(e) => {
+        if (!disabled && !active) {
+          e.currentTarget.style.color = T_CANVAS.graphite;
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.color = T_CANVAS.muted;
+        }
+      }}
     >
-      <span className="flex h-4 w-4 items-center justify-center">
-        {children}
-      </span>
+      <span className="flex h-4 w-4 items-center justify-center">{children}</span>
       <span className={`hidden ${labelHide}`}>{label}</span>
     </button>
   );
@@ -540,11 +623,12 @@ function MenuLink({
     <Link
       href={href}
       role="menuitem"
-      className="flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-bg-canvas)] hover:text-[var(--cc-text-primary)]"
+      className="flex items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+      style={{ color: T_CANVAS.muted }}
+      onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
+      onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
     >
-      <span className="flex h-4 w-4 items-center justify-center">
-        {children}
-      </span>
+      <span className="flex h-4 w-4 items-center justify-center">{children}</span>
       {label}
     </Link>
   );
@@ -554,21 +638,21 @@ function MenuLink({
 
 function formatRelative(date: Date): string {
   const sec = Math.max(1, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return `${sec}S AGO`;
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return `${min}M AGO`;
   const hr = Math.floor(min / 60);
-  return `${hr}h ago`;
+  return `${hr}H AGO`;
 }
 
 // ───────────────────────── Icons ─────────────────────────
 
 const iconProps = {
-  className: "h-4 w-4",
+  className: "h-3.5 w-3.5",
   viewBox: "0 0 24 24",
   fill: "none",
   stroke: "currentColor",
-  strokeWidth: 2,
+  strokeWidth: 1.75,
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
   "aria-hidden": true,
@@ -599,12 +683,12 @@ function ChatIcon() {
     </svg>
   );
 }
-function HistoryIcon() {
+function UploadIcon() {
   return (
     <svg {...iconProps}>
-      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M12 7v5l4 2" />
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
     </svg>
   );
 }
@@ -618,9 +702,26 @@ function TemplatesIcon() {
     </svg>
   );
 }
+function KeyboardIcon() {
+  return (
+    <svg {...iconProps}>
+      <rect x="2" y="6" width="20" height="12" rx="2" />
+      <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10" />
+    </svg>
+  );
+}
 function SparkleIcon() {
   return (
-    <svg {...iconProps} className="h-3.5 w-3.5">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3 w-3"
+      aria-hidden="true"
+    >
       <path d="M12 3v3" />
       <path d="M12 18v3" />
       <path d="M3 12h3" />

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <!-- CodeCanvas mark — pure black on transparent background, 1080×1080.
+       Use this if you want to put the mark on a colored background or photo. -->
+  <g transform="translate(540 540) scale(2.95) translate(-100 -100)" fill="#000000">
+    <rect x="48" y="12" width="140" height="40" rx="4"/>
+    <rect x="12" y="56" width="40" height="88" rx="4"/>
+    <rect x="48" y="148" width="140" height="40" rx="4"/>
+  </g>
+</svg>

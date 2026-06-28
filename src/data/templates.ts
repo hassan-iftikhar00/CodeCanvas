@@ -2,7 +2,7 @@
 export interface Template {
   id: string;
   name: string;
-  category: "forms" | "navigation" | "hero" | "cards" | "layout" | "other";
+  category: "forms" | "navigation" | "hero" | "cards" | "layout";
   description: string;
   preview: string; // Preview description
   canvasData: {
@@ -327,5 +327,4 @@ export const TEMPLATE_CATEGORIES = [
   { id: "hero", label: "Hero Sections", icon: "" },
   { id: "cards", label: "Cards", icon: "" },
   { id: "layout", label: "Layouts", icon: "" },
-  { id: "other", label: "Other", icon: "" },
 ] as const;

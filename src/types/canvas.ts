@@ -55,6 +55,15 @@ export const TOOL_KEY_MAP: Record<string, Tool> = {
   x: "bin",
 };
 
+export interface Layer {
+  id: string;
+  name: string;
+  type: "pen" | "shape" | "text" | "image";
+  visible: boolean;
+  locked: boolean;
+  opacity: number;
+}
+
 export const ZOOM_MIN = 25;
 export const ZOOM_MAX = 300;
 export const ZOOM_DEFAULT = 100;
@@ -66,3 +75,11 @@ export const CODE_PANEL_MIN_HEIGHT = 220;
 export const CODE_PANEL_MAX_HEIGHT = 1400;
 export const SPLIT_RATIO_MIN = 0.15;
 export const SPLIT_RATIO_MAX = 0.85;
+
+// Clamp helpers live next to the bounds they enforce so the constants and the
+// logic that applies them stay in one place (and stay unit-testable).
+export const clampZoom = (z: number): number =>
+  Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+
+export const clampCodePanelHeight = (h: number): number =>
+  Math.min(CODE_PANEL_MAX_HEIGHT, Math.max(CODE_PANEL_MIN_HEIGHT, h));

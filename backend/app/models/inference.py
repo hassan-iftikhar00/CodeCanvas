@@ -57,7 +57,8 @@ ROBOFLOW_DEFAULT_THRESHOLD = 0.4
 # 0.03–0.4 even for clear hits) because the class is a catch-all and the
 # training set was tiny. We compensated with card=0.03 + others=0.20.
 #
-# v4 (Small, 4,481 images incl. 2,500 synthetic, trained 2026-06-11) is
+# v4 (Small, 4,481 training-corpus images = 311 real + 2,700 synthetic +
+# ~1,470 unaccounted for, likely Roboflow auto-augmentation; trained 2026-06-11) is
 # well-calibrated across all four classes. Locally-verified test-set numbers
 # at conf=0.20 (see backend/eval_v4.py, run 2026-06-12, n=264):
 #   card    P 97.4%  R 98.8%
@@ -357,8 +358,15 @@ def detect_with_roboflow(
     model_id: Optional[str] = None,
     api_url: Optional[str] = None,
     confidence_threshold: Optional[float] = None,
+    sketch_source: Optional[str] = None,
 ) -> Optional[ExternalModelOutput]:
-    """Call Roboflow with a base64 sketch and return an ExternalModelOutput, or None on failure."""
+    """Call Roboflow with a base64 sketch and return an ExternalModelOutput, or None on failure.
+
+    ``sketch_source`` marks where the image came from. ``None``/``"canvas"`` is the
+    Konva export path and is left byte-for-byte untouched. ``"upload-photo"`` and
+    ``"upload-clean"`` route through ``preprocess_uploaded_photo`` to normalize a
+    real-world photo / digital wireframe into the clean line-art the model expects.
+    """
     api_key = api_key or os.getenv("ROBOFLOW_API_KEY")
     if not api_key or not sketch_image:
         return None
@@ -411,6 +419,23 @@ def detect_with_roboflow(
     except Exception as error:
         print(f"Roboflow: could not open sketch image: {error}")
         return None
+
+    # Uploaded images (photo of a paper sketch / digital wireframe) are normalized
+    # here so the model sees clean line-art-on-white, like its training data. The
+    # canvas export path (sketch_source None/"canvas") is intentionally skipped so
+    # it stays byte-identical. Applied BEFORE the debug dump below so the saved PNG
+    # reflects exactly what Roboflow receives.
+    if sketch_source in ("upload-photo", "upload-clean"):
+        try:
+            from app.utils.preprocessing import preprocess_uploaded_photo
+
+            processed = preprocess_uploaded_photo(
+                np.array(pil_image),
+                binarize=(sketch_source == "upload-photo"),
+            )
+            pil_image = Image.fromarray(processed)
+        except Exception as prep_error:
+            print(f"Roboflow: upload preprocessing failed, using raw image: {prep_error}")
 
     debug = os.getenv("DEBUG_AI_PROMPT", "").lower() in ("1", "true", "yes", "on")
 
@@ -559,6 +584,17 @@ def detect_with_roboflow(
         metadata["image_width"] = image_meta.get("width")
         metadata["image_height"] = image_meta.get("height")
 
+    # For uploads, stash the exact (processed) image Roboflow saw so the caller can
+    # hand it to Gemini for text-reading. Its pixel space matches the box coords
+    # above. Caller pops this before returning so the blob never reaches the browser.
+    if sketch_source in ("upload-photo", "upload-clean"):
+        try:
+            buf = io.BytesIO()
+            pil_image.save(buf, format="PNG")
+            metadata["processed_image_b64"] = base64.b64encode(buf.getvalue()).decode("ascii")
+        except Exception as enc_error:
+            print(f"Roboflow: could not stash processed image for Gemini: {enc_error}")
+
     return ExternalModelOutput(
         source="roboflow",
         model_version=resolved_model_id,
@@ -573,6 +609,7 @@ def _build_gemini_prompt(
     styling: str,
     description: Optional[str],
     extra_text: Optional[List[str]] = None,
+    has_image: bool = False,
 ) -> str:
     element_lines = []
     for index, element in enumerate(elements, start=1):
@@ -631,6 +668,31 @@ def _build_gemini_prompt(
 
     description_block = f"User description: {description}\n" if description else ""
 
+    # When the caller attaches the actual sketch image (upload path), the detector
+    # only gives boxes — it can't read text. This block tells Gemini to READ the
+    # baked-in text off the image and bind it to the detected boxes, WITHOUT using
+    # the image as licence to add/remove components (strict fidelity still holds).
+    image_block = ""
+    if has_image:
+        image_block = (
+            "\nIMPORTANT — AN IMAGE OF THE ORIGINAL SKETCH IS ATTACHED TO THIS REQUEST.\n"
+            "The component list above came from an object detector that locates boxes but CANNOT read text. The "
+            "attached image is the ground truth for the actual words the user drew. Use it as follows:\n"
+            "- READ the text inside or beside each detected component (button labels, nav links, headings, "
+            "paragraphs, input labels) and use that text VERBATIM as the component's copy. The box coordinates "
+            "above are in the SAME pixel space as the attached image, so match each box to the text drawn at that "
+            "location.\n"
+            "- The detected component list still defines WHAT EXISTS and HOW MANY. Do NOT add components you see in "
+            "the image that are not in the detected list, and do NOT drop any detected component. The image is for "
+            "READING TEXT and confirming top-to-bottom / left-to-right order ONLY — it is not licence to redesign "
+            "or embellish.\n"
+            "- Reading the user's own labels off the image is NOT a strict-fidelity violation — it is using the "
+            "source of truth. Inventing copy the user did not write still is. If a detected component has no "
+            "readable text in the image, fall back to the short generic placeholder rule below.\n"
+            "- An X-cross, or a box crossed by diagonal lines, is the wireframe convention for an image / media "
+            "placeholder — render an empty <img> placeholder there, never a literal X character.\n"
+        )
+
     return (
         "You are a senior frontend engineer. Generate production-ready UI code from the detected sketch components below.\n\n"
         f"Target framework: {framework}\n"
@@ -638,7 +700,8 @@ def _build_gemini_prompt(
         f"{description_block}\n"
         "Detected components (ordered top to bottom):\n"
         f"{elements_block}\n"
-        f"{extra_text_block}\n"
+        f"{extra_text_block}"
+        f"{image_block}\n"
         "How the detector was trained (read this carefully — the labels are not what their names suggest):\n"
         "- `navbar` = the top horizontal bar region. CONTAINER, not content.\n"
         "- `footer` = the bottom horizontal bar region. CONTAINER, not content.\n"
@@ -654,6 +717,8 @@ def _build_gemini_prompt(
         "- STRICT FIDELITY (most important rule, overrides every other instinct). Render ONLY the detected components above plus any unbound text below. Do NOT invent extra elements — no page titles, no headings, no subtitles, no taglines, no footer copyright lines, no branding text, no decorative dividers, no helper text, no \"this would look better with X\" additions. If the user drew three components, the output has exactly those three. The detector and canvas annotations are the source of truth; you are a renderer, not a designer. A login form drawn as just email + password + button must render as just email + password + button — not as email + password + button + a 'Sign In' heading you decided to add.\n"
         "- Compose the components in the order given (which is top-to-bottom on the canvas). A `navbar` MUST render at the top of the page; a `footer` MUST render at the bottom; everything else goes between them in canvas-y order.\n"
         "- Inside a navbar, multiple cards / text labels are nav items — arrange them horizontally, with the leftmost one (smallest x) typically being the brand/logo and the rightmost ones being the nav links.\n"
+        "- Inside a footer, multiple cards / text labels are footer columns or links — when 2+ items share an overlapping y-range with distinct x positions, render them as horizontally-arranged columns (flex/grid row), NOT stacked rows. Use canvas x positions to decide column order (smallest x = leftmost column). Only stack vertically when items have similar x but increasing y (one above the other on the canvas).\n"
+        "- GENERAL HORIZONTAL/VERTICAL RULE (applies to any container, including section): when 2+ sibling cards or labels share an overlapping y-range (their canvas y intervals intersect) but have clearly distinct x positions, render them as a horizontal row (flex/grid columns) in left-to-right canvas x order. Stack vertically only when siblings share similar x but increasing y. Three cards drawn side-by-side on the canvas must NEVER be rendered as three stacked rows.\n"
         "- Inside a section with stacked cards / text labels (similar x, increasing y), arrange them vertically. Group an `Email:`-style label with the wide-thin card immediately below or beside it as a labelled input.\n"
         "- A `card` whose attached text is an action verb is a `<button>`. A `card` immediately below a label-style text and shaped wide-thin is an `<input>`. A long text-only annotation in a section is a heading or paragraph.\n"
         "- When a component is annotated with `contains text: \"...\"`, that text is the COMPLETE intended copy. Use it verbatim. Do NOT prefix, suffix, or augment it with boilerplate (no \"©\", \"All rights reserved\", \"Welcome to\", taglines, slogans, default headings). If the user wrote `\"This is the footer\"`, the footer's only visible text is `\"This is the footer\"`.\n"
@@ -775,8 +840,14 @@ def generate_with_gemini(
     *,
     api_key: Optional[str] = None,
     extra_text: Optional[List[str]] = None,
+    image_bytes: Optional[bytes] = None,
 ) -> str:
     """Call Gemini to synthesize code from detected elements.
+
+    ``image_bytes`` (upload path only) is the processed sketch PNG. When present
+    it is sent to Gemini alongside the text prompt so the model can READ the text
+    baked into the pixels (the detector returns boxes but no text). The canvas
+    path leaves it None, so the request stays text-only and byte-identical.
 
     Routing:
       - Keys tried in deterministic order (sorted by env var suffix).
@@ -818,8 +889,26 @@ def generate_with_gemini(
             f"All Gemini keys are temporarily rate limited. Retry in {retry_after}s."
         )
 
+    # Decode the attached sketch once (upload path). If it fails to decode we fall
+    # back to a text-only call rather than aborting code generation.
+    sketch_image_part = None
+    if image_bytes is not None:
+        try:
+            from PIL import Image
+
+            sketch_image_part = Image.open(io.BytesIO(image_bytes))
+            sketch_image_part.load()  # force decode now so a bad image fails early
+        except Exception as img_error:
+            print(f"[gemini] could not decode attached image, proceeding text-only: {img_error}")
+            sketch_image_part = None
+
     prompt = _build_gemini_prompt(
-        elements, framework, styling, description, extra_text=extra_text
+        elements,
+        framework,
+        styling,
+        description,
+        extra_text=extra_text,
+        has_image=sketch_image_part is not None,
     )
 
     any_daily_exhausted = False
@@ -852,7 +941,12 @@ def generate_with_gemini(
 
             try:
                 model = genai.GenerativeModel(model_name)
-                response = model.generate_content(prompt)
+                content = (
+                    [prompt, sketch_image_part]
+                    if sketch_image_part is not None
+                    else prompt
+                )
+                response = model.generate_content(content)
                 text = getattr(response, "text", None)
                 if text:
                     _key_last_used[key_index] = time.time()

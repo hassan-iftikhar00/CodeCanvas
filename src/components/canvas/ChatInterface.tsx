@@ -9,6 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { T_CANVAS } from "./canvasTokens";
 
 interface Message {
   id: string;
@@ -32,7 +33,7 @@ const buildWelcome = (hasCode: boolean): Message => ({
   role: "assistant",
   content: hasCode
     ? 'Your code is ready. Try "Make the buttons rounded" or "Add a hero section".'
-    : "Draw a sketch on the canvas and click Run Detection. I can help refine the code once it's generated.",
+    : "Draw a sketch on the canvas and click Run Detection. I can help refine the code once it is generated.",
 });
 
 const loadStoredMessages = (projectId?: string): Message[] => {
@@ -89,7 +90,6 @@ export default function ChatInterface({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isProcessing]);
 
-  // Auto-grow textarea (1-4 lines)
   useLayoutEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -159,29 +159,39 @@ export default function ChatInterface({
   };
 
   return (
-    <div className="flex h-full flex-col bg-[var(--cc-bg-surface)]">
-      {/* Inline section header */}
-      <div className="flex items-center gap-3 px-4 pt-3 pb-2">
-        <span className="h-px flex-1 bg-[var(--cc-border-subtle)]" />
-        <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-[var(--cc-text-muted)]">
-          Ask AI
-        </span>
+    <div
+      className="flex h-full flex-col"
+      style={{
+        background: T_CANVAS.paper,
+        fontFamily: "var(--font-inter, ui-sans-serif, system-ui, sans-serif)",
+      }}
+    >
+      {/* SUB-HEADER — sketch state indicator */}
+      <div
+        className="flex items-center justify-between border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
+        style={{
+          borderColor: T_CANVAS.rule,
+          color: T_CANVAS.muted,
+          fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+        }}
+      >
+        <span style={{ color: T_CANVAS.graphite }}>ASK</span>
         <StatusPill ready={hasCode} />
-        <span className="h-px flex-1 bg-[var(--cc-border-subtle)]" />
       </div>
 
-      {/* Messages */}
+      {/* MESSAGES */}
       <div
-        className="flex-1 space-y-2.5 overflow-y-auto px-4 py-3"
+        className="flex-1 space-y-3 overflow-y-auto px-4 py-3"
         role="log"
         aria-live="polite"
         aria-relevant="additions"
+        style={{ background: T_CANVAS.paper }}
       >
         <AnimatePresence initial={false}>
           {visibleMessages.map((message) => (
             <motion.div
               key={message.id}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, ease: [0.22, 0.9, 0.28, 1] }}
               className={`flex ${
@@ -189,11 +199,20 @@ export default function ChatInterface({
               }`}
             >
               <div
-                className={`max-w-[88%] whitespace-pre-wrap break-words rounded-[8px] px-3 py-2 text-[13px] leading-relaxed ${
+                className="max-w-[88%] whitespace-pre-wrap break-words px-3 py-2 text-[13px] leading-[1.55]"
+                style={
                   message.role === "user"
-                    ? "bg-[var(--cc-bg-elevated)] text-[var(--cc-text-primary)]"
-                    : "bg-[var(--cc-bg-canvas)] text-[var(--cc-text-secondary)] border border-[var(--cc-border-subtle)]"
-                }`}
+                    ? {
+                        background: T_CANVAS.cobalt,
+                        color: T_CANVAS.paper,
+                        border: `1px solid ${T_CANVAS.cobalt}`,
+                      }
+                    : {
+                        background: T_CANVAS.vellum,
+                        color: T_CANVAS.graphite,
+                        border: `1px solid ${T_CANVAS.rule}`,
+                      }
+                }
               >
                 {message.content}
               </div>
@@ -203,11 +222,24 @@ export default function ChatInterface({
 
         {isProcessing ? (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-[8px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2">
-              <span className="text-[12px] text-[var(--cc-text-secondary)]">
-                Refining
-              </span>
-              <span className="cc-caret" aria-hidden="true" />
+            <div
+              className="flex items-center gap-2 px-3 py-2 text-[11px] tracking-[0.16em] uppercase"
+              style={{
+                background: T_CANVAS.vellum,
+                border: `1px solid ${T_CANVAS.rule}`,
+                color: T_CANVAS.muted,
+                fontFamily:
+                  "var(--font-jetbrains-mono, ui-monospace, monospace)",
+              }}
+            >
+              <span
+                className="inline-block h-1.5 w-1.5"
+                style={{
+                  background: T_CANVAS.cobalt,
+                  animation: "cc-pulse 1.2s ease-in-out infinite",
+                }}
+              />
+              REFINING
             </div>
           </div>
         ) : null}
@@ -215,15 +247,33 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggestion chips when empty */}
+      {/* SUGGESTION CHIPS — only when has code + no user messages yet */}
       {hasCode && messages.length === 0 ? (
-        <div className="flex flex-wrap gap-1.5 px-4 pb-2">
+        <div
+          className="flex flex-wrap gap-1.5 border-t px-4 py-2"
+          style={{ borderColor: T_CANVAS.rule }}
+        >
           {SUGGESTIONS.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => setInput(s)}
-              className="rounded-full border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-2.5 py-1 text-[11px] text-[var(--cc-text-secondary)] transition-colors hover:border-[var(--cc-accent)] hover:text-[var(--cc-accent)]"
+              className="px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase transition-colors"
+              style={{
+                background: T_CANVAS.paper,
+                border: `1px solid ${T_CANVAS.rule}`,
+                color: T_CANVAS.muted,
+                fontFamily:
+                  "var(--font-jetbrains-mono, ui-monospace, monospace)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = T_CANVAS.cobalt;
+                e.currentTarget.style.borderColor = T_CANVAS.cobalt;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = T_CANVAS.muted;
+                e.currentTarget.style.borderColor = T_CANVAS.rule;
+              }}
             >
               {s}
             </button>
@@ -231,12 +281,19 @@ export default function ChatInterface({
         </div>
       ) : null}
 
-      {/* Input bar */}
+      {/* INPUT BAR */}
       <form
         onSubmit={onSubmit}
-        className="border-t border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-3 py-3"
+        className="border-t px-3 py-3"
+        style={{ borderColor: T_CANVAS.rule, background: T_CANVAS.vellum }}
       >
-        <div className="flex items-end gap-2 rounded-[8px] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-canvas)] px-3 py-2 transition-colors focus-within:border-[var(--cc-accent)]">
+        <div
+          className="flex items-end gap-2 px-2.5 py-2 transition-colors"
+          style={{
+            background: T_CANVAS.paper,
+            border: `1px solid ${T_CANVAS.rule}`,
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={input}
@@ -252,24 +309,36 @@ export default function ChatInterface({
             disabled={!hasCode}
             rows={1}
             aria-label="Chat message"
-            className="flex-1 resize-none bg-transparent text-[13px] leading-relaxed text-[var(--cc-text-primary)] placeholder:text-[var(--cc-text-muted)] focus:outline-none disabled:opacity-50"
-            style={{ maxHeight: MAX_INPUT_HEIGHT }}
+            className="flex-1 resize-none bg-transparent text-[13px] leading-[1.5] focus:outline-none disabled:opacity-50"
+            style={{
+              maxHeight: MAX_INPUT_HEIGHT,
+              color: T_CANVAS.graphite,
+            }}
           />
           <motion.button
             type="submit"
             whileTap={{ scale: 0.92 }}
             disabled={!input.trim() || isProcessing || !hasCode}
             aria-label="Send message"
-            className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[var(--cc-bg-elevated)] text-[var(--cc-text-secondary)] transition-colors hover:bg-[var(--cc-accent)] hover:text-white disabled:opacity-40 disabled:hover:bg-[var(--cc-bg-elevated)] disabled:hover:text-[var(--cc-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)]"
+            className="flex h-7 w-7 flex-none items-center justify-center transition-colors disabled:opacity-40"
+            style={{
+              background:
+                !input.trim() || !hasCode ? T_CANVAS.vellum : T_CANVAS.cobalt,
+              color:
+                !input.trim() || !hasCode ? T_CANVAS.muted : T_CANVAS.paper,
+              border: `1px solid ${
+                !input.trim() || !hasCode ? T_CANVAS.rule : T_CANVAS.cobalt
+              }`,
+            }}
           >
             <svg
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth={2}
+              strokeWidth={1.75}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-3.5 w-3.5"
+              className="h-3 w-3"
             >
               <line x1="12" y1="19" x2="12" y2="5" />
               <polyline points="5 12 12 5 19 12" />
@@ -277,6 +346,20 @@ export default function ChatInterface({
           </motion.button>
         </div>
       </form>
+
+      <style jsx>{`
+        @keyframes cc-pulse {
+          0%,
+          100% {
+            opacity: 0.4;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.4);
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -284,19 +367,19 @@ export default function ChatInterface({
 function StatusPill({ ready }: { ready: boolean }) {
   return (
     <span
-      className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-        ready
-          ? "bg-[rgba(34,197,94,0.1)] text-[#4ade80]"
-          : "bg-[rgba(245,158,11,0.1)] text-[#fbbf24]"
-      }`}
+      className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] tracking-[0.14em] uppercase"
+      style={{
+        background: ready ? T_CANVAS.cobaltWash : T_CANVAS.vellum,
+        color: ready ? T_CANVAS.cobaltInk : T_CANVAS.muted,
+        border: `1px solid ${ready ? T_CANVAS.cobalt : T_CANVAS.rule}`,
+      }}
     >
       <span
         aria-hidden="true"
-        className={`h-1.5 w-1.5 rounded-full ${
-          ready ? "bg-[#4ade80]" : "bg-[#fbbf24]"
-        }`}
+        className="inline-block h-1.5 w-1.5"
+        style={{ background: ready ? T_CANVAS.cobalt : T_CANVAS.muted }}
       />
-      {ready ? "Ready" : "Sketch first"}
+      {ready ? "READY" : "SKETCH FIRST"}
     </span>
   );
 }

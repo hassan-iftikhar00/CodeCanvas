@@ -130,7 +130,7 @@ export function recordProjectActivity(
   }
 
   const currentActivity = readRecentProjectActivity().filter(
-    (entry) => !(entry.projectId === projectId && entry.type === type)
+    (entry) => entry.projectId !== projectId
   );
 
   const nextActivity = [

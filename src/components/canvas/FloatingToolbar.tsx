@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import type { Tool, ToolGroup } from "@/types/canvas";
+import { T_CANVAS } from "./canvasTokens";
 
 interface ToolItem {
   id: Tool;
@@ -100,19 +101,23 @@ export default function FloatingToolbar({
       aria-label="Drawing tools"
       aria-orientation="vertical"
       data-onboarding="draw-tools"
-      // Anchored near the top with a safe top inset and a max-height clamp so
-      // the toolbar can never be clipped when the code panel grows and the
-      // canvas area shrinks (BUG 4). overflow-y-auto + scrollbar-hidden lets
-      // long tool lists stay reachable on short viewports.
-      style={{ scrollbarWidth: "none" }}
-      className="absolute left-3 top-3 z-40 flex max-h-[calc(100%-1.5rem)] flex-col items-center gap-0.5 overflow-y-auto rounded-[14px] border border-[var(--cc-border-subtle)] bg-gradient-to-b from-[var(--cc-bg-elevated)] to-[var(--cc-bg-surface)] p-1.5 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-xl [&::-webkit-scrollbar]:hidden"
+      // Vertically centered on the left rail. max-h clamps to viewport so the
+      // toolbar can never overflow when the code panel grows and the canvas
+      // area shrinks. Drafting room: paper bg + hairline border, no glow.
+      style={{
+        scrollbarWidth: "none",
+        background: T_CANVAS.paper,
+        border: `1px solid ${T_CANVAS.rule}`,
+      }}
+      className="absolute left-3 top-1/2 -translate-y-1/2 z-40 flex max-h-[calc(100%-1.5rem)] flex-col items-center gap-0.5 overflow-y-auto p-1.5 [&::-webkit-scrollbar]:hidden"
     >
       {GROUP_ORDER.map((group, gi) => (
         <div key={group} className="flex flex-col items-center gap-1">
           {gi > 0 ? (
             <div
               aria-hidden="true"
-              className="my-1 h-px w-5 bg-[var(--cc-border-subtle)]"
+              className="my-1 h-px w-5"
+              style={{ background: T_CANVAS.rule, opacity: 0.35 }}
             />
           ) : null}
           {TOOLS.filter((t) => t.group === group).map((tool) => (
@@ -150,31 +155,52 @@ function ToolButton({
           duration: 0.22,
           ease: [0.34, 1.56, 0.64, 1],
         }}
-        className={`relative flex h-9 w-9 items-center justify-center rounded-[9px] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cc-accent)] ${
-          active
-            ? "bg-[var(--cc-accent-glow)] text-[var(--cc-accent)] shadow-[inset_0_0_0_1px_var(--cc-accent-glow-strong)]"
-            : "text-[var(--cc-text-secondary)] hover:bg-white/[0.06] hover:text-[var(--cc-text-primary)] active:bg-white/[0.10]"
-        }`}
+        className="relative flex h-9 w-9 items-center justify-center transition-colors duration-150 focus-visible:outline-none"
+        style={{
+          background: active ? T_CANVAS.graphite : "transparent",
+          color: active ? T_CANVAS.paper : T_CANVAS.muted,
+          border: `1px solid ${active ? T_CANVAS.graphite : "transparent"}`,
+        }}
+        onMouseEnter={(e) => {
+          if (!active) e.currentTarget.style.color = T_CANVAS.graphite;
+        }}
+        onMouseLeave={(e) => {
+          if (!active) e.currentTarget.style.color = T_CANVAS.muted;
+        }}
       >
-        {/* Active left accent bar */}
+        {/* Active left accent bar — cobalt mark */}
         {active ? (
           <motion.span
             layoutId="cc-toolbar-active-bar"
             aria-hidden="true"
-            className="absolute -left-1 top-1.5 bottom-1.5 w-[2px] rounded-r-full bg-[var(--cc-accent)]"
+            className="absolute -left-1.5 top-1.5 bottom-1.5 w-[2px]"
+            style={{ background: T_CANVAS.cobalt }}
             transition={{ type: "spring", stiffness: 380, damping: 30 }}
           />
         ) : null}
         {tool.icon}
       </motion.button>
 
-      {/* Tooltip */}
+      {/* Tooltip — mono, paper bg, hairline border */}
       <span
         role="tooltip"
-        className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-[var(--cc-radius-button)] border border-[var(--cc-border-subtle)] bg-[var(--cc-bg-elevated)] px-2 py-1 text-[11px] font-medium text-[var(--cc-text-primary)] opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-hover:delay-150"
+        className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap px-2 py-1 text-[10px] tracking-[0.14em] uppercase opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-hover:delay-150"
+        style={{
+          background: T_CANVAS.paper,
+          border: `1px solid ${T_CANVAS.rule}`,
+          color: T_CANVAS.graphite,
+          fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+        }}
       >
         {tool.label}
-        <kbd className="ml-2 rounded-[var(--cc-radius-tag)] bg-[var(--cc-bg-canvas)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--cc-text-secondary)]">
+        <kbd
+          className="ml-2 px-1.5 py-0.5 text-[10px]"
+          style={{
+            background: T_CANVAS.vellum,
+            color: T_CANVAS.muted,
+            fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+          }}
+        >
           {tool.shortcut}
         </kbd>
       </span>

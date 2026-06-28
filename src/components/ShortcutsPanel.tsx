@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import DraftingModal from "@/components/canvas/DraftingModal";
+import { T_CANVAS } from "@/components/canvas/canvasTokens";
 
 interface Shortcut {
   keys: string[];
@@ -9,42 +11,32 @@ interface Shortcut {
 }
 
 const shortcuts: Shortcut[] = [
-  // Tools
+  { keys: ["V"], description: "Select tool", category: "Tools" },
+  { keys: ["H"], description: "Hand / pan tool", category: "Tools" },
   { keys: ["P"], description: "Pen tool", category: "Tools" },
-  { keys: ["S"], description: "Shape tool", category: "Tools" },
+  { keys: ["N"], description: "Line tool", category: "Tools" },
+  { keys: ["R"], description: "Rectangle tool", category: "Tools" },
+  { keys: ["A"], description: "Arrow tool", category: "Tools" },
   { keys: ["T"], description: "Text tool", category: "Tools" },
   { keys: ["E"], description: "Eraser tool", category: "Tools" },
-  { keys: ["V"], description: "Select tool", category: "Tools" },
+  { keys: ["X"], description: "Delete tool", category: "Tools" },
 
-  // Canvas
-  { keys: ["G"], description: "Toggle grid", category: "Canvas" },
-  {
-    keys: ["Shift", "S"],
-    description: "Toggle snap to grid",
-    category: "Canvas",
-  },
-  { keys: ["0"], description: "Fit to screen", category: "Canvas" },
-  { keys: ["1"], description: "Zoom 100%", category: "Canvas" },
-  { keys: ["+"], description: "Zoom in", category: "Canvas" },
-  { keys: ["-"], description: "Zoom out", category: "Canvas" },
+  { keys: ["Ctrl", "0"], description: "Reset zoom", category: "Canvas" },
+  { keys: ["Ctrl", "="], description: "Zoom in", category: "Canvas" },
+  { keys: ["Ctrl", "-"], description: "Zoom out", category: "Canvas" },
 
-  // Edit
   { keys: ["Ctrl", "Z"], description: "Undo", category: "Edit" },
   { keys: ["Ctrl", "Shift", "Z"], description: "Redo", category: "Edit" },
-  { keys: ["Ctrl", "C"], description: "Copy", category: "Edit" },
-  { keys: ["Ctrl", "V"], description: "Paste", category: "Edit" },
-  { keys: ["Ctrl", "D"], description: "Duplicate", category: "Edit" },
-  { keys: ["Ctrl", "A"], description: "Select all", category: "Edit" },
+  { keys: ["Ctrl", "Y"], description: "Redo", category: "Edit" },
   { keys: ["Delete"], description: "Delete selection", category: "Edit" },
+  { keys: ["Backspace"], description: "Delete selection", category: "Edit" },
 
-  // View
   { keys: ["Ctrl", "\\"], description: "Toggle inspector", category: "View" },
   { keys: ["Ctrl", "`"], description: "Toggle code panel", category: "View" },
   { keys: ["Space"], description: "Pan mode (hold)", category: "View" },
 
-  // General
   { keys: ["?"], description: "Show shortcuts", category: "General" },
-  { keys: ["Esc"], description: "Deselect / Close", category: "General" },
+  { keys: ["Esc"], description: "Close shortcuts panel", category: "General" },
   { keys: ["Ctrl", "S"], description: "Save project", category: "General" },
 ];
 
@@ -59,24 +51,6 @@ export default function ShortcutsPanel({
 }: ShortcutsPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-        e.preventDefault();
-        onClose();
-      } else if (e.key === "Escape") {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
-    }
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   const filteredShortcuts = shortcuts.filter(
     (shortcut) =>
       shortcut.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -87,151 +61,159 @@ export default function ShortcutsPanel({
 
   const groupedShortcuts = filteredShortcuts.reduce(
     (acc, shortcut) => {
-      if (!acc[shortcut.category]) {
-        acc[shortcut.category] = [];
-      }
+      if (!acc[shortcut.category]) acc[shortcut.category] = [];
       acc[shortcut.category].push(shortcut);
       return acc;
     },
     {} as Record<string, Shortcut[]>
   );
 
-  const formatKey = (key: string) => {
-    if (key === "Ctrl") return "Ctrl";
-    if (key === "Shift") return "Shift";
-    if (key === "Alt") return "Alt";
-    return key;
-  };
-
   return (
-    <div
-      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
-      onClick={onClose}
+    <DraftingModal
+      open={isOpen}
+      onClose={onClose}
+      slug="REFERENCE · SHORTCUTS"
+      title="Keyboard shortcuts."
+      subtitle="Every command without leaving the keyboard."
+      maxWidth={680}
+      footer={
+        <p
+          className="text-center text-[10px] tracking-[0.16em] uppercase"
+          style={{
+            color: T_CANVAS.muted,
+            fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+          }}
+        >
+          PRESS <Kbd>?</Kbd> OR <Kbd>Esc</Kbd> TO CLOSE
+        </p>
+      }
     >
-      <div
-        className="glass-strong w-full max-w-3xl rounded-2xl shadow-2xl animate-scale-in"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="border-b border-[var(--grey-700)] px-6 py-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white">
-              Keyboard Shortcuts
-            </h2>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-2 text-[var(--text-secondary)] transition-all duration-[var(--duration-fast)] hover:bg-[var(--grey-700)] hover:text-white"
-              aria-label="Close"
-            >
-              <svg
-                className="h-6 w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <svg
-              className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--text-muted)]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search shortcuts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-[var(--grey-700)] bg-[var(--grey-900)] py-2 pl-10 pr-4 text-white placeholder:text-[var(--text-muted)] focus:border-[var(--orange-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--orange-glow)]"
+      {/* SEARCH */}
+      <div className="mb-5">
+        <div
+          className="flex items-center gap-2 px-3 py-1.5"
+          style={{
+            background: T_CANVAS.paper,
+            border: `1px solid ${T_CANVAS.rule}`,
+          }}
+        >
+          <svg
+            className="h-3 w-3"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            style={{ color: T_CANVAS.muted }}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
-          </div>
+          </svg>
+          <input
+            type="text"
+            placeholder="SEARCH SHORTCUTS..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 bg-transparent text-[11px] tracking-[0.14em] uppercase outline-none placeholder:opacity-60"
+            style={{
+              color: T_CANVAS.graphite,
+              fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+            }}
+            autoFocus
+          />
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="max-h-[60vh] overflow-y-auto p-6">
-          {Object.entries(groupedShortcuts).map(
-            ([category, categoryShortcuts]) => (
-              <div key={category} className="mb-6 last:mb-0">
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                  {category}
-                </h3>
-                <div className="space-y-2">
-                  {categoryShortcuts.map((shortcut, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between rounded-lg border border-[var(--grey-700)] bg-[var(--grey-900)] px-4 py-3 transition-colors hover:border-[var(--grey-600)] hover:bg-[var(--grey-800)]"
-                    >
-                      <span className="text-white">{shortcut.description}</span>
-                      <div className="flex gap-1">
-                        {shortcut.keys.map((key, keyIdx) => (
-                          <kbd
-                            key={keyIdx}
-                            className="flex min-w-[32px] items-center justify-center rounded-md border border-[var(--grey-600)] bg-[var(--grey-800)] px-2 py-1 text-xs font-semibold text-white shadow-sm"
-                          >
-                            {formatKey(key)}
-                          </kbd>
-                        ))}
-                      </div>
-                    </div>
+      {/* GROUPED SHORTCUTS */}
+      {Object.entries(groupedShortcuts).map(([category, list]) => (
+        <div key={category} className="mb-5 last:mb-0">
+          <div
+            className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+            style={{
+              color: T_CANVAS.muted,
+              fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+            }}
+          >
+            {category}
+          </div>
+          <div
+            className="divide-y"
+            style={{
+              border: `1px solid ${T_CANVAS.rule}`,
+            }}
+          >
+            {list.map((s, idx) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between px-3 py-2 text-[12px]"
+                style={{
+                  background: T_CANVAS.paper,
+                  color: T_CANVAS.graphite,
+                  borderTop:
+                    idx === 0 ? undefined : `1px solid ${T_CANVAS.rule}`,
+                  fontFamily:
+                    "var(--font-inter, ui-sans-serif, system-ui, sans-serif)",
+                }}
+              >
+                <span>{s.description}</span>
+                <div className="flex gap-1">
+                  {s.keys.map((key, ki) => (
+                    <Kbd key={ki}>{key}</Kbd>
                   ))}
                 </div>
               </div>
-            )
-          )}
-
-          {filteredShortcuts.length === 0 && (
-            <div className="py-12 text-center text-[var(--text-muted)]">
-              <svg
-                className="mx-auto mb-4 h-16 w-16 opacity-50"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <p className="text-lg font-medium">No shortcuts found</p>
-              <p className="mt-1 text-sm">Try a different search term</p>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
+      ))}
 
-        {/* Footer Tip */}
-        <div className="border-t border-[var(--grey-700)] px-6 py-3">
-          <p className="text-center text-sm text-[var(--text-muted)]">
-            Press{" "}
-            <kbd className="rounded bg-[var(--grey-800)] px-1.5 py-0.5 font-mono text-xs text-white">
-              ?
-            </kbd>{" "}
-            or{" "}
-            <kbd className="rounded bg-[var(--grey-800)] px-1.5 py-0.5 font-mono text-xs text-white">
-              Esc
-            </kbd>{" "}
-            to close
+      {filteredShortcuts.length === 0 && (
+        <div
+          className="border px-4 py-12 text-center"
+          style={{
+            background: T_CANVAS.vellum,
+            borderColor: T_CANVAS.rule,
+            borderStyle: "dashed",
+          }}
+        >
+          <p
+            className="text-[12px] tracking-[0.14em] uppercase"
+            style={{
+              color: T_CANVAS.muted,
+              fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+            }}
+          >
+            NO SHORTCUTS FOUND
+          </p>
+          <p
+            className="mt-2 text-[11px]"
+            style={{
+              color: T_CANVAS.muted,
+              fontFamily: "var(--font-inter, ui-sans-serif, system-ui)",
+            }}
+          >
+            Try a different search term.
           </p>
         </div>
-      </div>
-    </div>
+      )}
+    </DraftingModal>
+  );
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd
+      className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] tracking-[0.04em]"
+      style={{
+        background: T_CANVAS.vellum,
+        border: `1px solid ${T_CANVAS.rule}`,
+        color: T_CANVAS.graphite,
+        fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+      }}
+    >
+      {children}
+    </kbd>
   );
 }

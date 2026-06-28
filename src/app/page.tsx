@@ -1,155 +1,154 @@
 "use client";
 
+/**
+ * Landing page — "Drafting Room" direction
+ *
+ * Promoted from /design-preview-v2. Self-contained styles (scoped to .d5-root)
+ * so it doesn't fight the global ThemeProvider on the rest of the app.
+ *
+ * Slots preserved 1:1 from the previous Warm Studio landing:
+ *   nav, hero (mini-canvas + GridScan), video demo, 6 feature cards,
+ *   testimonials, CTA, footer.
+ * Mini-canvas drawing + supabase auth + localStorage redirect preserved exactly.
+ *
+ * Pricing/Testimonials components are intentionally commented out (not
+ * deleted) so they can be migrated to Drafting Room and re-imported later.
+ * The Footer used the old palette and had no live consumer, so its file was
+ * removed; an inline Drafting Room FooterBlock lives below.
+ */
+
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import { motion } from "motion/react";
-import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import { Instrument_Serif, Inter, JetBrains_Mono } from "next/font/google";
 import { createClient } from "@/lib/supabase/client";
-import Pricing from "@/components/Pricing";
-import Testimonials from "@/components/Testimonials";
-import Footer from "@/components/Footer";
+import { Instagram, Github, Twitter, Mail, Check, Send } from "lucide-react";
+import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
+import { DraftingMark as Mark, DraftingCross as Cross } from "@/lib/drafting-room/marks";
 
-const GridScan = dynamic(() => import("@/components/GridScan"), {
-  ssr: false,
-});
+// GridScan removed from this page — the Three.js perspective tunnel fought the
+// precision register. Replaced with a static graph + cobalt scan tick + crosshair
+// cursor (same approach as /design-preview-v2). GridScan component is still
+// available for other surfaces if we want it.
 
-// ============================================================
-// Fonts - Warm Studio (LIGHT mode)
-// ============================================================
-const fraunces = Fraunces({
+// ─── fonts ────────────────────────────────────────────────────────────────────
+const serif = Instrument_Serif({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  weight: "400",
+  variable: "--d5-serif",
   display: "swap",
 });
-const inter = Inter({
+const sans = Inter({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--d5-sans",
   display: "swap",
 });
-const jetbrains = JetBrains_Mono({
+const mono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-jetbrains",
+  variable: "--d5-mono",
   display: "swap",
 });
 
-// ============================================================
-// Tokens - Warm Studio (light variant only for this pilot)
-// ============================================================
-const T = {
-  bg: "#F1E9D8",
-  surface: "#FAF4E4",
-  elevated: "#FFFEFA",
-  ink: "#2A1F18",
-  muted: "#7A6B5A",
-  subtle: "#A89888",
-  hairline: "#E3D9C3",
-  accent: "#BD5B3D",
-  accentHover: "#8E3E25",
-  accentSoft: "#F1D9CE",
-  counter: "#3F5E4F",
-  anchor: "#1A1410",
-  anchorText: "#F1E9D8",
-  anchorMuted: "#A89888",
-};
+// ─── tokens ──────────────────────────────────────────────────────────────────
+// `T` and the `Mark` / `Cross` SVGs are imported from src/lib/drafting-room
+// so landing, auth and canvas all draw from the same palette and brand mark.
+// (See the imports at the top of this file.)
 
-// ============================================================
-// Motion CSS
-// ============================================================
-const motionCSS = `
-@keyframes lp-pulse { 0%,100% { opacity: 0.4; transform: scale(1); } 50% { opacity: 1; transform: scale(1.4); } }
-@keyframes lp-draw { from { stroke-dashoffset: 400; } to { stroke-dashoffset: 0; } }
-@keyframes lp-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-@keyframes lp-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-@keyframes lp-glow {
-  0%, 100% { text-shadow: 0 0 30px rgba(189,91,61,0.25); }
-  50% { text-shadow: 0 0 50px rgba(189,91,61,0.5); }
-}
-.lp-pulse { animation: lp-pulse 2s ease-in-out infinite; }
-.lp-blink { animation: lp-blink 1s steps(1) infinite; }
-.lp-float { animation: lp-float 3.4s ease-in-out infinite; }
-.lp-draw { stroke-dasharray: 400; animation: lp-draw 2.6s cubic-bezier(0.65,0,0.35,1) infinite alternate; }
-.lp-glow { animation: lp-glow 3s ease-in-out infinite; }
-.lp-btn { transition: transform 200ms cubic-bezier(0.16,1,0.3,1), background 200ms ease-out, box-shadow 200ms ease-out; }
-.lp-btn:active { transform: scale(0.97); }
-.lp-paper {
-  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.17  0 0 0 0 0.12  0 0 0 0 0.10  0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  background-size: 240px 240px;
-}
-`;
+// ─── testimonial + footer data (lifted verbatim from old components) ─────────
+const TESTIMONIALS = [
+  {
+    name: "Sarah Chen",
+    role: "UI/UX Designer",
+    company: "TechCorp",
+    quote:
+      "CodeCanvas transformed my workflow. I can sketch ideas and get production code in minutes instead of hours.",
+    avatar: "SC",
+  },
+  {
+    name: "Michael Rodriguez",
+    role: "Frontend Developer",
+    company: "StartupXYZ",
+    quote:
+      "The AI detection is incredibly accurate. It understands my sketches better than I expected.",
+    avatar: "MR",
+  },
+  {
+    name: "Emily Watson",
+    role: "Product Manager",
+    company: "InnovateLabs",
+    quote:
+      "Perfect for rapid prototyping. Our team can iterate on designs ten times faster now.",
+    avatar: "EW",
+  },
+  {
+    name: "David Kim",
+    role: "Full Stack Developer",
+    company: "DevStudio",
+    quote:
+      "Clean code generation and a great template library. Saves me hours every week.",
+    avatar: "DK",
+  },
+  {
+    name: "Lisa Thompson",
+    role: "Design Lead",
+    company: "Creative Co",
+    quote:
+      "Finally, a tool that bridges the gap between design and development perfectly.",
+    avatar: "LT",
+  },
+];
 
-// ============================================================
-// Logo & wordmark - terracotta C
-// ============================================================
-function Logo({
-  size = 28,
-  color = T.accent,
-}: {
-  size?: number;
-  color?: string;
-}) {
-  return (
-    <svg
-      viewBox="0 0 200 200"
-      width={size}
-      height={size}
-      fill={color}
-      aria-label="CodeCanvas"
-    >
-      <rect x="55" y="15" width="130" height="46" rx="12" />
-      <rect x="15" y="65" width="46" height="74" rx="12" />
-      <rect x="55" y="143" width="130" height="46" rx="12" />
-    </svg>
-  );
-}
+const FOOTER_COLS: Array<{ title: string; links: Array<{ label: string; href: string }> }> = [
+  {
+    title: "Product",
+    links: [
+      { label: "Features", href: "/#features" },
+      { label: "Stories", href: "/#stories" },
+      { label: "Canvas", href: "/canvas" },
+      { label: "Demo", href: "/demo" },
+    ],
+  },
+  {
+    title: "Account",
+    links: [
+      { label: "Log in", href: "/auth/login" },
+      { label: "Sign up", href: "/auth/signup" },
+    ],
+  },
+];
 
-function Wordmark({
-  color = T.ink,
-  size = 18,
-}: {
-  color?: string;
-  size?: number;
-}) {
-  return (
-    <span
-      style={{
-        fontFamily: "var(--font-fraunces)",
-        fontWeight: 600,
-        fontSize: size,
-        letterSpacing: "-0.02em",
-        color,
-      }}
-    >
-      Code<span style={{ fontStyle: "italic", fontWeight: 500 }}>Canvas</span>
-    </span>
-  );
-}
+// Logo mark + crosshair are imported from src/lib/drafting-room/marks.
 
-// ============================================================
-// PAGE - original structure, Warm Studio skin
-// ============================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// PAGE
+
 export default function Home() {
+  // ── state + handlers — preserved verbatim from previous landing ────────────
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokes, setStrokes] = useState<{ x: number; y: number }[][]>([]);
-  const [currentStroke, setCurrentStroke] = useState<
-    { x: number; y: number }[]
-  >([]);
+  const [currentStroke, setCurrentStroke] = useState<{ x: number; y: number }[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const router = useRouter();
   const supabase = createClient();
 
-  const handleContinueDesign = async () => {
-    localStorage.setItem("miniCanvasDesign", JSON.stringify(strokes));
-    const target = "/canvas?fromMini=true";
+  // Auth-aware nav: if logged in, push target; if not, send to signup with
+  // the target as redirectTo. Used for every "enter the product" CTA so new
+  // visitors land on signup (not login) — fewer clicks to first sketch.
+  const handleStartNav = async (target: string) => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      router.push(`/auth/login?redirectTo=${encodeURIComponent(target)}`);
+      router.push(`/auth/signup?redirectTo=${encodeURIComponent(target)}`);
     } else {
       router.push(target);
     }
+  };
+
+  const handleContinueDesign = async () => {
+    localStorage.setItem("miniCanvasDesign", JSON.stringify(strokes));
+    await handleStartNav("/canvas?fromMini=true");
   };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -157,9 +156,7 @@ export default function Home() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    setCurrentStroke([
-      { x: e.clientX - rect.left, y: e.clientY - rect.top },
-    ]);
+    setCurrentStroke([{ x: e.clientX - rect.left, y: e.clientY - rect.top }]);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -181,6 +178,33 @@ export default function Home() {
     setIsDrawing(false);
   };
 
+  const clearCanvas = () => {
+    setStrokes([]);
+    setCurrentStroke([]);
+  };
+
+  // ── hero cursor crosshair + coord readout — follows pointer, hides on leave
+  const heroWrapRef = useRef<HTMLElement>(null);
+  const crosshairRef = useRef<HTMLDivElement>(null);
+  const [coord, setCoord] = useState({ x: 0, y: 0, active: false });
+  const onHeroMove = (e: React.MouseEvent<HTMLElement>) => {
+    const el = heroWrapRef.current;
+    const c = crosshairRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = Math.round(e.clientX - r.left);
+    const y = Math.round(e.clientY - r.top);
+    if (c) {
+      c.style.transform = `translate(${x}px, ${y}px)`;
+      c.style.opacity = "1";
+    }
+    setCoord({ x, y, active: true });
+  };
+  const onHeroLeave = () => {
+    if (crosshairRef.current) crosshairRef.current.style.opacity = "0";
+    setCoord((p) => ({ ...p, active: false }));
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -193,18 +217,25 @@ export default function Home() {
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, rect.width, rect.height);
 
-    // Warm dot grid
-    ctx.fillStyle = T.hairline;
-    for (let x = 8; x < rect.width; x += 18) {
-      for (let y = 8; y < rect.height; y += 18) {
-        ctx.beginPath();
-        ctx.arc(x, y, 1.1, 0, Math.PI * 2);
-        ctx.fill();
-      }
+    // Drafting graph — thin orthogonal lines at 16px
+    ctx.strokeStyle = T.tick;
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= rect.width; x += 16) {
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, rect.height);
+      ctx.stroke();
     }
-    // Cocoa ink strokes
-    ctx.strokeStyle = T.ink;
-    ctx.lineWidth = 2.6;
+    for (let y = 0; y <= rect.height; y += 16) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(rect.width, y + 0.5);
+      ctx.stroke();
+    }
+
+    // Pen strokes in graphite
+    ctx.strokeStyle = T.graphite;
+    ctx.lineWidth = 2.4;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     [...strokes, currentStroke].forEach((stroke) => {
@@ -216,340 +247,427 @@ export default function Home() {
     });
   }, [strokes, currentStroke]);
 
-  const clearCanvas = () => {
-    setStrokes([]);
-    setCurrentStroke([]);
-  };
-
+  // ── render ─────────────────────────────────────────────────────────────────
   return (
-    <div
-      className={`${fraunces.variable} ${inter.variable} ${jetbrains.variable} min-h-screen`}
-      style={{
-        background: T.bg,
-        color: T.ink,
-        fontFamily: "var(--font-inter)",
-      }}
-    >
-      <style dangerouslySetInnerHTML={{ __html: motionCSS }} />
+    <div className={`${serif.variable} ${sans.variable} ${mono.variable} d5-root min-h-screen`}>
+      <style jsx global>{`
+        :root {
+          --d5-paper: ${T.paper};
+          --d5-vellum: ${T.vellum};
+          --d5-tick: ${T.tick};
+          --d5-rule: ${T.rule};
+          --d5-graphite: ${T.graphite};
+          --d5-cobalt: ${T.cobalt};
+          --d5-cobalt-ink: ${T.cobaltInk};
+          --d5-cobalt-wash: ${T.cobaltWash};
+          --d5-muted: ${T.muted};
+        }
+        .d5-root {
+          background: var(--d5-paper);
+          color: var(--d5-graphite);
+          font-family: var(--d5-sans), ui-sans-serif, system-ui, sans-serif;
+          letter-spacing: -0.005em;
+        }
+        .d5-mono {
+          font-family: var(--d5-mono), ui-monospace, monospace;
+          font-feature-settings: "zero", "ss01";
+          letter-spacing: 0;
+        }
+        .d5-serif {
+          font-family: var(--d5-serif), ui-serif, Georgia, serif;
+          font-feature-settings: "liga", "dlig", "kern";
+        }
+        .d5-serif em {
+          margin-right: 0.18em;
+        }
+        /* Two-layer graph: fine 8px hairline texture + coarse 32px structural.
+           Coarse line is 1.5px (not 1px) so sub-pixel rendering on uncalibrated
+           external displays can't lose it. Fine layer stays 1px at 0.4 opacity
+           so the texture doesn't compete with the structure. */
+        .d5-grid-fine {
+          background-image:
+            linear-gradient(to right, var(--d5-tick) 1px, transparent 1px),
+            linear-gradient(to bottom, var(--d5-tick) 1px, transparent 1px);
+          background-size: 8px 8px;
+          opacity: 0.4;
+        }
+        .d5-grid {
+          background-image:
+            linear-gradient(to right, var(--d5-tick) 1.5px, transparent 1.5px),
+            linear-gradient(to bottom, var(--d5-tick) 1.5px, transparent 1.5px);
+          background-size: 32px 32px;
+          opacity: 1;
+        }
+        .d5-reg::before,
+        .d5-reg::after {
+          content: "";
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          border: 1px solid var(--d5-rule);
+        }
+        .d5-reg::before {
+          top: -1px;
+          left: -1px;
+          border-right: 0;
+          border-bottom: 0;
+        }
+        .d5-reg::after {
+          bottom: -1px;
+          right: -1px;
+          border-left: 0;
+          border-top: 0;
+        }
+        .d5-tag {
+          font-family: var(--d5-mono), ui-monospace, monospace;
+          font-size: 10px;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: var(--d5-muted);
+        }
+        /* RULE: every button has a solid fill — never transparent. The hero
+           and CTA sections both have grid backgrounds, and transparent buttons
+           let the grid lines bleed through their text. Paper fill on light
+           pages, graphite fill on dark sections. See memory for full rule. */
+        .d5-btn {
+          font-family: var(--d5-mono);
+          font-size: 11px;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          padding: 12px 22px;
+          border: 1px solid var(--d5-rule);
+          background: var(--d5-paper);
+          color: var(--d5-graphite);
+          transition: background 120ms cubic-bezier(0.2, 0.7, 0.1, 1),
+            color 120ms cubic-bezier(0.2, 0.7, 0.1, 1),
+            border-color 120ms cubic-bezier(0.2, 0.7, 0.1, 1);
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+        .d5-btn:hover {
+          background: var(--d5-graphite);
+          color: var(--d5-paper);
+        }
+        .d5-btn-primary {
+          background: var(--d5-cobalt);
+          border-color: var(--d5-cobalt);
+          color: var(--d5-paper);
+        }
+        .d5-btn-primary:hover {
+          background: var(--d5-cobalt-ink);
+          border-color: var(--d5-cobalt-ink);
+          color: var(--d5-paper);
+        }
+        .d5-btn-on-graphite {
+          background: var(--d5-cobalt);
+          border-color: var(--d5-cobalt);
+          color: var(--d5-paper);
+        }
+        .d5-btn-on-graphite:hover {
+          background: var(--d5-paper);
+          border-color: var(--d5-paper);
+          color: var(--d5-graphite);
+        }
+        .d5-btn-ghost-on-graphite {
+          background: var(--d5-graphite);
+          border-color: rgba(242, 241, 236, 0.3);
+          color: var(--d5-paper);
+        }
+        .d5-btn-ghost-on-graphite:hover {
+          background: var(--d5-paper);
+          border-color: var(--d5-paper);
+          color: var(--d5-graphite);
+        }
+        .d5-social {
+          background: var(--d5-paper);
+          color: var(--d5-graphite);
+        }
+        .d5-social:hover {
+          background: var(--d5-graphite);
+          color: var(--d5-paper);
+        }
+        .d5-social svg {
+          stroke: currentColor;
+        }
+        .d5-input {
+          background: transparent;
+          border: 0;
+          border-bottom: 1px solid var(--d5-rule);
+          padding: 8px 0;
+          font-family: var(--d5-sans);
+          color: var(--d5-graphite);
+          outline: none;
+          width: 100%;
+          font-size: 14px;
+        }
+        .d5-input:focus {
+          border-bottom-color: var(--d5-cobalt);
+        }
+        .d5-root *::selection {
+          background: var(--d5-cobalt-wash);
+          color: var(--d5-cobalt-ink);
+        }
+        @keyframes d5-blink {
+          50% {
+            opacity: 0;
+          }
+        }
+        @keyframes d5-tick-sweep {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        @keyframes d5-pulse {
+          0%,
+          100% {
+            opacity: 0.4;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.4);
+          }
+        }
+        .d5-dot-pulse {
+          animation: d5-pulse 2s ease-in-out infinite;
+        }
+      `}</style>
 
-      {/* ───────── Navigation Header ───────── */}
-      <nav
-        className="relative z-20 border-b backdrop-blur"
-        style={{
-          borderColor: T.hairline,
-          background: "rgba(241,233,216,0.82)",
-        }}
+      <TopBar />
+
+      {/* ─── HERO ─────────────────────────────────────────────────────────── */}
+      <main
+        className="relative overflow-hidden border-b"
+        style={{ borderColor: T.rule, cursor: "none" }}
+        ref={heroWrapRef}
+        onMouseMove={onHeroMove}
+        onMouseLeave={onHeroLeave}
       >
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2.5">
-              <Logo size={32} color={T.accent} />
-              <Wordmark color={T.ink} size={20} />
-            </Link>
-            <div className="flex items-center gap-2 sm:gap-4">
-              <Link
-                href="/auth/login"
-                className="rounded-lg px-3 py-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm"
-                style={{ color: T.muted }}
-              >
-                Log in
-              </Link>
-              <Link
-                href="/canvas"
-                className="lp-btn rounded-xl px-3 py-2 text-xs font-medium sm:px-5 sm:py-2.5 sm:text-sm"
-                style={{
-                  background: T.accent,
-                  color: T.surface,
-                  boxShadow: "0 8px 20px -10px rgba(189,91,61,0.55)",
-                }}
-              >
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+        {/* hairline graph — fine + coarse, static, on-brand */}
+        <div className="absolute inset-0 d5-grid-fine pointer-events-none" />
+        <div className="absolute inset-0 d5-grid pointer-events-none" />
 
-      {/* ───────── Hero Section ───────── */}
-      <main className="relative overflow-hidden">
-        {/* Warm paper texture + radial accent (replaces dark GridScan visually for light mode) */}
-        <div
-          className="lp-paper pointer-events-none absolute inset-0 z-0 opacity-[0.06] mix-blend-multiply"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -right-32 -top-32 z-0 h-[520px] w-[520px] rounded-full opacity-50"
-          style={{
-            background:
-              "radial-gradient(circle at center, rgba(189,91,61,0.16) 0%, transparent 70%)",
-          }}
-          aria-hidden
-        />
-        {/* GridScan - cursor-reactive shader grid (Three.js).
-            IMPORTANT: this wrapper MUST be pointer-events-auto so the
-            component's internal mousemove listener (GridScan.tsx, line ~398)
-            can receive cursor coords. The hero content overlay at z-10 is
-            pointer-events-none with selective auto on interactive children,
-            so cursor passes through the empty hero space and hits GridScan
-            below - the same pattern React Bits' Dot Grid uses for proximity
-            response and click shockwaves. */}
-        <div className="absolute inset-0 z-0 pointer-events-auto">
-          <GridScan
-            sensitivity={0.75}
-            lineThickness={1.3}
-            linesColor="#D8CDB4"
-            gridScale={0.18}
-            lineStyle="solid"
-            lineJitter={0.04}
-            scanColor="#BD5B3D"
-            scanOpacity={0.18}
-            scanDirection="pingpong"
-            scanDuration={2.4}
-            scanDelay={1.8}
-            scanGlow={0.8}
-            scanSoftness={1.8}
-            scanPhaseTaper={0.9}
-            scanOnClick
-            snapBackDelay={350}
-            enablePost
-            bloomIntensity={0.25}
-            chromaticAberration={0.0002}
-            noiseIntensity={0.003}
+        {/* silent margin guides */}
+        <div className="absolute left-0 right-0 h-px pointer-events-none" style={{ top: 64, background: T.tick, opacity: 0.5 }} />
+        <div className="absolute left-0 right-0 h-px pointer-events-none" style={{ bottom: 64, background: T.tick, opacity: 0.5 }} />
+
+        {/* cobalt scan tick — slow traverse along bottom edge */}
+        <div className="absolute left-0 bottom-0 w-full h-px pointer-events-none overflow-hidden">
+          <div
+            className="absolute h-px"
+            style={{
+              width: 140,
+              background: T.cobalt,
+              animation: "d5-tick-sweep 9s linear infinite",
+            }}
           />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 lg:py-24 pointer-events-none">
-          <div className="grid gap-8 sm:gap-12 lg:grid-cols-2 lg:gap-16 items-center">
-            {/* Left: Hero Copy */}
-            <div className="space-y-6 sm:space-y-8 pointer-events-auto">
+        {/* cursor crosshair (mix-blend-difference) */}
+        <div
+          ref={crosshairRef}
+          className="pointer-events-none absolute top-0 left-0"
+          style={{
+            width: 0,
+            height: 0,
+            mixBlendMode: "difference",
+            opacity: 0,
+            transition: "opacity 120ms linear",
+          }}
+        >
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 40 40"
+            style={{ transform: "translate(-50%, -50%)", color: T.cobalt }}
+          >
+            <circle cx="20" cy="20" r="8" fill="none" stroke="currentColor" strokeWidth="1" />
+            <line x1="20" y1="0" x2="20" y2="14" stroke="currentColor" strokeWidth="1" />
+            <line x1="20" y1="26" x2="20" y2="40" stroke="currentColor" strokeWidth="1" />
+            <line x1="0" y1="20" x2="14" y2="20" stroke="currentColor" strokeWidth="1" />
+            <line x1="26" y1="20" x2="40" y2="20" stroke="currentColor" strokeWidth="1" />
+            <circle cx="20" cy="20" r="1.2" fill="currentColor" />
+          </svg>
+        </div>
+
+        <div className="relative z-10 mx-auto max-w-7xl px-6 pt-20 pb-24 sm:pt-24 sm:pb-28 lg:px-10 pointer-events-none">
+          {/* slug + coord row — left: figure ID, right: live cursor coords (drafting tool readout) */}
+          <div className="d5-mono mb-12 flex items-center justify-between text-[10px] tracking-[0.16em] uppercase pointer-events-auto" style={{ color: T.muted }}>
+            <span>
+              FIG. 01 / TOOL VIEW · LIVE
+              {strokes.length > 0 && (
+                <span style={{ color: T.cobalt }}>{" · "}{strokes.length} STROKES</span>
+              )}
+            </span>
+            <span className="flex items-center gap-3 tabular-nums">
+              <Cross size={8} />
+              <span>
+                x:{" "}
+                <span style={{ color: T.graphite }}>
+                  {coord.active ? coord.x.toString().padStart(4, "0") : "····"}
+                </span>
+              </span>
+              <span>
+                y:{" "}
+                <span style={{ color: T.graphite }}>
+                  {coord.active ? coord.y.toString().padStart(4, "0") : "····"}
+                </span>
+              </span>
+            </span>
+          </div>
+
+          <div className="grid items-start gap-10 lg:grid-cols-12 lg:gap-16">
+            {/* ── LEFT: Hero copy ─────────────────────────────────────────── */}
+            <div
+              className="lg:col-span-7 pointer-events-auto relative"
+              style={{
+                background: T.paper,
+                border: `1px solid ${T.rule}`,
+              }}
+            >
+              {/* title block — mirrors the canvas card's UNTITLED · DRAFT strip */}
+              <div
+                className="d5-mono flex items-center justify-between border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                style={{ borderColor: T.rule, color: T.muted }}
+              >
+                <span style={{ color: T.graphite }}>BRIEF · v0.1</span>
+                <span className="flex items-center gap-2">
+                  <span
+                    className="d5-dot-pulse inline-block h-1.5 w-1.5"
+                    style={{ background: T.cobalt }}
+                  />
+                  EDITORIAL
+                </span>
+              </div>
+
+              <div className="space-y-8 p-6 sm:p-8">
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium"
-                style={{
-                  background: T.surface,
-                  borderColor: T.hairline,
-                  color: T.muted,
-                }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                className="inline-flex items-center gap-2 d5-mono text-[10px] tracking-[0.18em] uppercase border px-3 py-1.5"
+                style={{ borderColor: T.rule, color: T.graphite, background: T.paper }}
               >
                 <span
-                  className="lp-pulse h-1.5 w-1.5 rounded-full"
-                  style={{ background: T.counter }}
+                  className="d5-dot-pulse inline-block h-1.5 w-1.5"
+                  style={{ background: T.cobalt }}
                 />
-                Sketch-to-code in seconds
+                Sketch to code · v0.1
               </motion.div>
 
               <div className="space-y-0">
-                <motion.h1
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: 0.7,
-                    delay: 0.1,
-                    ease: [0.65, 0, 0.35, 1],
-                  }}
-                  className="text-4xl tracking-[-0.025em] sm:text-5xl md:text-6xl lg:text-7xl"
-                  style={{
-                    fontFamily: "var(--font-fraunces)",
-                    fontWeight: 500,
-                    color: T.ink,
-                    lineHeight: 0.95,
-                  }}
-                >
-                  Draw.
-                </motion.h1>
-                <motion.h1
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: 0.7,
-                    delay: 0.2,
-                    ease: [0.65, 0, 0.35, 1],
-                  }}
-                  className="text-4xl tracking-[-0.025em] sm:text-5xl md:text-6xl lg:text-7xl"
-                  style={{
-                    fontFamily: "var(--font-fraunces)",
-                    fontWeight: 500,
-                    color: T.ink,
-                    lineHeight: 0.95,
-                  }}
-                >
-                  Describe.
-                </motion.h1>
-                <motion.h1
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{
-                    duration: 0.7,
-                    delay: 0.3,
-                    ease: [0.65, 0, 0.35, 1],
-                  }}
-                  className="lp-glow text-4xl italic tracking-[-0.025em] sm:text-5xl md:text-6xl lg:text-7xl"
-                  style={{
-                    fontFamily: "var(--font-fraunces)",
-                    fontWeight: 500,
-                    color: T.accent,
-                    lineHeight: 0.95,
-                  }}
-                >
-                  Ship.
-                </motion.h1>
+                {(["Draw.", "Describe.", "Ship."] as const).map((word, i) => (
+                  <motion.h1
+                    key={word}
+                    initial={{ opacity: 0, y: 24 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.7, delay: 0.1 + i * 0.1, ease: [0.65, 0, 0.35, 1] }}
+                    className="d5-serif"
+                    style={{
+                      fontSize: "clamp(56px, 9vw, 132px)",
+                      lineHeight: 0.92,
+                      letterSpacing: "-0.03em",
+                      color: i === 2 ? T.cobalt : T.graphite,
+                      fontStyle: i === 2 ? "italic" : "normal",
+                      fontWeight: 400,
+                    }}
+                  >
+                    {word}
+                  </motion.h1>
+                ))}
               </div>
 
               <motion.p
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.6,
-                  delay: 0.5,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
-                className="max-w-lg text-base leading-relaxed sm:text-lg md:text-xl"
-                style={{ color: T.muted }}
+                transition={{ duration: 0.6, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                className="max-w-xl text-[18px] leading-[1.55]"
+                style={{ color: T.graphite }}
               >
-                Convert rough sketches into production-ready frontends - live
-                preview and one-click export.
+                Convert rough sketches into production-ready frontends, with live preview and one-click export.
               </motion.p>
 
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.6,
-                  delay: 0.6,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
-                className="flex flex-col gap-3 sm:flex-row sm:gap-4"
+                transition={{ duration: 0.6, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                className="flex flex-wrap items-center gap-3"
               >
-                <Link
-                  href="/canvas"
-                  className="lp-btn group inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold sm:px-8 sm:py-4 sm:text-base"
-                  style={{
-                    background: T.accent,
-                    color: T.surface,
-                    boxShadow: "0 14px 36px -14px rgba(189,91,61,0.55)",
-                  }}
-                >
-                  Open Canvas
-                  <svg
-                    className="h-4 w-4 transition-transform group-hover:translate-x-1 sm:h-5 sm:w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 7l5 5m0 0l-5 5m5-5H6"
-                    />
-                  </svg>
-                </Link>
-
                 <button
-                  className="lp-btn inline-flex items-center justify-center rounded-xl border-2 px-6 py-3 text-sm font-semibold sm:px-8 sm:py-[10px] sm:text-base"
-                  style={{
-                    borderColor: T.ink,
-                    color: T.ink,
-                    background: "transparent",
-                  }}
+                  onClick={() => handleStartNav("/canvas")}
+                  className="d5-btn d5-btn-primary"
                 >
-                  Watch Demo
+                  Open Canvas <span>→</span>
                 </button>
+                <button className="d5-btn">Watch Demo</button>
               </motion.div>
 
-              {/* Feature Pills */}
+              {/* feature pills — hairline mono badges */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.85 }}
-                className="flex flex-wrap gap-3 pt-4"
+                className="flex flex-wrap gap-2 pt-4"
               >
-                {[
-                  "Live Preview",
-                  "AI-Powered Recognition",
-                  "One-Click Export",
-                ].map((label) => (
-                  <div
+                {["LIVE PREVIEW", "AI RECOGNITION", "ONE-CLICK EXPORT"].map((label) => (
+                  <span
                     key={label}
-                    className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium"
-                    style={{
-                      background: T.surface,
-                      borderColor: T.hairline,
-                      color: T.ink,
-                    }}
+                    className="d5-mono inline-flex items-center gap-2 border px-3 py-1.5 text-[10px] tracking-[0.18em]"
+                    style={{ borderColor: T.rule, color: T.graphite, background: T.paper }}
                   >
-                    <span style={{ color: T.accent }}>
-                      <svg
-                        className="h-4 w-4"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </span>
+                    <Cross size={8} />
                     {label}
-                  </div>
+                  </span>
                 ))}
               </motion.div>
+              </div>
             </div>
 
-            {/* Right: Interactive Mini Canvas */}
+            {/* ── RIGHT: Mini-canvas in drafting card ─────────────────────── */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{
-                duration: 0.8,
-                delay: 0.4,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              className="relative pointer-events-auto"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="relative lg:col-span-5 pointer-events-auto"
             >
               <div
-                className="relative overflow-hidden rounded-2xl border"
+                className="relative d5-reg"
                 style={{
-                  background: T.surface,
-                  borderColor: T.hairline,
-                  boxShadow: "0 30px 60px -30px rgba(42,31,24,0.18)",
+                  background: T.paper,
+                  border: `1px solid ${T.rule}`,
                 }}
               >
+                {/* title block */}
                 <div
-                  className="flex items-center justify-between border-b px-4 py-3"
-                  style={{ borderColor: T.hairline }}
+                  className="d5-mono flex items-center justify-between border-b px-4 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                  style={{ borderColor: T.rule, color: T.muted }}
                 >
-                  <h3
-                    className="text-sm font-semibold"
-                    style={{ color: T.ink }}
-                  >
-                    Try it now <span style={{ color: T.muted }}>|</span> Draw a
-                    button
-                  </h3>
+                  <span style={{ color: T.graphite }}>UNTITLED · DRAFT</span>
                   <button
                     onClick={clearCanvas}
-                    className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
-                    style={{
-                      background: T.bg,
-                      color: T.muted,
-                      fontFamily: "var(--font-jetbrains)",
-                    }}
+                    className="hover:text-[var(--d5-graphite)] transition-colors"
+                    style={{ color: T.muted }}
                   >
-                    Clear
+                    CLEAR ↺
                   </button>
                 </div>
 
+                {/* canvas */}
                 <div className="relative">
                   <canvas
                     ref={canvasRef}
                     className="w-full cursor-crosshair"
                     style={{
                       width: "100%",
-                      height: "300px",
-                      background: T.elevated,
+                      height: 320,
+                      background: T.cobaltWash,
+                      display: "block",
                     }}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
@@ -558,357 +676,535 @@ export default function Home() {
                   />
                   {strokes.length === 0 && (
                     <div
-                      className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2"
-                      style={{ color: T.subtle }}
+                      className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3"
+                      style={{ color: T.muted }}
                     >
-                      <svg
-                        width="36"
-                        height="36"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke={T.accent}
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path
-                          className="lp-draw"
-                          d="M4 18 L 7 12 L 12 16 L 17 8 L 20 12"
-                        />
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={T.cobalt} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 18 L 7 12 L 12 16 L 17 8 L 20 12" />
                       </svg>
-                      <span
-                        className="text-[11px]"
-                        style={{ fontFamily: "var(--font-jetbrains)" }}
-                      >
-                        any pen · any speed · rough is fine
+                      <span className="d5-mono text-[10px] tracking-[0.18em] uppercase">
+                        Any pen · any speed · rough is fine
                       </span>
                     </div>
                   )}
                 </div>
 
+                {/* continue strip */}
                 {strokes.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                    className="border-t p-4"
-                    style={{ borderColor: T.hairline }}
+                    transition={{ duration: 0.35 }}
+                    className="border-t p-3"
+                    style={{ borderColor: T.rule }}
                   >
-                    <p
-                      className="mb-2 text-xs font-semibold uppercase tracking-wide"
-                      style={{
-                        color: T.muted,
-                        fontFamily: "var(--font-jetbrains)",
-                      }}
-                    >
-                      Live Preview
-                    </p>
                     <button
                       onClick={handleContinueDesign}
-                      className="lp-btn w-full rounded-xl px-6 py-3 font-semibold"
-                      style={{
-                        background: T.accent,
-                        color: T.surface,
-                        boxShadow:
-                          "0 12px 30px -12px rgba(189,91,61,0.55)",
-                      }}
+                      className="d5-btn d5-btn-primary w-full"
                     >
-                      Continue in Canvas
+                      Continue in Canvas →
                     </button>
                   </motion.div>
                 )}
 
-                {/* Mono status strip - the tool signature */}
+                {/* mono status strip */}
                 <div
-                  className="flex items-center justify-between px-4 py-2 text-[10px]"
+                  className="d5-mono flex items-center justify-between border-t px-4 py-2 text-[10px] tracking-[0.14em] uppercase"
                   style={{
-                    background: T.anchor,
-                    color: T.anchorMuted,
-                    fontFamily: "var(--font-jetbrains)",
+                    borderColor: T.rule,
+                    background: T.graphite,
+                    color: "rgba(242,241,236,0.45)",
                   }}
                 >
-                  <div className="flex items-center gap-3">
-                    <span style={{ color: T.anchorText }}>
-                      ~/sketch.canvas
-                    </span>
-                    <span>480 × 300</span>
+                  <div className="flex items-center gap-4">
+                    <span style={{ color: T.paper }}>~/sketch.canvas</span>
+                    <span>480 × 320</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span style={{ color: T.accent }}>● PEN</span>
-                    <span>{strokes.length} strokes</span>
+                  <div className="flex items-center gap-4">
+                    <span style={{ color: T.cobalt }}>● PEN</span>
+                    <span>{strokes.length} STROKES</span>
                   </div>
                 </div>
               </div>
             </motion.div>
           </div>
         </div>
+
+        {/* status bar */}
+        <HeroStatusBar strokes={strokes.length} />
       </main>
 
-      {/* ───────── Features Section ───────── */}
-      <section
-        className="border-t py-16 sm:py-24"
-        style={{
-          borderColor: T.hairline,
-          background: T.surface,
-        }}
-      >
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          {/* Video Demo */}
-          <div className="mb-24">
-            <div className="mb-8 text-center">
-              <h2
-                className="text-3xl tracking-[-0.02em] sm:text-4xl"
-                style={{
-                  fontFamily: "var(--font-fraunces)",
-                  fontWeight: 600,
-                  color: T.ink,
-                }}
+      {/* ─── 01 — SEE IT IN ACTION (video demo) ───────────────────────────── */}
+      <SeeInAction />
+
+      {/* ─── 02 — WHY CODECANVAS (6 feature cards) ────────────────────────── */}
+      <WhyCodeCanvas />
+
+      {/* ─── Pricing — disabled, will migrate ──────────────────────────────── */}
+      {/* <Pricing /> */}
+
+      {/* ─── 03 — STORIES (inline Drafting-Room Testimonials) ─────────────── */}
+      <TestimonialsBlock />
+
+      {/* ─── CTA ───────────────────────────────────────────────────────────── */}
+      <CTABlock onStart={() => handleStartNav("/canvas")} />
+
+      {/* ─── COLOPHON / FOOTER (inline Drafting-Room Footer) ──────────────── */}
+      <FooterBlock />
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SUB-COMPONENTS
+
+function TopBar() {
+  return (
+    <header
+      className="d5-mono sticky top-0 z-50 flex items-center justify-between border-b px-6 py-3"
+      style={{ background: T.paper, borderColor: T.rule }}
+    >
+      <Link href="/" className="flex items-center gap-3">
+        <Mark size={22} color={T.graphite} />
+        <span className="text-[13px] tracking-[0.18em] uppercase" style={{ color: T.graphite }}>
+          CodeCanvas
+        </span>
+        <span className="text-[10px] tracking-[0.16em] uppercase" style={{ color: T.muted }}>
+          / DRAFTING ROOM
+        </span>
+      </Link>
+      <nav className="hidden items-center gap-6 text-[11px] tracking-[0.16em] uppercase md:flex" style={{ color: T.graphite }}>
+        <Link href="#features">Features</Link>
+        <Link href="#stories">Stories</Link>
+        <Link href="/canvas">Canvas</Link>
+      </nav>
+      <div className="flex items-center gap-3">
+        <Link
+          href="/auth/login"
+          className="d5-mono text-[11px] tracking-[0.16em] uppercase px-3 py-2"
+          style={{ color: T.muted }}
+        >
+          Log in
+        </Link>
+        <Link href="/auth/signup" className="d5-btn d5-btn-primary" style={{ padding: "8px 16px", fontSize: 10 }}>
+          Get Started →
+        </Link>
+      </div>
+    </header>
+  );
+}
+
+function HeroStatusBar({ strokes }: { strokes: number }) {
+  const [time, setTime] = useState("--:--:--");
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      const fmt = (n: number) => n.toString().padStart(2, "0");
+      setTime(`${fmt(d.getHours())}:${fmt(d.getMinutes())}:${fmt(d.getSeconds())}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div
+      className="d5-mono relative border-t flex items-center justify-between px-6 py-2 text-[10px] tracking-[0.14em] uppercase"
+      style={{ borderColor: T.rule, background: T.paper, color: T.muted }}
+    >
+      <div className="flex items-center gap-5">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-1.5 h-1.5" style={{ background: T.cobalt }} />
+          {strokes > 0 ? "DRAFTING" : "IDLE"}
+        </span>
+        <span>ZOOM 100%</span>
+        <span>GRID 16PX</span>
+        <span>SNAP ON</span>
+      </div>
+      <div className="flex items-center gap-5">
+        <span>GEMINI 2.5 · WARM</span>
+        <span>ROBOFLOW v2</span>
+        <span style={{ color: T.graphite }}>{time}</span>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({ index, title, caption }: { index: string; title: string; caption: string }) {
+  return (
+    <div className="flex items-baseline justify-between border-b pb-5 mb-12" style={{ borderColor: T.rule }}>
+      <div className="flex items-baseline gap-6">
+        <span className="d5-mono text-[12px] tracking-[0.2em]" style={{ color: T.cobalt }}>
+          {index}
+        </span>
+        <h2 className="d5-serif" style={{ fontSize: 56, lineHeight: 1, letterSpacing: "-0.025em", fontWeight: 400 }}>
+          {title}
+        </h2>
+      </div>
+      <span className="d5-mono text-[11px] tracking-[0.14em] uppercase hidden sm:inline" style={{ color: T.muted }}>
+        {caption}
+      </span>
+    </div>
+  );
+}
+
+function SeeInAction() {
+  return (
+    <section className="border-b" style={{ borderColor: T.rule }}>
+      <div className="mx-auto max-w-7xl px-6 lg:px-10 py-24">
+        <SectionHeader index="01" title="See it in action" caption="Sketch → detect → generate · ≈1.2s" />
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          className="relative d5-reg mx-auto max-w-5xl"
+          style={{ border: `1px solid ${T.rule}`, background: T.vellum }}
+        >
+          {/* title block bar */}
+          <div
+            className="d5-mono flex items-center justify-between border-b px-4 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+            style={{ borderColor: T.rule, color: T.muted, background: T.paper }}
+          >
+            <span style={{ color: T.graphite }}>demo-video.mp4</span>
+            <span className="flex items-center gap-3">
+              <span>1920 × 1080</span>
+              <Cross size={8} />
+              <span style={{ color: T.cobalt }}>● PLAYING</span>
+            </span>
+          </div>
+          {/* video well */}
+          <div className="p-3">
+            <video className="w-full" autoPlay loop muted playsInline style={{ display: "block" }}>
+              <source
+                src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/media/demo-video.mp4`}
+                type="video/mp4"
+              />
+              Your browser does not support the video tag.
+            </video>
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function WhyCodeCanvas() {
+  const features = [
+    {
+      title: "Natural sketching",
+      desc: "Draw components just like on paper. The model reads your intent.",
+    },
+    {
+      title: "Smart recognition",
+      desc: "Detects buttons, inputs, and layouts and converts them to clean code.",
+    },
+    {
+      title: "Live preview",
+      desc: "Your design comes to life with real-time code generation.",
+    },
+    {
+      title: "Natural language",
+      desc: "Describe interactions and behavior; the logic is generated for you.",
+    },
+    {
+      title: "Export ready",
+      desc: "Download code with proper structure and sensible defaults.",
+    },
+    {
+      title: "Style freedom",
+      desc: "Choose your framework, styling approach, and coding patterns.",
+    },
+  ];
+  return (
+    <section id="features" className="border-b" style={{ borderColor: T.rule }}>
+      <div className="mx-auto max-w-7xl px-6 lg:px-10 py-24">
+        <SectionHeader index="02" title="Why CodeCanvas" caption="Hairline-first. Cobalt as interaction ink." />
+        <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-3" style={{ background: T.rule }}>
+          {features.map((f, i) => (
+            <motion.div
+              key={f.title}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+              className="p-8 transition-colors hover:bg-[var(--d5-vellum)]"
+              style={{ background: T.paper }}
+            >
+              <div className="flex items-start justify-between mb-6">
+                <span className="d5-mono text-[11px] tracking-[0.2em]" style={{ color: T.cobalt }}>
+                  0{i + 1}
+                </span>
+                <Cross size={8} />
+              </div>
+              <h3
+                className="d5-serif mb-3"
+                style={{ fontSize: 28, lineHeight: 1, letterSpacing: "-0.02em", fontWeight: 400 }}
               >
-                See It In Action
-              </h2>
-              <p
-                className="mt-4 text-lg"
-                style={{ color: T.muted }}
-              >
-                Watch how CodeCanvas transforms sketches into production-ready
-                code
+                {f.title}
+              </h3>
+              <p className="text-[14px] leading-[1.55]" style={{ color: T.muted }}>
+                {f.desc}
               </p>
-            </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TestimonialsBlock() {
+  const [i, setI] = useState(0);
+  const [auto, setAuto] = useState(true);
+  useEffect(() => {
+    if (!auto) return;
+    const t = setInterval(() => setI((v) => (v + 1) % TESTIMONIALS.length), 5000);
+    return () => clearInterval(t);
+  }, [auto]);
+  const t = TESTIMONIALS[i];
+  return (
+    <section id="stories" className="border-b" style={{ borderColor: T.rule }}>
+      <div className="mx-auto max-w-7xl px-6 lg:px-10 py-24">
+        <SectionHeader index="03" title="Stories from the workshop" caption={`${TESTIMONIALS.length} VOICES · DESIGNERS & DEVELOPERS`} />
+
+        <div className="grid gap-12 lg:grid-cols-12 items-start">
+          {/* big quote */}
+          <div className="lg:col-span-9">
+            <motion.blockquote
+              key={i}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="d5-serif"
+              style={{
+                fontSize: "clamp(28px, 4vw, 56px)",
+                lineHeight: 1.15,
+                letterSpacing: "-0.02em",
+                fontWeight: 400,
+              }}
+            >
+              <span style={{ color: T.cobalt }}>“</span>
+              {t.quote}
+              <span style={{ color: T.cobalt }}>”</span>
+            </motion.blockquote>
 
             <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-80px" }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="relative mx-auto max-w-5xl"
+              key={`m-${i}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.45, delay: 0.1 }}
+              className="d5-mono mt-8 flex items-center gap-4 text-[11px] tracking-[0.18em] uppercase"
+              style={{ color: T.muted }}
             >
-              <div
-                className="relative overflow-hidden rounded-2xl border p-4"
-                style={{
-                  borderColor: T.hairline,
-                  background: T.elevated,
-                  boxShadow: "0 40px 80px -40px rgba(42,31,24,0.25)",
-                }}
+              <span
+                className="inline-flex h-9 w-9 items-center justify-center border text-[11px]"
+                style={{ borderColor: T.rule, color: T.graphite, background: T.paper }}
               >
-                <video
-                  className="w-full rounded-lg"
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                >
-                  <source
-                    src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/media/demo-video.mp4`}
-                    type="video/mp4"
-                  />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-
-              <div
-                className="pointer-events-none absolute -left-10 top-1/2 h-40 w-40 rounded-full opacity-50"
-                style={{
-                  background:
-                    "radial-gradient(circle, rgba(189,91,61,0.25) 0%, transparent 70%)",
-                }}
-              />
-              <div
-                className="pointer-events-none absolute -right-10 top-1/4 h-40 w-40 rounded-full opacity-30"
-                style={{
-                  background:
-                    "radial-gradient(circle, rgba(63,94,79,0.2) 0%, transparent 70%)",
-                }}
-              />
+                {t.avatar}
+              </span>
+              <span style={{ color: T.graphite }}>{t.name}</span>
+              <span>·</span>
+              <span>{t.role}</span>
+              <span>·</span>
+              <span>{t.company}</span>
             </motion.div>
           </div>
 
-          <div className="mb-16 text-center">
-            <h2
-              className="text-3xl tracking-[-0.02em] sm:text-4xl"
-              style={{
-                fontFamily: "var(--font-fraunces)",
-                fontWeight: 600,
-                color: T.ink,
-              }}
-            >
-              Why CodeCanvas?
-            </h2>
-            <p className="mt-4 text-lg" style={{ color: T.muted }}>
-              Fast, intuitive, and built for makers
+          {/* index column */}
+          <div className="lg:col-span-3">
+            <div className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-3" style={{ color: T.muted }}>
+              INDEX
+            </div>
+            <div className="space-y-2">
+              {TESTIMONIALS.map((tx, idx) => (
+                <button
+                  key={tx.name}
+                  onClick={() => {
+                    setI(idx);
+                    setAuto(false);
+                  }}
+                  className="d5-mono w-full text-left text-[11px] tracking-[0.14em] uppercase flex items-center justify-between py-1.5 border-b transition-colors"
+                  style={{
+                    borderColor: idx === i ? T.cobalt : T.tick,
+                    color: idx === i ? T.graphite : T.muted,
+                  }}
+                >
+                  <span>
+                    {(idx + 1).toString().padStart(2, "0")} · {tx.name.split(" ")[0]}
+                  </span>
+                  <span>{tx.company}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CTABlock({ onStart }: { onStart: () => void }) {
+  return (
+    <section
+      className="relative border-b"
+      style={{ background: T.graphite, color: T.paper, borderColor: T.rule }}
+    >
+      {/* fine grid on dark section — paper-colored lines at low opacity
+          so it survives laptop displays. The global d5-grid-fine uses tick
+          color which is invisible on graphite. */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(242,241,236,0.07) 1px, transparent 1px)," +
+            "linear-gradient(to bottom, rgba(242,241,236,0.07) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }}
+      />
+      <div className="relative mx-auto max-w-5xl px-6 lg:px-10 py-28 text-center">
+        <div
+          className="d5-mono inline-flex items-center gap-2 text-[10px] tracking-[0.18em] uppercase border px-3 py-1.5 mb-10"
+          style={{
+            borderColor: "rgba(242,241,236,0.3)",
+            color: T.paper,
+            background: T.graphite,
+          }}
+        >
+          <span className="inline-block w-1.5 h-1.5" style={{ background: T.cobalt }} />
+          READY WHEN YOU ARE
+        </div>
+        <h2
+          className="d5-serif"
+          style={{
+            fontSize: "clamp(48px, 7vw, 96px)",
+            lineHeight: 0.95,
+            letterSpacing: "-0.03em",
+            fontWeight: 400,
+            color: T.paper,
+          }}
+        >
+          Ready to build <em style={{ color: T.cobalt }}>faster?</em>
+        </h2>
+        <p className="d5-serif mx-auto mt-6 max-w-xl text-[18px]" style={{ color: "rgba(242,241,236,0.7)", fontStyle: "italic" }}>
+          Start sketching your next project today. No credit card required.
+        </p>
+        <div className="mt-12 flex items-center justify-center gap-3">
+          <button onClick={onStart} className="d5-btn d5-btn-on-graphite">
+            Get Started Free <span>→</span>
+          </button>
+          <Link href="#features" className="d5-btn d5-btn-ghost-on-graphite">
+            See Features
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FooterBlock() {
+  const [email, setEmail] = useState("");
+  const [subscribed, setSubscribed] = useState(false);
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubscribed(true);
+    setEmail("");
+    setTimeout(() => setSubscribed(false), 3000);
+  };
+  const year = new Date().getFullYear();
+  return (
+    <footer style={{ background: T.paper }}>
+      <div className="mx-auto max-w-7xl px-6 lg:px-10 py-20">
+        <div className="grid gap-12 lg:grid-cols-12">
+          {/* brand + newsletter */}
+          <div className="lg:col-span-4">
+            <Link href="/" className="flex items-center gap-3 mb-6">
+              <Mark size={28} color={T.graphite} />
+              <span className="d5-mono text-[13px] tracking-[0.18em] uppercase" style={{ color: T.graphite }}>
+                CodeCanvas
+              </span>
+            </Link>
+            <p className="text-[14px] leading-[1.6] mb-8 max-w-sm" style={{ color: T.muted }}>
+              The workshop where rough wireframes become production-ready React. Drawn by you, drafted by the room.
             </p>
+
+            <div className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-2" style={{ color: T.muted }}>
+              Newsletter
+            </div>
+            <form onSubmit={handleSubscribe} className="flex items-end gap-2">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@studio.com"
+                className="d5-input flex-1"
+              />
+              <button
+                type="submit"
+                disabled={subscribed}
+                className="d5-btn"
+                style={{ padding: "8px 14px", fontSize: 10 }}
+              >
+                {subscribed ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+              </button>
+            </form>
+
+            <div className="mt-8 flex gap-2">
+              {[
+                { Icon: Instagram, href: "https://instagram.com/trycodecanvas", label: "Instagram" },
+                { Icon: Twitter, href: "https://x.com/TryCodeCanvas", label: "X" },
+                { Icon: Github, href: "https://github.com/trycodecanvas", label: "GitHub" },
+                { Icon: Mail, href: "mailto:hassaniftikhardev@gmail.com", label: "Email" },
+              ].map(({ Icon, href, label }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="d5-social flex h-9 w-9 items-center justify-center border transition-colors"
+                  style={{ borderColor: T.rule }}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </a>
+              ))}
+            </div>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                title: "Natural Sketching",
-                description:
-                  "Draw components just like on paper. Our model understands your intent.",
-              },
-              {
-                title: "Smart Recognition",
-                description:
-                  "Detects buttons, inputs, and layouts and converts them to clean code.",
-              },
-              {
-                title: "Live Preview",
-                description:
-                  "See your design come to life with real-time code generation.",
-              },
-              {
-                title: "Natural Language",
-                description:
-                  "Describe interactions and behavior, and the logic is generated for you.",
-              },
-              {
-                title: "Export Ready",
-                description:
-                  "Download code with proper structure and sensible defaults.",
-              },
-              {
-                title: "Style Freedom",
-                description:
-                  "Choose your framework, styling approach, and coding patterns.",
-              },
-            ].map((feature, idx) => (
-              <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{
-                  duration: 0.5,
-                  delay: idx * 0.06,
-                  ease: [0.16, 1, 0.3, 1],
-                }}
-                whileHover={{ y: -3 }}
-                className="group rounded-2xl border p-6 transition-all"
-                style={{
-                  background: T.elevated,
-                  borderColor: T.hairline,
-                }}
-              >
-                <div
-                  className="mb-4 flex h-9 w-9 items-center justify-center rounded-lg"
-                  style={{
-                    background: T.accentSoft,
-                    color: T.accent,
-                  }}
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+          {/* link columns */}
+          <div className="grid grid-cols-2 gap-8 lg:col-span-8">
+            {FOOTER_COLS.map((col) => (
+              <div key={col.title}>
+                <div className="d5-mono text-[10px] tracking-[0.2em] uppercase mb-4 pb-2 border-b" style={{ borderColor: T.rule, color: T.graphite }}>
+                  {col.title}
                 </div>
-                <h3
-                  className="mb-2 text-lg tracking-tight"
-                  style={{
-                    fontFamily: "var(--font-fraunces)",
-                    fontWeight: 600,
-                    color: T.ink,
-                  }}
-                >
-                  {feature.title}
-                </h3>
-                <p
-                  className="text-sm leading-relaxed"
-                  style={{ color: T.muted }}
-                >
-                  {feature.description}
-                </p>
-              </motion.div>
+                <ul className="space-y-2.5">
+                  {col.links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        className="text-[13px] transition-colors hover:text-[var(--d5-cobalt)]"
+                        style={{ color: T.muted }}
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
           </div>
         </div>
-      </section>
 
-      {/* ───────── Pricing - temporarily disabled, will migrate to Warm Studio later ───────── */}
-      {/* <Pricing /> */}
-
-      {/* ───────── Testimonials - untouched component ───────── */}
-      <Testimonials />
-
-      {/* ───────── CTA Section ───────── */}
-      <section
-        className="relative overflow-hidden border-t py-16 sm:py-24"
-        style={{
-          borderColor: "rgba(227,217,195,0.1)",
-          background: T.anchor,
-        }}
-      >
+        {/* copyright row — single line, full width, no colophon */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            background:
-              "radial-gradient(circle at 30% 50%, rgba(214,122,90,0.25) 0%, transparent 60%), radial-gradient(circle at 80% 50%, rgba(125,181,138,0.15) 0%, transparent 60%)",
-          }}
-          aria-hidden
-        />
-        <div className="relative z-10 mx-auto max-w-4xl px-6 text-center lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <div className="lp-float inline-block">
-              <Logo size={48} color="#D67A5A" />
-            </div>
-            <h2
-              className="mt-8 text-4xl tracking-[-0.02em] sm:text-5xl"
-              style={{
-                fontFamily: "var(--font-fraunces)",
-                fontWeight: 500,
-                color: T.anchorText,
-                lineHeight: 1.05,
-              }}
-            >
-              Ready to build faster?
-            </h2>
-            <p
-              className="mt-6 text-lg leading-8"
-              style={{ color: T.anchorMuted }}
-            >
-              Start sketching your next project today. No credit card required.
-            </p>
-            <div className="mt-10 flex items-center justify-center gap-4">
-              <Link
-                href="/canvas"
-                className="lp-btn inline-flex items-center justify-center gap-2 rounded-xl px-8 py-4 text-base font-semibold"
-                style={{
-                  background: "#D67A5A",
-                  color: T.anchor,
-                  boxShadow: "0 16px 40px -12px rgba(214,122,90,0.6)",
-                }}
-              >
-                Get Started Free
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M5 12h14M13 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-          </motion.div>
+          className="d5-mono mt-16 pt-6 border-t flex flex-col items-start justify-between gap-2 text-[10px] tracking-[0.14em] uppercase sm:flex-row sm:items-center"
+          style={{ borderColor: T.rule, color: T.muted }}
+        >
+          <span style={{ color: T.graphite }}>© {year} CodeCanvas</span>
+          <span>All rights reserved · Built for makers</span>
         </div>
-      </section>
-
-      {/* ───────── Footer - untouched component ───────── */}
-      <Footer />
-    </div>
+      </div>
+    </footer>
   );
 }

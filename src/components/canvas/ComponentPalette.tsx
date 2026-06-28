@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import DraftingModal from "./DraftingModal";
+import { T_CANVAS } from "./canvasTokens";
 
 interface Component {
   id: string;
@@ -121,90 +123,140 @@ export default function ComponentPalette({
   onClose,
   onInsertComponent,
 }: ComponentPaletteProps) {
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-10 bg-black/30 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      />
-
-      {/* Panel */}
-      <div className="fixed right-0 top-0 z-30 h-screen w-80 animate-slide-in-right border-l border-[#2E2E2E] bg-[#1A1A1A] shadow-2xl">
-        {/* Header */}
-        <div className="border-b border-[#2E2E2E] p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">Components</h2>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-[#A0A0A0] transition-colors hover:bg-[#2E2E2E] hover:text-white"
+    <DraftingModal
+      open={isOpen}
+      onClose={onClose}
+      slug="LIBRARY · COMPONENTS"
+      title="Drop-in elements."
+      subtitle="Quick-add common UI patterns to bootstrap your sketch."
+      maxWidth={680}
+    >
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {COMPONENTS.map((component) => (
+          <button
+            key={component.id}
+            onClick={() => {
+              onInsertComponent(component);
+              onClose();
+            }}
+            className="group flex flex-col items-start gap-2 px-3 py-3 text-left transition-colors"
+            style={{
+              background: T_CANVAS.paper,
+              border: `1px solid ${T_CANVAS.rule}`,
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.borderColor = T_CANVAS.cobalt)
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.borderColor = T_CANVAS.rule)
+            }
+          >
+            <span
+              className="flex h-7 w-7 items-center justify-center"
+              style={{
+                background: T_CANVAS.vellum,
+                border: `1px solid ${T_CANVAS.rule}`,
+                color: T_CANVAS.cobalt,
+              }}
             >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-          <p className="text-xs text-[#A0A0A0]">
-            Quick-add UI elements to your canvas
-          </p>
-        </div>
-
-        {/* Components Grid */}
-        <div className="h-[calc(100vh-120px)] overflow-y-auto p-4">
-          <div className="grid grid-cols-2 gap-3">
-            {COMPONENTS.map((component) => (
-              <button
-                key={component.id}
-                onClick={() => {
-                  onInsertComponent(component);
-                  onClose();
-                }}
-                className="group flex flex-col items-center gap-2 rounded-xl border border-[#2E2E2E] bg-[#0A0A0A] p-4 text-center transition-all hover:border-[#FF6B00] hover:bg-[#1A1A1A] hover:shadow-[0_0_20px_rgba(255,107,0,0.2)]"
-              >
-                <span className="text-3xl">{component.icon}</span>
-                <div>
-                  <h3 className="text-sm font-semibold text-white">
-                    {component.name}
-                  </h3>
-                  <p className="mt-1 text-xs text-[#A0A0A0]">
-                    {component.description}
-                  </p>
-                </div>
-                <div className="mt-auto flex items-center gap-1 text-xs text-[#FF6B00] opacity-0 transition-opacity group-hover:opacity-100">
-                  <svg
-                    className="h-3 w-3"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Add
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+              <ComponentGlyph id={component.id} />
+            </span>
+            <h3
+              className="text-[11px] tracking-[0.16em] uppercase"
+              style={{
+                color: T_CANVAS.graphite,
+                fontFamily:
+                  "var(--font-jetbrains-mono, ui-monospace, monospace)",
+              }}
+            >
+              {component.name}
+            </h3>
+            <p
+              className="text-[11px] leading-[1.4]"
+              style={{
+                color: T_CANVAS.muted,
+                fontFamily:
+                  "var(--font-inter, ui-sans-serif, system-ui, sans-serif)",
+              }}
+            >
+              {component.description}
+            </p>
+            <span
+              className="mt-1 inline-flex items-center gap-1 text-[10px] tracking-[0.16em] uppercase opacity-0 transition-opacity group-hover:opacity-100"
+              style={{ color: T_CANVAS.cobalt }}
+            >
+              + INSERT →
+            </span>
+          </button>
+        ))}
       </div>
-    </>
+    </DraftingModal>
   );
+}
+
+function ComponentGlyph({ id }: { id: string }) {
+  const ic = {
+    fill: "none" as const,
+    stroke: "currentColor" as const,
+    strokeWidth: 1.5,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    viewBox: "0 0 24 24",
+    className: "h-4 w-4",
+    "aria-hidden": true,
+  };
+  switch (id) {
+    case "button":
+      return (
+        <svg {...ic}>
+          <rect x="3" y="9" width="18" height="6" rx="1" />
+        </svg>
+      );
+    case "input":
+      return (
+        <svg {...ic}>
+          <rect x="3" y="9" width="18" height="6" rx="0.5" />
+          <line x1="6" y1="12" x2="10" y2="12" />
+        </svg>
+      );
+    case "card":
+      return (
+        <svg {...ic}>
+          <rect x="3" y="4" width="18" height="16" rx="1" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      );
+    case "navbar":
+      return (
+        <svg {...ic}>
+          <rect x="2" y="5" width="20" height="4" rx="0.5" />
+          <line x1="5" y1="7" x2="9" y2="7" />
+          <line x1="16" y1="7" x2="19" y2="7" />
+        </svg>
+      );
+    case "hero":
+      return (
+        <svg {...ic}>
+          <rect x="3" y="4" width="18" height="14" rx="1" />
+          <line x1="6" y1="9" x2="14" y2="9" />
+          <line x1="6" y1="12" x2="11" y2="12" />
+          <rect x="6" y="14" width="6" height="2" rx="0.5" />
+        </svg>
+      );
+    case "footer":
+      return (
+        <svg {...ic}>
+          <rect x="2" y="14" width="20" height="6" rx="0.5" />
+          <line x1="5" y1="17" x2="11" y2="17" />
+          <line x1="15" y1="17" x2="19" y2="17" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...ic}>
+          <rect x="4" y="4" width="16" height="16" rx="1" />
+        </svg>
+      );
+  }
 }

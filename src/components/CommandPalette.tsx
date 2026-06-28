@@ -9,6 +9,10 @@ import {
   recordProjectActivity,
   type DashboardProject,
 } from "@/lib/dashboard-projects";
+import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
+
+const MONO = "var(--font-jetbrains-mono, ui-monospace, monospace)";
+const SANS = "var(--font-inter, ui-sans-serif, system-ui, sans-serif)";
 
 export interface CanvasCommand {
   id: string;
@@ -44,6 +48,7 @@ type PaletteAction =
 
 const COMMAND_PALETTE_EVENT = "codecanvas:open-command-palette";
 const REGISTER_EVENT = "codecanvas:register-canvas-commands";
+const OPEN_SHORTCUTS_EVENT = "codecanvas:open-shortcuts-panel";
 
 let canvasCommandRegistry: CanvasCommand[] = [];
 
@@ -58,6 +63,17 @@ export function openCommandPalette() {
     window.dispatchEvent(new Event(COMMAND_PALETTE_EVENT));
   }
 }
+
+// Asks whichever page hosts the migrated `ShortcutsPanel` to open it. Used by
+// the command palette so its "Keyboard shortcuts" command points at the new
+// Drafting Room modal instead of rendering a duplicate inline view.
+export function openShortcutsPanel() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(OPEN_SHORTCUTS_EVENT));
+  }
+}
+
+export const SHORTCUTS_PANEL_EVENT = OPEN_SHORTCUTS_EVENT;
 
 export function registerCanvasCommands(commands: CanvasCommand[]): () => void {
   canvasCommandRegistry = [...canvasCommandRegistry, ...commands];
@@ -80,7 +96,6 @@ export default function CommandPalette() {
   const [projects, setProjects] = useState<DashboardProject[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
   const [canvasCommands, setCanvasCommands] = useState<CanvasCommand[]>(
     () => canvasCommandRegistry
   );
@@ -123,12 +138,10 @@ export default function CommandPalette() {
       if (isShortcut) {
         event.preventDefault();
         setIsOpen((current) => !current);
-        setShowShortcuts(false);
       }
     };
     const onOpenPalette = () => {
       setIsOpen(true);
-      setShowShortcuts(false);
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener(COMMAND_PALETTE_EVENT, onOpenPalette);
@@ -154,7 +167,6 @@ export default function CommandPalette() {
     if (!isOpen) {
       setQuery("");
       setSelectedIndex(0);
-      setShowShortcuts(false);
     }
   }, [isOpen]);
 
@@ -244,12 +256,17 @@ export default function CommandPalette() {
       {
         id: "show-shortcuts",
         title: "Keyboard shortcuts",
-        subtitle: "See the main navigation shortcuts",
+        subtitle: "Open the shortcuts reference",
         keywords: "shortcuts help keyboard",
         kind: "command",
         group: "Help",
         shortcut: "?",
-        onSelect: () => setShowShortcuts(true),
+        onSelect: () => {
+          // Close the palette and ask the host page to open the migrated
+          // ShortcutsPanel (single source of truth, drafting room theme).
+          setIsOpen(false);
+          openShortcutsPanel();
+        },
       },
     ],
     [createProject, isCreatingProject, router]
@@ -318,11 +335,11 @@ export default function CommandPalette() {
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query, showShortcuts]);
+  }, [query]);
 
   // Keyboard navigation
   useEffect(() => {
-    if (!isOpen || showShortcuts) return;
+    if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -363,7 +380,7 @@ export default function CommandPalette() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [filteredActions, isOpen, selectedIndex, showShortcuts]);
+  }, [filteredActions, isOpen, selectedIndex]);
 
   // Auto-scroll selected into view
   useEffect(() => {
@@ -379,16 +396,18 @@ export default function CommandPalette() {
       {isOpen ? (
         <motion.div
           key="palette"
-          className="fixed inset-0 z-[var(--z-modal,50)] flex items-start justify-center px-4 pt-20"
+          className="fixed inset-0 z-(--z-modal,50) flex items-start justify-center px-4 pt-20"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18, ease: [0.22, 0.9, 0.28, 1] }}
+          style={{ fontFamily: SANS }}
         >
           <div
             aria-hidden="true"
             onClick={() => setIsOpen(false)}
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            className="absolute inset-0 backdrop-blur-[2px]"
+            style={{ background: "rgba(14, 14, 15, 0.55)" }}
           />
           <motion.div
             ref={dialogRef}
@@ -399,17 +418,69 @@ export default function CommandPalette() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.22, ease: [0.22, 1.4, 0.32, 1] }}
-            className="relative z-[var(--z-popover,60)] w-full max-w-2xl overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border-grey)] bg-[var(--grey-800)] shadow-[var(--shadow-2xl)]"
+            className="relative z-(--z-popover,60) w-full max-w-2xl overflow-hidden"
+            style={{
+              background: T.paper,
+              border: `1px solid ${T.rule}`,
+              boxShadow:
+                "0 24px 48px -16px rgba(14,14,15,0.45), 0 2px 8px rgba(14,14,15,0.2)",
+            }}
           >
-            <div className="border-b border-[var(--border-grey)] px-4 py-3">
-              <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border-grey)] bg-[var(--grey-900)] px-4 py-3 focus-within:border-[var(--orange-primary)] focus-within:shadow-[0_0_0_3px_var(--orange-glow)] transition-shadow">
+            {/* Header slug · same editorial spine as DraftingModal */}
+            <div
+              className="flex items-center justify-between border-b px-4 py-2"
+              style={{
+                background: T.vellum,
+                borderColor: T.rule,
+                fontFamily: MONO,
+              }}
+            >
+              <div
+                className="flex items-center gap-2 text-[10px] tracking-[0.18em] uppercase"
+                style={{ color: T.muted }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-1.5 w-1.5"
+                  style={{ background: T.cobalt }}
+                />
+                <span style={{ color: T.graphite }}>COMMAND</span>
+                <span>·</span>
+                <span>NAVIGATE</span>
+              </div>
+              <kbd
+                className="px-2 py-0.5 text-[10px] tracking-[0.14em] uppercase"
+                style={{
+                  background: T.paper,
+                  border: `1px solid ${T.rule}`,
+                  color: T.muted,
+                  fontFamily: MONO,
+                }}
+              >
+                Ctrl+K
+              </kbd>
+            </div>
+
+            {/* Search row */}
+            <div
+              className="border-b px-4 py-3"
+              style={{ borderColor: T.rule, background: T.paper }}
+            >
+              <div
+                className="flex items-center gap-3 px-3 py-2"
+                style={{
+                  background: T.paper,
+                  border: `1px solid ${T.rule}`,
+                }}
+              >
                 <svg
                   aria-hidden="true"
-                  className="h-5 w-5 text-[var(--text-muted)]"
+                  className="h-4 w-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
-                  strokeWidth={2}
+                  strokeWidth={1.75}
+                  style={{ color: T.cobalt }}
                 >
                   <path
                     strokeLinecap="round"
@@ -427,133 +498,202 @@ export default function CommandPalette() {
                   aria-activedescendant={
                     filteredActions[selectedIndex]?.id ?? undefined
                   }
-                  className="w-full bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                  className="w-full bg-transparent text-[13px] outline-none placeholder:opacity-60"
+                  style={{
+                    color: T.graphite,
+                    fontFamily: SANS,
+                  }}
                 />
-                <kbd className="rounded-full border border-[var(--border-grey)] px-2 py-1 text-[10px] uppercase tracking-[0.24em] text-[var(--text-secondary)]">
+                <kbd
+                  className="px-1.5 py-0.5 text-[10px] tracking-[0.14em] uppercase"
+                  style={{
+                    background: T.vellum,
+                    border: `1px solid ${T.rule}`,
+                    color: T.muted,
+                    fontFamily: MONO,
+                  }}
+                >
                   Esc
                 </kbd>
               </div>
             </div>
 
-            {showShortcuts ? (
-              <div className="space-y-3 px-4 py-4 text-sm text-[var(--text-secondary)]">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-                    Keyboard shortcuts
-                  </h2>
-                  <button
-                    onClick={() => setShowShortcuts(false)}
-                    className="rounded-full border border-[var(--border-grey)] px-3 py-1 text-xs text-[var(--text-secondary)] transition-colors hover:border-[var(--orange-primary)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--orange-primary)]"
+            {/* Listbox */}
+            <div
+              ref={listRef}
+              id="palette-listbox"
+              role="listbox"
+              aria-label="Available commands"
+              className="max-h-112 overflow-y-auto"
+              style={{
+                background: T.paper,
+                scrollbarColor: `${T.graphite} transparent`,
+              }}
+            >
+              <style jsx global>{`
+                #palette-listbox::-webkit-scrollbar {
+                  width: 10px;
+                  height: 10px;
+                }
+                #palette-listbox::-webkit-scrollbar-track {
+                  background: transparent;
+                }
+                #palette-listbox::-webkit-scrollbar-thumb {
+                  background: ${T.rule};
+                  border: 2px solid transparent;
+                  border-radius: 9999px;
+                }
+                #palette-listbox::-webkit-scrollbar-thumb:hover {
+                  background: ${T.graphite};
+                }
+                #palette-listbox::-webkit-scrollbar-thumb:active {
+                  background: ${T.cobalt};
+                }
+              `}</style>
+              {filteredActions.length === 0 ? (
+                <div
+                  className="mx-3 my-6 border px-4 py-10 text-center"
+                  style={{
+                    background: T.vellum,
+                    borderColor: T.rule,
+                    borderStyle: "dashed",
+                  }}
+                >
+                  <p
+                    className="text-[11px] tracking-[0.14em] uppercase"
+                    style={{ color: T.muted, fontFamily: MONO }}
                   >
-                    Back
-                  </button>
+                    NO RESULTS
+                  </p>
+                  <p
+                    className="mt-1 text-[12px]"
+                    style={{ color: T.muted, fontFamily: SANS }}
+                  >
+                    Nothing matches &ldquo;{query}&rdquo;.
+                  </p>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <ShortcutRow
-                    shortcut="Ctrl/Cmd + K"
-                    label="Toggle command palette"
-                  />
-                  <ShortcutRow shortcut="Esc" label="Close overlays" />
-                  <ShortcutRow shortcut="Ctrl/Cmd + S" label="Save project" />
-                  <ShortcutRow shortcut="Ctrl/Cmd + Z" label="Undo" />
-                  <ShortcutRow shortcut="Ctrl/Cmd + Shift + Z" label="Redo" />
-                  <ShortcutRow
-                    shortcut="Ctrl/Cmd + \\"
-                    label="Toggle right panel"
-                  />
-                  <ShortcutRow
-                    shortcut="Ctrl/Cmd + `"
-                    label="Toggle code panel"
-                  />
-                  <ShortcutRow shortcut="?" label="Show shortcuts" />
-                </div>
-              </div>
-            ) : (
-              <div
-                ref={listRef}
-                id="palette-listbox"
-                role="listbox"
-                aria-label="Available commands"
-                className="max-h-[28rem] overflow-y-auto px-2 py-2"
-              >
-                {filteredActions.length === 0 ? (
-                  <div className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">
-                    No results for &ldquo;{query}&rdquo;.
-                  </div>
-                ) : (
-                  groupedActions.map(({ group, items, startIndex }) => (
-                    <div key={group} className="mb-2 last:mb-0">
-                      <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
-                        {group}
-                      </div>
-                      {items.map((action, i) => {
-                        const idx = startIndex + i;
-                        const isSelected = selectedIndex === idx;
-                        return (
-                          <button
-                            key={action.id}
-                            id={action.id}
-                            data-cmd-index={idx}
-                            role="option"
-                            aria-selected={isSelected}
-                            onMouseEnter={() => setSelectedIndex(idx)}
-                            onClick={() => void action.onSelect()}
-                            className={`flex w-full items-center justify-between rounded-[var(--radius-md)] px-3 py-2.5 text-left transition-colors focus-visible:outline-none ${
-                              isSelected
-                                ? "bg-[var(--grey-700)] text-[var(--text-primary)]"
-                                : "text-[var(--text-secondary)] hover:bg-[var(--grey-700)]/60"
-                            }`}
-                          >
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium truncate">
-                                {action.title}
-                              </div>
-                              <div className="mt-0.5 text-xs text-[var(--text-muted)] truncate">
-                                {action.subtitle}
-                              </div>
-                            </div>
-                            <div className="ml-3 flex flex-none items-center gap-2">
-                              {action.kind === "command" && action.shortcut ? (
-                                <kbd className="rounded-[var(--radius-xs)] border border-[var(--border-grey)] bg-[var(--grey-900)] px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-secondary)]">
-                                  {action.shortcut}
-                                </kbd>
-                              ) : null}
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] ${
-                                  action.kind === "project"
-                                    ? "bg-[var(--success-bg)] text-[var(--success-light)]"
-                                    : "bg-[var(--orange-subtle)] text-[var(--orange-300)]"
-                                }`}
-                              >
-                                {action.kind === "project"
-                                  ? "Project"
-                                  : "Command"}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+              ) : (
+                groupedActions.map(({ group, items, startIndex }) => (
+                  <div key={group}>
+                    <div
+                      className="border-b px-4 py-1 text-[10px] tracking-[0.2em] uppercase"
+                      style={{
+                        background: T.vellum,
+                        borderColor: T.rule,
+                        color: T.muted,
+                        fontFamily: MONO,
+                      }}
+                    >
+                      {group}
                     </div>
-                  ))
-                )}
-              </div>
-            )}
+                    {items.map((action, i) => {
+                      const idx = startIndex + i;
+                      const isSelected = selectedIndex === idx;
+                      return (
+                        <button
+                          key={action.id}
+                          id={action.id}
+                          data-cmd-index={idx}
+                          role="option"
+                          aria-selected={isSelected}
+                          onMouseEnter={() => setSelectedIndex(idx)}
+                          onClick={() => void action.onSelect()}
+                          className="relative flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors focus-visible:outline-none"
+                          style={{
+                            background: isSelected ? T.vellum : T.paper,
+                            color: T.graphite,
+                            borderBottom: `1px solid ${T.rule}33`,
+                          }}
+                        >
+                          {/* Cobalt left rail when selected · same affordance
+                              as the toolbar active mark */}
+                          {isSelected ? (
+                            <span
+                              aria-hidden="true"
+                              className="absolute left-0 top-0 bottom-0 w-0.5"
+                              style={{ background: T.cobalt }}
+                            />
+                          ) : null}
+                          <div className="min-w-0">
+                            <div
+                              className="truncate text-[13px]"
+                              style={{
+                                color: T.graphite,
+                                fontFamily: SANS,
+                              }}
+                            >
+                              {action.title}
+                            </div>
+                            <div
+                              className="mt-0.5 truncate text-[11px]"
+                              style={{
+                                color: T.muted,
+                                fontFamily: SANS,
+                              }}
+                            >
+                              {action.subtitle}
+                            </div>
+                          </div>
+                          <div className="ml-3 flex flex-none items-center gap-2">
+                            {action.kind === "command" && action.shortcut ? (
+                              <kbd
+                                className="px-1.5 py-0.5 text-[10px] tracking-[0.06em]"
+                                style={{
+                                  background: T.vellum,
+                                  border: `1px solid ${T.rule}`,
+                                  color: T.graphite,
+                                  fontFamily: MONO,
+                                }}
+                              >
+                                {action.shortcut}
+                              </kbd>
+                            ) : null}
+                            <span
+                              className="px-2 py-0.5 text-[10px] tracking-[0.18em] uppercase"
+                              style={{
+                                background:
+                                  action.kind === "project"
+                                    ? T.cobaltWash
+                                    : T.paper,
+                                border: `1px solid ${
+                                  action.kind === "project" ? T.cobalt : T.rule
+                                }`,
+                                color:
+                                  action.kind === "project"
+                                    ? T.cobaltInk
+                                    : T.muted,
+                                fontFamily: MONO,
+                              }}
+                            >
+                              {action.kind === "project" ? "PROJECT" : "CMD"}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))
+              )}
+            </div>
 
-            <div className="flex items-center justify-between border-t border-[var(--border-grey)] bg-[var(--grey-900)] px-4 py-2 text-[10px] uppercase tracking-[0.2em] text-[var(--text-muted)]">
-              <div className="flex items-center gap-3">
-                <span>
-                  <kbd className="font-mono">↑↓</kbd> Navigate
-                </span>
-                <span>
-                  <kbd className="font-mono">↵</kbd> Select
-                </span>
-                <span>
-                  <kbd className="font-mono">Esc</kbd> Close
-                </span>
+            {/* Footer · mono hint bar */}
+            <div
+              className="flex items-center justify-between border-t px-4 py-1.5 text-[10px] tracking-[0.16em] uppercase"
+              style={{
+                background: T.vellum,
+                borderColor: T.rule,
+                color: T.muted,
+                fontFamily: MONO,
+              }}
+            >
+              <div className="flex items-center gap-4">
+                <FooterHint k="↑↓" label="NAVIGATE" />
+                <FooterHint k="↵" label="SELECT" />
+                <FooterHint k="ESC" label="CLOSE" />
               </div>
               <span>
-                {filteredActions.length} result
-                {filteredActions.length === 1 ? "" : "s"}
+                {filteredActions.length} RESULT
+                {filteredActions.length === 1 ? "" : "S"}
               </span>
             </div>
           </motion.div>
@@ -563,13 +703,21 @@ export default function CommandPalette() {
   );
 }
 
-function ShortcutRow({ shortcut, label }: { shortcut: string; label: string }) {
+function FooterHint({ k, label }: { k: string; label: string }) {
   return (
-    <div className="rounded-[var(--radius-md)] border border-[var(--border-grey)] bg-[var(--grey-900)] px-4 py-3">
-      <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-muted)]">
-        {shortcut}
-      </div>
-      <div className="mt-1 text-sm text-[var(--text-primary)]">{label}</div>
-    </div>
+    <span className="flex items-center gap-1.5">
+      <kbd
+        className="px-1.5 py-0.5 text-[10px]"
+        style={{
+          background: T.paper,
+          border: `1px solid ${T.rule}`,
+          color: T.graphite,
+          fontFamily: MONO,
+        }}
+      >
+        {k}
+      </kbd>
+      <span>{label}</span>
+    </span>
   );
 }
