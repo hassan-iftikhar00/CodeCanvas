@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import type { CodeFramework, StylingOption } from "@/components/ExportDialog";
 
-interface BuildOptions {
+export interface BuildOptions {
   code: string;
   framework: CodeFramework;
   styling: StylingOption;
@@ -27,23 +27,40 @@ export async function buildExportZip(opts: BuildOptions): Promise<Blob> {
 // runs. Vue / Next.js callers get the same scaffold plus a README note.
 
 function writeReactScaffold(folder: JSZip, opts: BuildOptions) {
+  const files = buildReactScaffoldFiles(opts);
+  for (const [path, content] of Object.entries(files)) {
+    folder.file(path, content);
+  }
+}
+
+/**
+ * The Vite + React scaffold as a flat path → content map. Shared by the ZIP
+ * export (above) and the "Open in StackBlitz" action (open-in-stackblitz.ts),
+ * so both always ship the identical project.
+ */
+export function buildReactScaffoldFiles(
+  opts: BuildOptions
+): Record<string, string> {
   const useTailwind = opts.styling === "tailwind";
   const useStyledComponents = opts.styling === "styled-components";
   const projectName = sanitizeNpmName(opts.projectName);
 
-  folder.file("src/App.tsx", opts.code.trim() + "\n");
-  folder.file("src/main.tsx", mainTsx(useTailwind));
-  folder.file("src/index.css", indexCss(opts.styling));
-  folder.file("index.html", viteIndexHtml(opts.projectName));
-  folder.file("vite.config.ts", viteConfig(useTailwind));
-  folder.file("tsconfig.json", tsconfigJson());
-  folder.file("tsconfig.node.json", tsconfigNodeJson());
-  folder.file(
-    "package.json",
-    packageJson({ projectName, useTailwind, useStyledComponents })
-  );
-  folder.file(".gitignore", gitignore());
-  folder.file("README.md", reactReadme(opts));
+  return {
+    "src/App.tsx": opts.code.trim() + "\n",
+    "src/main.tsx": mainTsx(useTailwind),
+    "src/index.css": indexCss(opts.styling),
+    "index.html": viteIndexHtml(opts.projectName),
+    "vite.config.ts": viteConfig(useTailwind),
+    "tsconfig.json": tsconfigJson(),
+    "tsconfig.node.json": tsconfigNodeJson(),
+    "package.json": packageJson({
+      projectName,
+      useTailwind,
+      useStyledComponents,
+    }),
+    ".gitignore": gitignore(),
+    "README.md": reactReadme(opts),
+  };
 }
 
 function mainTsx(_useTailwind: boolean): string {
@@ -187,8 +204,15 @@ function packageJson(opts: PackageJsonOpts): string {
       type: "module",
       scripts: {
         dev: "vite",
+        // StackBlitz's node template boots with `npm install && npm start`;
+        // without a start script the dev server never launches and the
+        // preview shows "Starting dev server" forever.
+        start: "vite",
         build: "tsc -b && vite build",
         preview: "vite preview",
+      },
+      stackblitz: {
+        startCommand: "npm run dev",
       },
       dependencies,
       devDependencies,

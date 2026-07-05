@@ -3,7 +3,7 @@
  * Implements a command pattern with a configurable max history limit
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from "react";
 
 interface UseHistoryOptions<T> {
   initialState: T;
@@ -36,7 +36,7 @@ export function useHistory<T>({
   const setState = useCallback(
     (newState: T | ((prev: T) => T)) => {
       const updatedState =
-        typeof newState === 'function'
+        typeof newState === "function"
           ? (newState as (prev: T) => T)(state)
           : newState;
 
@@ -81,21 +81,21 @@ export function useHistory<T>({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "z") {
         e.preventDefault();
         undo();
       } else if (
         (e.ctrlKey || e.metaKey) &&
         e.shiftKey &&
-        (e.key === 'z' || e.key === 'Z')
+        (e.key === "z" || e.key === "Z")
       ) {
         e.preventDefault();
         redo();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]);
 
   return {

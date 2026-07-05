@@ -32,8 +32,8 @@ export type DraftingToken = keyof typeof DRAFTING_TOKENS;
 // preview-v2 CodeWell treatment: graphite background, paper-tinted ink at
 // graded opacity, brighter cobalt accent that survives on dark.
 export const DRAFTING_DARK = {
-  bg: "#0E0E0F",          // graphite — main slab background
-  bgRaised: "#131316",    // raised surfaces (sub-headers, tab bar rows)
+  bg: "#0E0E0F", // graphite — main slab background
+  bgRaised: "#131316", // raised surfaces (sub-headers, tab bar rows)
   rule: "rgba(242,241,236,0.18)",
   ruleSoft: "rgba(242,241,236,0.12)",
   inkBright: "rgba(242,241,236,0.95)",
@@ -43,11 +43,13 @@ export const DRAFTING_DARK = {
   inkDim: "rgba(242,241,236,0.25)",
   surfaceSoft: "rgba(242,241,236,0.05)",
   surfaceHover: "rgba(242,241,236,0.12)",
-  cobalt: "#8C8DD4",      // brighter cobalt — readable on graphite
+  cobalt: "#8C8DD4", // brighter cobalt — readable on graphite
   cobaltInk: "#B7B8E5",
   cobaltWash: "#232347",
-  warning: "#C4936A",     // softened orange for fallback bars
+  warning: "#C4936A", // softened orange for fallback bars
   warningWash: "rgba(196,147,106,0.10)",
+  success: "#7DB894", // desaturated green — readable on graphite
+  error: "#C97B7B", // desaturated red, same weight as success
 } as const;
 
 export type DraftingDarkToken = keyof typeof DRAFTING_DARK;

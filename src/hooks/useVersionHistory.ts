@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-interface ProjectVersion {
+export interface ProjectVersion {
   id: string;
   project_id: string;
   version_number: number;
@@ -39,7 +39,7 @@ interface UseVersionHistoryReturn {
     canvasData: any,
     description?: string
   ) => Promise<boolean>;
-  restoreVersion: (versionId: string) => Promise<any | null>;
+  restoreVersion: (versionId: string) => Promise<ProjectVersion | null>;
   deleteVersion: (versionId: string) => Promise<boolean>;
   compareVersions: (
     v1Id: string,
@@ -131,7 +131,7 @@ export function useVersionHistory(): UseVersionHistoryReturn {
   );
 
   const restoreVersion = useCallback(
-    async (versionId: string): Promise<any | null> => {
+    async (versionId: string): Promise<ProjectVersion | null> => {
       setError(null);
 
       try {
@@ -143,7 +143,10 @@ export function useVersionHistory(): UseVersionHistoryReturn {
 
         if (restoreError) throw restoreError;
 
-        return data.canvas_data;
+        // Return the whole row: callers restore the code AND the canvas
+        // snapshot (returning only canvas_data made toolbox restore silently
+        // skip the code).
+        return data as ProjectVersion;
       } catch (err) {
         const errorMessage = getSupabaseErrorMessage(
           err,

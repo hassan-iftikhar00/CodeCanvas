@@ -1,7 +1,7 @@
 # Code-Verified Status & Work Split
 
 > Created: 2026-06-25
-> Last updated: 2026-06-26
+> Last updated: 2026-07-02 (B12 done, B13 speed metrics done)
 > Author: Hassan (Lead)
 > Method: **Code-verified**. Every line below was checked against the actual source, not against CLAUDE.md or the other audit files. Each claim cites `file:line`.
 > Why this exists: CLAUDE.md and the audit files had drifted from the code. Some items marked "done" are not done; one backend item marked "open" is actually done. This file is the ground truth as of the date above.
@@ -112,16 +112,16 @@ Already applied (do not redo): `useProjectSave` memoization (`useProjectSave.ts:
 | B4 | Proxy log scrub | ✅ | `proxy.ts` clean — just needs the doc tick |
 | B1 | DB schema unification | ✅ | `migration 20260430000001` (rename to title/thumbnail_url/iterations, cascade FK, auto-version trigger, RLS) |
 | B2 | FastAPI persistence layer | ✅/❓ | `main.py:268-300` writes iteration+project, `load_project_or_403` enforces ownership. Confirm any remaining "fix" intent |
-| B5 | Framework selector backend | ⚠️ | `inference.py:1145-1149` branches react/html/vue; confirm frontend exposes the selector |
-| B8 | Error retry logic | ⚠️ | Gemini key rotation + OpenRouter 2x retry done; Roboflow has timeout but no retry |
-| B3 | Auth callback race fix | ❓ | route exists `auth/callback/route.ts`; internals not traced |
-| B6 | Export-as-ZIP **endpoint** | ❌ | no backend endpoint in `main.py` (client-side `export-zip.ts` exists) |
+| B5 | Framework selector | ✅ | Backend: `inference.py:1145-1149` branches react/html/vue. Frontend: `selectedFramework` state in `canvas/page.tsx`; REACT/HTML/VUE pill in `CanvasTopBar`; passed through `runGeneration`, upload path, and chat handler. Done 2026-06-30. |
+| B8 | Error retry logic | ✅ | `inference.py`: `detect_with_roboflow` now retries up to 3 attempts (env: `ROBOFLOW_MAX_RETRIES`) with 1s/2s exponential backoff. Non-retryable errors (credit exhaustion, 401/403/auth) bypass the loop immediately. Done 2026-06-30. |
+| B3 | Auth callback race fix | ✅ | `auth/callback/route.ts` rewritten 2026-06-30: replaced Promise-based `setAllPromise` (deadlocked when `setAll` was never called on error paths) with synchronous `pendingCookies` array. Cookies collected as SDK emits them, applied to response after exchange resolves regardless of success/failure. `console.log` calls removed. tsc clean. |
+| B6 | Export-as-ZIP **endpoint** | 🟦 | client-side `export-zip.ts` (JSZip, browser Blob) is complete and covers the full use-case — no backend endpoint needed. Non-issue. |
 | B7 | Rate limiting on AI endpoint | ✅ | per-user sliding-window limiter `app/utils/rate_limit.py`; wired into `/api/predict` (`main.py`), 429 + `Retry-After`, env-tunable. Done 2026-06-26 |
-| B9 | CI/CD pipeline + lint | ❌ | no `.github/workflows` |
+| B9 | CI/CD pipeline + lint | ✅ | `.github/workflows/ci.yml` (2026-06-29): frontend job (pnpm tsc + lint + Vitest) + backend job (pytest Python 3.11, pip cache, libGL apt dep). Runs on push/PR to main. |
 | B10 | Clean `inference.py` interface | ❓ | subjective; not assessed |
-| B11 | Frontend + backend tests | ⚠️ | infra + first suites on BOTH sides. Backend: pytest, 42 tests, all pass: `tests/test_rate_limit.py` (14 — limiter, fake-clock + real-thread lock test) + `tests/test_synthesis_helpers.py` (28 — bbox geometry, canvas-extent inference, container reclassify/synthesis, text-to-element matching); infra `pytest.ini` + `conftest.py` (path + conditional cv2 stub) + `requirements-dev.txt`. Frontend: Vitest 4.1.9, 17 tests in `src/types/canvas.test.ts` (clampZoom, clampCodePanelHeight, bounds invariants, TOOL_KEY_MAP); infra `vitest.config.ts` + `pnpm test`/`test:watch` scripts; clamp helpers moved into `src/types/canvas.ts` (exported) so tests guard the real path. Broader coverage ongoing. Started 2026-06-26 |
-| B12 | API response caching | ❌ | none |
-| B13 | Accuracy + speed metrics | ⚠️ | write-up in Audits doc; no code metrics |
+| B11 | Frontend + backend tests | ⚠️ | infra + first suites on BOTH sides. Backend: pytest, 62 tests, all pass: `tests/test_rate_limit.py` (14) + `tests/test_synthesis_helpers.py` (28) + `tests/test_response_cache.py` (20 — B12 cache: LRU/TTL/thread-safety/key stability). Frontend: Vitest 4.1.9, 17 tests in `src/types/canvas.test.ts`. Broader coverage ongoing. Started 2026-06-26 |
+| B12 | API response caching | ✅ | `app/utils/response_cache.py`: `GenerationCache` (LRU+TTL, thread-safe). `main.py`: `_generation_cache_key` (sha256 sketch+framework+source+annotations), check before Roboflow+Gemini, put after successful Gemini (skips fallback/mock/template). 20 tests. Env: `CACHE_ENABLED`, `CACHE_TTL_SECONDS=1800`, `CACHE_MAX_SIZE=50`. Done 2026-07-02. |
+| B13 | Accuracy + speed metrics | ✅ | Speed: `time.perf_counter()` wraps Roboflow + Gemini in `resolve_external_model_output`; `[timing]` log per run; `timing_ms` on `GenerateCodeResponse`. Accuracy numbers: Audits/ARCHITECTURE_DETAILS.md. Done 2026-07-02. |
 
 ---
 

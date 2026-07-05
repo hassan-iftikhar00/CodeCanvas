@@ -140,9 +140,10 @@ describe("TOOL_KEY_MAP", () => {
 
   it("maps every shortcut to a known Tool", () => {
     for (const [key, tool] of entries) {
-      expect(ALL_TOOLS, `key "${key}" maps to unknown tool "${tool}"`).toContain(
-        tool
-      );
+      expect(
+        ALL_TOOLS,
+        `key "${key}" maps to unknown tool "${tool}"`
+      ).toContain(tool);
     }
   });
 

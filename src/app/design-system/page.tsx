@@ -78,13 +78,7 @@ function Logo({ size = 48, color }: { size?: number; color: string }) {
   );
 }
 
-function Wordmark({
-  color,
-  size = 32,
-}: {
-  color: string;
-  size?: number;
-}) {
+function Wordmark({ color, size = 32 }: { color: string; size?: number }) {
   return (
     <span
       style={{
@@ -204,7 +198,9 @@ function ModePanel({
             fontFamily: "var(--font-jetbrains)",
           }}
         >
-          {mode === "light" ? "@media (prefers: light)" : "@media (prefers: dark)"}
+          {mode === "light"
+            ? "@media (prefers: light)"
+            : "@media (prefers: dark)"}
         </span>
       </div>
       {children}
@@ -417,16 +413,17 @@ function Hero() {
               color: T.light.ink,
             }}
           >
-            The system,<br />
+            The system,
+            <br />
             <em style={{ color: T.light.accent }}>not the screenshot.</em>
           </h1>
           <p
             className="mt-6 max-w-xl text-[15px] leading-[1.65]"
             style={{ color: T.light.muted }}
           >
-            Every primitive needed to build CodeCanvas in Warm Studio. Light
-            and dark, every component state, the motion language, the brand
-            mark. Implementation reference.
+            Every primitive needed to build CodeCanvas in Warm Studio. Light and
+            dark, every component state, the motion language, the brand mark.
+            Implementation reference.
           </p>
         </div>
       </div>
@@ -719,7 +716,12 @@ function TypographySection() {
     ["h1", "44px", "A canvas with warmth built in.", "fraunces 600 / -0.02em"],
     ["h2", "30px", "Section heading", "fraunces 600 / -0.015em"],
     ["h3", "22px", "Subheading", "fraunces 500"],
-    ["body-lg", "16px", "Body large - generous reading copy.", "inter 400 / 1.65"],
+    [
+      "body-lg",
+      "16px",
+      "Body large - generous reading copy.",
+      "inter 400 / 1.65",
+    ],
     ["body", "14px", "Body - default UI text.", "inter 400 / 1.6"],
     ["body-sm", "13px", "Body small - secondary copy.", "inter 400 / 1.55"],
     ["caption", "11px", "CAPTION · UPPERCASE · +0.20em", "fraunces 500 / smcp"],
@@ -744,7 +746,11 @@ function TypographySection() {
             : isMono
               ? "var(--font-jetbrains)"
               : "var(--font-inter)";
-          const weight = spec.includes("600") ? 600 : spec.includes("500") ? 500 : 400;
+          const weight = spec.includes("600")
+            ? 600
+            : spec.includes("500")
+              ? 500
+              : 400;
           const tracking = spec.includes("-0.025em")
             ? "-0.025em"
             : spec.includes("-0.02em")
@@ -866,10 +872,7 @@ function RadiusSection() {
             >
               {r.value}
             </div>
-            <div
-              className="mt-1 text-[10px]"
-              style={{ color: T.light.subtle }}
-            >
+            <div className="mt-1 text-[10px]" style={{ color: T.light.subtle }}>
               {r.use}
             </div>
           </div>
@@ -890,13 +893,19 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
       <BtnDemo label="Primary" mode={mode}>
         <button
           className="ds-btn rounded-xl px-4 py-2 text-[13px] font-medium"
-          style={{ background: t.accent, color: mode === "light" ? "#FAF4E4" : "#1A1410" }}
+          style={{
+            background: t.accent,
+            color: mode === "light" ? "#FAF4E4" : "#1A1410",
+          }}
         >
           Run detection
         </button>
         <button
           className="ds-btn rounded-xl px-4 py-2 text-[13px] font-medium"
-          style={{ background: t.accentHover, color: mode === "light" ? "#FAF4E4" : "#1A1410" }}
+          style={{
+            background: t.accentHover,
+            color: mode === "light" ? "#FAF4E4" : "#1A1410",
+          }}
         >
           Hover
         </button>
@@ -923,7 +932,10 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
         </button>
         <button
           className="ds-btn flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-medium"
-          style={{ background: t.accent, color: mode === "light" ? "#FAF4E4" : "#1A1410" }}
+          style={{
+            background: t.accent,
+            color: mode === "light" ? "#FAF4E4" : "#1A1410",
+          }}
         >
           <Spinner color={mode === "light" ? "#FAF4E4" : "#1A1410"} size={12} />
           Loading
@@ -1009,7 +1021,10 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
       <BtnDemo label="Danger" mode={mode}>
         <button
           className="ds-btn rounded-xl px-4 py-2 text-[13px] font-medium"
-          style={{ background: t.danger, color: mode === "light" ? "#FAF4E4" : "#1A1410" }}
+          style={{
+            background: t.danger,
+            color: mode === "light" ? "#FAF4E4" : "#1A1410",
+          }}
         >
           Delete
         </button>
@@ -1052,14 +1067,21 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
       <BtnDemo label="Icon" mode={mode}>
         <button
           className="ds-btn flex h-9 w-9 items-center justify-center rounded-xl"
-          style={{ background: t.surface, color: t.ink, border: `1px solid ${t.hairline}` }}
+          style={{
+            background: t.surface,
+            color: t.ink,
+            border: `1px solid ${t.hairline}`,
+          }}
           aria-label="play"
         >
           <PlayIcon />
         </button>
         <button
           className="ds-btn flex h-9 w-9 items-center justify-center rounded-xl"
-          style={{ background: t.accent, color: mode === "light" ? "#FAF4E4" : "#1A1410" }}
+          style={{
+            background: t.accent,
+            color: mode === "light" ? "#FAF4E4" : "#1A1410",
+          }}
         >
           <PlayIcon />
         </button>
@@ -1095,13 +1117,20 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
       <BtnDemo label="With icon" mode={mode}>
         <button
           className="ds-btn flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-medium"
-          style={{ background: t.accent, color: mode === "light" ? "#FAF4E4" : "#1A1410" }}
+          style={{
+            background: t.accent,
+            color: mode === "light" ? "#FAF4E4" : "#1A1410",
+          }}
         >
           <ArrowIcon /> Generate
         </button>
         <button
           className="ds-btn flex items-center gap-2 rounded-xl px-4 py-2 text-[13px] font-medium"
-          style={{ background: t.surface, color: t.ink, border: `1px solid ${t.hairline}` }}
+          style={{
+            background: t.surface,
+            color: t.ink,
+            border: `1px solid ${t.hairline}`,
+          }}
         >
           <DownloadIcon /> Export
         </button>
@@ -1365,10 +1394,7 @@ function FormPrimitives({ mode }: { mode: "light" | "dark" }) {
             className="mt-2 w-full px-3.5 py-2 text-[13px] outline-none"
             style={{ ...baseInput, borderColor: t.danger }}
           />
-          <div
-            className="mt-1.5 text-[11px]"
-            style={{ color: t.danger }}
-          >
+          <div className="mt-1.5 text-[11px]" style={{ color: t.danger }}>
             Project names cannot contain spaces or symbols.
           </div>
         </div>
@@ -1884,7 +1910,10 @@ function FeedbackSection() {
           </div>
           <div
             className="text-[11px]"
-            style={{ color: T.light.muted, fontFamily: "var(--font-jetbrains)" }}
+            style={{
+              color: T.light.muted,
+              fontFamily: "var(--font-jetbrains)",
+            }}
           >
             generating… 1.2s elapsed
           </div>
@@ -2002,8 +2031,10 @@ function StatesSection() {
             borderColor: T.light.hairline,
           }}
         >
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-full"
-               style={{ background: T.light.accentSoft, color: T.light.danger }}>
+          <div
+            className="inline-flex h-14 w-14 items-center justify-center rounded-full"
+            style={{ background: T.light.accentSoft, color: T.light.danger }}
+          >
             <CloseIcon />
           </div>
           <h3
@@ -2095,10 +2126,7 @@ function MotionSection() {
           <Label>Duration tokens</Label>
           <div className="mt-4 space-y-3">
             {timings.map((t) => (
-              <div
-                key={t.name}
-                className="flex items-center gap-4 text-[12px]"
-              >
+              <div key={t.name} className="flex items-center gap-4 text-[12px]">
                 <div
                   className="w-16 text-[11px]"
                   style={{
@@ -2264,20 +2292,19 @@ function MotionSection() {
               <span style={{ color: T.light.accent }}>export</span> default …
             </div>
             <div>
-              <span style={{ color: T.light.muted }}>2</span> &nbsp;
-              return (
+              <span style={{ color: T.light.muted }}>2</span> &nbsp; return (
             </div>
             <div>
-              <span style={{ color: T.light.muted }}>3</span> &nbsp;&nbsp;
-              &lt;<span style={{ color: T.light.counter }}>div</span>&gt;
+              <span style={{ color: T.light.muted }}>3</span> &nbsp;&nbsp; &lt;
+              <span style={{ color: T.light.counter }}>div</span>&gt;
             </div>
             <div>
               <span style={{ color: T.light.muted }}>4</span> &nbsp;&nbsp;&nbsp;
               …
             </div>
             <div>
-              <span style={{ color: T.light.muted }}>5</span> &nbsp;&nbsp;
-              &lt;/<span style={{ color: T.light.counter }}>div</span>&gt;
+              <span style={{ color: T.light.muted }}>5</span> &nbsp;&nbsp; &lt;/
+              <span style={{ color: T.light.counter }}>div</span>&gt;
             </div>
             <div>
               <span style={{ color: T.light.muted }}>6</span> &nbsp;);
@@ -2317,7 +2344,8 @@ function MotionSection() {
                 fontWeight: 500,
               }}
             >
-              Sketch → code,<br />
+              Sketch → code,
+              <br />
               <em style={{ color: T.dark.accent }}>the transition</em>
             </h3>
             <p
@@ -2393,10 +2421,7 @@ function MotionTile({
       }}
     >
       <div className="flex items-baseline justify-between">
-        <div
-          className="text-[12px] font-medium"
-          style={{ color: T.light.ink }}
-        >
+        <div className="text-[12px] font-medium" style={{ color: T.light.ink }}>
           {title}
         </div>
         <div
@@ -2410,10 +2435,7 @@ function MotionTile({
         </div>
       </div>
       <div className="my-4 min-h-[80px]">{children}</div>
-      <div
-        className="text-[10px]"
-        style={{ color: T.light.subtle }}
-      >
+      <div className="text-[10px]" style={{ color: T.light.subtle }}>
         {spec}
       </div>
     </div>
@@ -2465,7 +2487,9 @@ function IconsSection() {
                 {name === "close" && <CloseIcon />}
                 {name === "search" && <SearchIcon />}
                 {name === "chevron" && <ChevronIcon />}
-                {name === "spinner" && <Spinner color={T.light.ink} size={14} />}
+                {name === "spinner" && (
+                  <Spinner color={T.light.ink} size={14} />
+                )}
               </span>
               <span
                 className="text-[10px]"
@@ -2544,16 +2568,10 @@ function DSFooter() {
             </div>
             <div>
               <Label mode="dark">Owner</Label>
-              <div
-                className="mt-3 text-[12px]"
-                style={{ color: T.dark.ink }}
-              >
+              <div className="mt-3 text-[12px]" style={{ color: T.dark.ink }}>
                 Maarij · Frontend
               </div>
-              <div
-                className="mt-1 text-[11px]"
-                style={{ color: T.dark.muted }}
-              >
+              <div className="mt-1 text-[11px]" style={{ color: T.dark.muted }}>
                 Per CLAUDE_CONTEXT roles
               </div>
             </div>

@@ -31,17 +31,26 @@ export default function AuthLoadingSkeleton() {
         <div className="px-6 py-8 sm:px-8">
           <div
             className="h-8 w-3/4"
-            style={{ background: T_AUTH.vellum, animation: "d5-skeleton-pulse 1.6s ease-in-out infinite" }}
+            style={{
+              background: T_AUTH.vellum,
+              animation: "d5-skeleton-pulse 1.6s ease-in-out infinite",
+            }}
           />
           <div
             className="mt-3 h-4 w-1/2"
-            style={{ background: T_AUTH.vellum, animation: "d5-skeleton-pulse 1.6s ease-in-out infinite" }}
+            style={{
+              background: T_AUTH.vellum,
+              animation: "d5-skeleton-pulse 1.6s ease-in-out infinite",
+            }}
           />
           <div className="mt-7 space-y-5">
             <div>
               <div
                 className="h-2 w-16"
-                style={{ background: T_AUTH.vellum, animation: "d5-skeleton-pulse 1.6s ease-in-out infinite" }}
+                style={{
+                  background: T_AUTH.vellum,
+                  animation: "d5-skeleton-pulse 1.6s ease-in-out infinite",
+                }}
               />
               <div
                 className="mt-2 h-px w-full"
@@ -51,7 +60,10 @@ export default function AuthLoadingSkeleton() {
             <div>
               <div
                 className="h-2 w-20"
-                style={{ background: T_AUTH.vellum, animation: "d5-skeleton-pulse 1.6s ease-in-out infinite" }}
+                style={{
+                  background: T_AUTH.vellum,
+                  animation: "d5-skeleton-pulse 1.6s ease-in-out infinite",
+                }}
               />
               <div
                 className="mt-2 h-px w-full"

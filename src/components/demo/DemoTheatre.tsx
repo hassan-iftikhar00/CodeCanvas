@@ -49,7 +49,8 @@ export default function DemoTheatre() {
       const drawDuration = 2500;
       const textTypeDuration = 1000;
       const instructionTypeDuration = 1500;
-      const totalDuration = drawDuration + textTypeDuration + instructionTypeDuration;
+      const totalDuration =
+        drawDuration + textTypeDuration + instructionTypeDuration;
       const startTime = Date.now();
 
       const centerX = canvasWidth / 2;
@@ -114,7 +115,8 @@ export default function DemoTheatre() {
         } else if (elapsed < totalDuration) {
           setButtonText(buttonTextFull);
           const instructionProgress =
-            (elapsed - drawDuration - textTypeDuration) / instructionTypeDuration;
+            (elapsed - drawDuration - textTypeDuration) /
+            instructionTypeDuration;
           const charIndex = Math.floor(
             instructionProgress * instructionTextFull.length
           );
@@ -188,7 +190,11 @@ export default function DemoTheatre() {
       <button
         onClick={restartDemo}
         className="fixed top-4 left-4 z-50 p-2 transition-colors"
-        style={{ background: T.paper, border: `1px solid ${T.rule}`, color: T.muted }}
+        style={{
+          background: T.paper,
+          border: `1px solid ${T.rule}`,
+          color: T.muted,
+        }}
         title="Replay Demo"
         onMouseEnter={(e) => {
           e.currentTarget.style.background = T.cobalt;
@@ -275,7 +281,10 @@ export default function DemoTheatre() {
                   className="absolute pointer-events-none"
                   style={{ left: cursorPos.x - 2, top: cursorPos.y - 2 }}
                 >
-                  <MousePointer2 style={{ color: T.cobalt }} className="w-5 h-5" />
+                  <MousePointer2
+                    style={{ color: T.cobalt }}
+                    className="w-5 h-5"
+                  />
                 </div>
               )}
             </div>
@@ -332,12 +341,17 @@ export default function DemoTheatre() {
               className="text-4xl text-center"
               style={{ color: T.graphite, fontFamily: SERIF }}
             >
-              Generating code<span style={{ color: T.cobalt }}> with AI</span>...
+              Generating code<span style={{ color: T.cobalt }}> with AI</span>
+              ...
             </h2>
             {/* 1px hairline progress bar */}
             <div
               className="w-96"
-              style={{ background: T.vellum, border: `1px solid ${T.rule}`, height: 2 }}
+              style={{
+                background: T.vellum,
+                border: `1px solid ${T.rule}`,
+                height: 2,
+              }}
             >
               <div
                 className="h-full transition-all duration-100"
@@ -410,7 +424,10 @@ export default function DemoTheatre() {
                   {/* Toolbar */}
                   <div
                     className="flex items-center justify-between px-4 py-2"
-                    style={{ borderBottom: `1px solid ${T.rule}`, background: T.vellum }}
+                    style={{
+                      borderBottom: `1px solid ${T.rule}`,
+                      background: T.vellum,
+                    }}
                   >
                     <span
                       className="text-[10px] tracking-[0.16em] uppercase"
@@ -436,21 +453,23 @@ export default function DemoTheatre() {
                           <Smartphone className="w-3 h-3" />
                         </button>
                       </div>
-                      {([RefreshCw, ExternalLink, Download] as const).map((Icon, i) => (
-                        <button
-                          key={i}
-                          className="p-1.5 transition-colors"
-                          style={{ color: T.muted }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.color = T.graphite)
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.color = T.muted)
-                          }
-                        >
-                          <Icon className="w-4 h-4" />
-                        </button>
-                      ))}
+                      {([RefreshCw, ExternalLink, Download] as const).map(
+                        (Icon, i) => (
+                          <button
+                            key={i}
+                            className="p-1.5 transition-colors"
+                            style={{ color: T.muted }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.color = T.graphite)
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.color = T.muted)
+                            }
+                          >
+                            <Icon className="w-4 h-4" />
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
 
@@ -490,7 +509,10 @@ export default function DemoTheatre() {
                   {/* Footer */}
                   <div
                     className="px-4 py-2 flex items-center justify-between"
-                    style={{ borderTop: `1px solid ${T.rule}`, background: T.vellum }}
+                    style={{
+                      borderTop: `1px solid ${T.rule}`,
+                      background: T.vellum,
+                    }}
                   >
                     <span
                       className="text-[10px] tracking-[0.12em] uppercase"

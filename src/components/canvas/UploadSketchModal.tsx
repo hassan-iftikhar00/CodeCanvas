@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import DraftingModal, {
   ModalButton,
   ModalSection,
@@ -20,6 +20,8 @@ export interface UploadDetectionPayload {
   /** Natural pixel dimensions, used to seed a minimal canvasData. */
   width: number;
   height: number;
+  /** Original filename from the user's device (e.g. "wireframe.png"). */
+  fileName?: string;
 }
 
 interface UploadSketchModalProps {
@@ -55,10 +57,27 @@ export default function UploadSketchModal({
     if (inputRef.current) inputRef.current.value = "";
   }, []);
 
+  // Clear only the chosen file, keeping the image-type toggle where the user
+  // set it. Used by the "Remove" button under the preview.
+  const clearSelection = useCallback(() => {
+    setPreview(null);
+    setFileName("");
+    setError(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }, []);
+
   const handleClose = useCallback(() => {
     reset();
     onClose();
   }, [reset, onClose]);
+
+  // Start fresh every time the modal opens. Detection closes the modal via
+  // setShowUpload(false) (not handleClose), so without this the previous file
+  // and its preview would still be sitting here on the next open, including the
+  // "Replace image" reopen from the uploaded-sketch panel.
+  useEffect(() => {
+    if (open) reset();
+  }, [open, reset]);
 
   const readFile = useCallback(
     (file: File) => {
@@ -120,7 +139,7 @@ export default function UploadSketchModal({
 
   const handleDetect = () => {
     if (!preview || isGenerating) return;
-    onDetect({ ...preview, source });
+    onDetect({ ...preview, source, fileName: fileName || undefined });
   };
 
   const footer = (
@@ -185,8 +204,48 @@ export default function UploadSketchModal({
                 style={{ border: `1px solid ${T_CANVAS.rule}` }}
               />
               <span className="text-[11px]" style={{ color: T_CANVAS.muted }}>
-                {fileName} · click to replace
+                {fileName}
               </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isGenerating}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    inputRef.current?.click();
+                  }}
+                  className="px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
+                  style={{
+                    background: T_CANVAS.paper,
+                    border: `1px solid ${T_CANVAS.rule}`,
+                    color: T_CANVAS.graphite,
+                    fontFamily:
+                      "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                    cursor: isGenerating ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  disabled={isGenerating}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearSelection();
+                  }}
+                  className="px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
+                  style={{
+                    background: T_CANVAS.paper,
+                    border: `1px solid ${T_CANVAS.rule}`,
+                    color: T_CANVAS.error,
+                    fontFamily:
+                      "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                    cursor: isGenerating ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
             </>
           ) : (
             <>
@@ -249,13 +308,13 @@ export default function UploadSketchModal({
             active={source === "upload-photo"}
             onClick={() => setSource("upload-photo")}
             label="Photo / scan"
-            hint="Phone photo or scan of a paper or whiteboard sketch"
+            hint="Camera photo or scan of a paper or whiteboard sketch. Background noise and shadows are cleaned up automatically."
           />
           <ModalOption
             active={source === "upload-clean"}
             onClick={() => setSource("upload-clean")}
             label="Digital wireframe"
-            hint="Clean exported wireframe image with crisp lines"
+            hint="Exported from Figma, Balsamiq, draw.io, etc. Crisp lines are kept as-is, no cleanup applied."
           />
         </div>
         <p className="mt-2 text-[11px]" style={{ color: T_CANVAS.muted }}>

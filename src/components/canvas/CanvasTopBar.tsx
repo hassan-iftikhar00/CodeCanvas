@@ -27,7 +27,11 @@ interface CanvasTopBarProps {
   onSave?: () => void;
   onRunDetection?: () => void;
   isGenerating?: boolean;
+  framework?: "react" | "html" | "vue";
+  onFrameworkChange?: (f: "react" | "html" | "vue") => void;
   onExport?: () => void;
+  onOpenStackBlitz?: () => void;
+  onShare?: () => void;
   onUploadSketch?: () => void;
   onChatToggle?: () => void;
   onTemplatesToggle?: () => void;
@@ -69,7 +73,11 @@ export default function CanvasTopBar({
   onSave,
   onRunDetection,
   isGenerating,
+  framework = "react",
+  onFrameworkChange,
   onExport,
+  onOpenStackBlitz,
+  onShare,
   onUploadSketch,
   onChatToggle,
   onTemplatesToggle,
@@ -92,7 +100,9 @@ export default function CanvasTopBar({
   useEffect(() => {
     const getUser = async () => {
       try {
-        const { data: { user: u } } = await supabase.auth.getUser();
+        const {
+          data: { user: u },
+        } = await supabase.auth.getUser();
         if (u) {
           setUser({
             id: u.id,
@@ -116,7 +126,10 @@ export default function CanvasTopBar({
   useEffect(() => {
     if (!showUserMenu) return;
     const onClick = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(e.target as Node)
+      ) {
         setShowUserMenu(false);
       }
     };
@@ -221,7 +234,10 @@ export default function CanvasTopBar({
             href={backButtonHref}
             aria-label="Back to dashboard"
             className="flex h-8 w-8 items-center justify-center transition-colors"
-            style={{ color: T_CANVAS.muted, border: `1px solid ${T_CANVAS.rule}` }}
+            style={{
+              color: T_CANVAS.muted,
+              border: `1px solid ${T_CANVAS.rule}`,
+            }}
           >
             <svg
               className="h-3.5 w-3.5"
@@ -333,7 +349,10 @@ export default function CanvasTopBar({
                 {saveLabel[saveState]}
               </span>
               {isSavingName ? (
-                <span className="text-[11px]" style={{ color: T_CANVAS.cobalt }}>
+                <span
+                  className="text-[11px]"
+                  style={{ color: T_CANVAS.cobalt }}
+                >
                   ·
                 </span>
               ) : null}
@@ -345,13 +364,21 @@ export default function CanvasTopBar({
       {/* RIGHT — actions cluster */}
       <div className="flex flex-wrap items-center justify-end gap-1">
         {onUploadSketch ? (
-          <ToolbarButton onClick={onUploadSketch} label="UPLOAD" hideLabelBelow="lg">
+          <ToolbarButton
+            onClick={onUploadSketch}
+            label="UPLOAD"
+            hideLabelBelow="lg"
+          >
             <UploadIcon />
           </ToolbarButton>
         ) : null}
 
         {onTemplatesToggle ? (
-          <ToolbarButton onClick={onTemplatesToggle} label="TEMPLATES" hideLabelBelow="lg">
+          <ToolbarButton
+            onClick={onTemplatesToggle}
+            label="TEMPLATES"
+            hideLabelBelow="lg"
+          >
             <TemplatesIcon />
           </ToolbarButton>
         ) : null}
@@ -368,17 +395,6 @@ export default function CanvasTopBar({
           </ToolbarButton>
         ) : null}
 
-        {onExport ? (
-          <ToolbarButton
-            onClick={onExport}
-            label="EXPORT"
-            hideLabelBelow="xl"
-            dataOnboardingId="export-action"
-          >
-            <ExportIcon />
-          </ToolbarButton>
-        ) : null}
-
         {onChatToggle ? (
           <ToolbarButton
             onClick={onChatToggle}
@@ -387,6 +403,12 @@ export default function CanvasTopBar({
             active={isChatActive}
           >
             <ChatIcon />
+          </ToolbarButton>
+        ) : null}
+
+        {onShare ? (
+          <ToolbarButton onClick={onShare} label="SHARE" hideLabelBelow="xl">
+            <ShareIcon />
           </ToolbarButton>
         ) : null}
 
@@ -399,6 +421,94 @@ export default function CanvasTopBar({
           >
             <KeyboardIcon />
           </ToolbarButton>
+        ) : null}
+
+        {onFrameworkChange ? (
+          <div
+            className="ml-1 flex items-center"
+            style={{ border: `1px solid ${T_CANVAS.rule}` }}
+            role="group"
+            aria-label="Output framework"
+          >
+            {(["react", "html", "vue"] as const).map((f, i) => {
+              const active = framework === f;
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => onFrameworkChange(f)}
+                  aria-pressed={active}
+                  title={f.toUpperCase()}
+                  className="px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase transition-colors"
+                  style={{
+                    background: active ? T_CANVAS.graphite : "transparent",
+                    color: active ? T_CANVAS.paper : T_CANVAS.muted,
+                    borderLeft:
+                      i > 0 ? `1px solid ${T_CANVAS.rule}` : undefined,
+                    fontFamily:
+                      "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!active)
+                      e.currentTarget.style.color = T_CANVAS.graphite;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) e.currentTarget.style.color = T_CANVAS.muted;
+                  }}
+                >
+                  {f.toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        {onExport ? (
+          // Split control: left half opens the export dialog, right half
+          // launches the project straight into StackBlitz.
+          <div
+            className="flex items-stretch"
+            style={{ border: `1px solid ${T_CANVAS.rule}` }}
+            role="group"
+            aria-label="Export actions"
+          >
+            <button
+              type="button"
+              onClick={onExport}
+              title="Export"
+              data-onboarding="export-action"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+              style={{ background: "transparent", color: T_CANVAS.muted }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.color = T_CANVAS.graphite)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = T_CANVAS.muted)
+              }
+            >
+              <span className="flex h-4 w-4 items-center justify-center">
+                <ExportIcon />
+              </span>
+              <span className="hidden xl:inline">EXPORT</span>
+            </button>
+            {onOpenStackBlitz ? (
+              <button
+                type="button"
+                onClick={onOpenStackBlitz}
+                title="Open in StackBlitz"
+                className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-opacity hover:opacity-85"
+                style={{
+                  background: T_CANVAS.graphite,
+                  color: T_CANVAS.paper,
+                  borderLeft: `1px solid ${T_CANVAS.rule}`,
+                }}
+              >
+                <span className="flex h-4 w-4 items-center justify-center">
+                  <BoltIcon />
+                </span>
+                <span className="hidden xl:inline">STACKBLITZ</span>
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         {onRunDetection ? (
@@ -490,7 +600,8 @@ export default function CanvasTopBar({
                       className="truncate text-[12px]"
                       style={{
                         color: T_CANVAS.graphite,
-                        fontFamily: "var(--font-inter, ui-sans-serif, system-ui)",
+                        fontFamily:
+                          "var(--font-inter, ui-sans-serif, system-ui)",
                       }}
                     >
                       {displayName}
@@ -604,7 +715,9 @@ function ToolbarButton({
         }
       }}
     >
-      <span className="flex h-4 w-4 items-center justify-center">{children}</span>
+      <span className="flex h-4 w-4 items-center justify-center">
+        {children}
+      </span>
       <span className={`hidden ${labelHide}`}>{label}</span>
     </button>
   );
@@ -628,7 +741,9 @@ function MenuLink({
       onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
       onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
     >
-      <span className="flex h-4 w-4 items-center justify-center">{children}</span>
+      <span className="flex h-4 w-4 items-center justify-center">
+        {children}
+      </span>
       {label}
     </Link>
   );
@@ -673,6 +788,24 @@ function ExportIcon() {
       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+function BoltIcon() {
+  return (
+    <svg {...iconProps}>
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  );
+}
+function ShareIcon() {
+  return (
+    <svg {...iconProps}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.6" y1="10.5" x2="15.4" y2="6.5" />
+      <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
     </svg>
   );
 }

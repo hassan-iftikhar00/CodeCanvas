@@ -28,6 +28,39 @@ const CHAT_STORAGE_PREFIX = "cc:chat:";
 const MAX_PERSISTED_MESSAGES = 50;
 const MAX_INPUT_HEIGHT = 120;
 
+// Minimal typing for the Web Speech API (not in lib.dom yet).
+interface SpeechRecognitionResultLike {
+  0: { transcript: string };
+  isFinal: boolean;
+}
+interface SpeechRecognitionEventLike {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: SpeechRecognitionResultLike;
+  };
+}
+interface SpeechRecognitionLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+const getSpeechRecognition = (): SpeechRecognitionCtor | null => {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+};
+
 const buildWelcome = (hasCode: boolean): Message => ({
   id: "welcome",
   role: "assistant",
@@ -67,8 +100,14 @@ export default function ChatInterface({
     loadStoredMessages(projectId)
   );
   const [input, setInput] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  // Text already committed before the current dictation session started.
+  const baseInputRef = useRef("");
 
   const welcome = buildWelcome(hasCode);
   const visibleMessages =
@@ -94,11 +133,68 @@ export default function ChatInterface({
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "0px";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`;
+    const next = Math.min(el.scrollHeight, MAX_INPUT_HEIGHT);
+    el.style.height = `${next}px`;
+    // Only show the scrollbar once real content overflows the cap. An empty
+    // textarea (or a long placeholder that wraps) must never scroll.
+    el.style.overflowY = el.scrollHeight > MAX_INPUT_HEIGHT ? "auto" : "hidden";
   }, [input]);
+
+  // Detect Web Speech API support after mount (not during render) so the
+  // server and first client render agree, avoiding a hydration mismatch.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- capability detection must run client-side post-mount
+    setSpeechSupported(getSpeechRecognition() !== null);
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
+  const stopDictation = () => {
+    recognitionRef.current?.stop();
+  };
+
+  const startDictation = () => {
+    const Ctor = getSpeechRecognition();
+    if (!Ctor) return;
+
+    const recognition = new Ctor();
+    recognition.lang = "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    // Snapshot existing text so transcript appends instead of overwriting.
+    baseInputRef.current = input ? `${input.trimEnd()} ` : "";
+
+    recognition.onresult = (event) => {
+      let transcript = "";
+      for (let i = 0; i < event.results.length; i += 1) {
+        transcript += event.results[i][0].transcript;
+      }
+      setInput(baseInputRef.current + transcript);
+    };
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    recognition.onerror = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  };
+
+  const toggleDictation = () => {
+    if (!hasCode || isProcessing) return;
+    if (listening) stopDictation();
+    else startDictation();
+  };
 
   const send = async () => {
     if (!input.trim() || isProcessing) return;
+    if (listening) stopDictation();
     const userMessage = input.trim();
     setInput("");
 
@@ -291,7 +387,8 @@ export default function ChatInterface({
           className="flex items-end gap-2 px-2.5 py-2 transition-colors"
           style={{
             background: T_CANVAS.paper,
-            border: `1px solid ${T_CANVAS.rule}`,
+            border: `1px solid ${focused ? T_CANVAS.cobalt : T_CANVAS.rule}`,
+            boxShadow: focused ? `0 0 0 3px ${T_CANVAS.cobaltWash}` : "none",
           }}
         >
           <textarea
@@ -301,10 +398,10 @@ export default function ChatInterface({
               setInput(e.target.value)
             }
             onKeyDown={onKey}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder={
-              hasCode
-                ? "Describe what to change... (Enter to send, Shift+Enter for newline)"
-                : "Run detection first to start refining..."
+              hasCode ? "Describe what to change..." : "Run detection first..."
             }
             disabled={!hasCode}
             rows={1}
@@ -312,9 +409,53 @@ export default function ChatInterface({
             className="flex-1 resize-none bg-transparent text-[13px] leading-[1.5] focus:outline-none disabled:opacity-50"
             style={{
               maxHeight: MAX_INPUT_HEIGHT,
+              overflowY: "hidden",
               color: T_CANVAS.graphite,
             }}
           />
+          {speechSupported ? (
+            <motion.button
+              type="button"
+              onClick={toggleDictation}
+              whileTap={{ scale: 0.92 }}
+              disabled={!hasCode || isProcessing}
+              aria-label={listening ? "Stop voice input" : "Start voice input"}
+              aria-pressed={listening}
+              title={listening ? "Stop voice input" : "Voice input"}
+              className="flex h-7 w-7 flex-none items-center justify-center transition-colors disabled:opacity-40"
+              style={{
+                background: listening ? T_CANVAS.cobalt : T_CANVAS.vellum,
+                color: listening ? T_CANVAS.paper : T_CANVAS.muted,
+                border: `1px solid ${
+                  listening ? T_CANVAS.cobalt : T_CANVAS.rule
+                }`,
+                animation: listening
+                  ? "cc-mic-ring 1.6s ease-out infinite"
+                  : undefined,
+              }}
+              onMouseEnter={(e) => {
+                if (!listening) e.currentTarget.style.color = T_CANVAS.cobalt;
+              }}
+              onMouseLeave={(e) => {
+                if (!listening) e.currentTarget.style.color = T_CANVAS.muted;
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3.5 w-3.5"
+              >
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+            </motion.button>
+          ) : null}
           <motion.button
             type="submit"
             whileTap={{ scale: 0.92 }}
@@ -357,6 +498,17 @@ export default function ChatInterface({
           50% {
             opacity: 1;
             transform: scale(1.4);
+          }
+        }
+        @keyframes cc-mic-ring {
+          0% {
+            box-shadow: 0 0 0 0 ${T_CANVAS.cobalt}66;
+          }
+          70% {
+            box-shadow: 0 0 0 6px ${T_CANVAS.cobalt}00;
+          }
+          100% {
+            box-shadow: 0 0 0 0 ${T_CANVAS.cobalt}00;
           }
         }
       `}</style>

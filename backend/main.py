@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import math
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -28,8 +30,12 @@ from app.models.inference import (
     ROBOFLOW_DEFAULT_MODEL_ID,
     SketchDetector,
     _build_gemini_prompt,
+    build_annotation_prompt,
+    build_incremental_prompt,
+    build_repair_prompt,
     create_mock_external_model_output,
     detect_with_roboflow,
+    diff_detection_sets,
     generate_with_gemini,
 )
 
@@ -38,6 +44,8 @@ def _debug_ai_enabled() -> bool:
     return os.getenv("DEBUG_AI_PROMPT", "").lower() in ("1", "true", "yes", "on")
 from app.utils.preprocessing import preprocess_canvas_data
 from app.utils.rate_limit import SlidingWindowRateLimiter
+from app.utils.role_inference import annotate_alignment, annotate_role_hints
+from app.utils.response_cache import CachedResult, GenerationCache
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -83,6 +91,20 @@ ai_rate_limiter: Optional[SlidingWindowRateLimiter] = (
     else None
 )
 
+# B12: In-memory cache so identical sketch+framework+labels return without
+# hitting Roboflow or Gemini again. Bounded (LRU) + time-limited (TTL) to
+# keep memory predictable. Cache hits still persist a new iteration so version
+# history remains correct. Set CACHE_ENABLED=false to disable (e.g. QA runs).
+CACHE_ENABLED = _env_flag("CACHE_ENABLED", True)
+CACHE_TTL_SECONDS = float(os.getenv("CACHE_TTL_SECONDS", "1800"))
+CACHE_MAX_SIZE = int(os.getenv("CACHE_MAX_SIZE", "50"))
+
+generation_cache: Optional[GenerationCache] = (
+    GenerationCache(CACHE_MAX_SIZE, CACHE_TTL_SECONDS)
+    if CACHE_ENABLED
+    else None
+)
+
 
 def _client_ip(http_request: Request) -> str:
     """Best-effort client IP for the rate-limit fallback key. Only used when the
@@ -101,6 +123,64 @@ def _rate_limit_key(request: "GenerateCodeRequest", http_request: Request) -> st
     if user_id:
         return f"user:{user_id}"
     return f"ip:{_client_ip(http_request)}"
+
+
+def _generation_cache_key(
+    sketch_image: str,
+    framework: str,
+    sketch_source: Optional[str],
+    text_annotations: Optional[List["TextAnnotation"]],
+    brand_kit: Optional["BrandKit"] = None,
+    screens: Optional[List[str]] = None,
+    current_screen: Optional[str] = None,
+) -> str:
+    """Stable cache key for an AI generation request.
+
+    Hashes the raw sketch bytes (first 16 hex chars of SHA-256 covers
+    uniqueness in practice) plus the framework and source modality. For
+    canvas sketches, text annotations are included in the key because the
+    same sketch with different labels should produce different output. For
+    uploads the image itself carries the text (Gemini reads it), so
+    annotations are not separately keyed.
+    """
+    img_hash = hashlib.sha256(sketch_image.encode()).hexdigest()[:16]
+    fw = (framework or "react").lower()
+    src = (sketch_source or "canvas").lower()
+
+    if src == "canvas" and text_annotations:
+        ann_data = sorted(
+            [{"t": a.text, "x": round(a.x), "y": round(a.y)} for a in text_annotations],
+            key=lambda d: (d["x"], d["y"], d["t"]),
+        )
+        ann_hash = hashlib.sha256(
+            json.dumps(ann_data, separators=(",", ":")).encode()
+        ).hexdigest()[:12]
+    else:
+        ann_hash = "noann"
+
+    # Brand kit changes the prompt (colors/font), so it must change the key —
+    # otherwise editing the kit would serve the previous palette from cache.
+    kit_data = brand_kit.as_prompt_dict() if brand_kit else {}
+    if kit_data:
+        kit_hash = hashlib.sha256(
+            json.dumps(kit_data, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()[:12]
+    else:
+        kit_hash = "nokit"
+
+    # Multi-screen context changes the prompt (NAVIGATION block names the
+    # other screens), so the same sketch generated as "Login of [Login,
+    # Dashboard]" must not serve a cached single-screen result.
+    if screens and len(screens) > 1:
+        screen_hash = hashlib.sha256(
+            json.dumps(
+                {"s": screens, "c": current_screen or ""}, separators=(",", ":")
+            ).encode()
+        ).hexdigest()[:12]
+    else:
+        screen_hash = "noscr"
+
+    return f"{img_hash}|{fw}|{src}|{ann_hash}|{kit_hash}|{screen_hash}"
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
@@ -135,6 +215,20 @@ app.add_middleware(
 class CanvasData(BaseModel):
     strokes: Optional[List[List[Dict[str, float]]]] = None
     lines: Optional[List[Dict[str, Any]]] = None
+    # Passthrough fields: the backend never reads these, but model_dump() of
+    # this model is what gets persisted to iterations.canvas_data (and mirrored
+    # onto projects.canvas_data). Omitting them silently STRIPPED rectangles
+    # (shapes), template groups, and the uploaded-sketch stub from every
+    # generation iteration, which broke checkpoint/version restore of the
+    # drawing. Keep in sync with CanvasData in src/types/canvas.ts.
+    shapes: Optional[List[Dict[str, Any]]] = None
+    componentGroups: Optional[List[Dict[str, Any]]] = None
+    uploadedSketch: Optional[Dict[str, Any]] = None
+    # Multi-screen flows (App Uplift feature A): per-screen snapshots
+    # ({id, name, canvasData, generatedCode, ...}) plus which one is active.
+    # Backend never reads these; they must survive model_dump() persistence.
+    screens: Optional[List[Dict[str, Any]]] = None
+    activeScreenId: Optional[str] = None
     width: int = Field(default=1000, gt=0, le=8000)
     height: int = Field(default=600, gt=0, le=8000)
 
@@ -150,6 +244,29 @@ class TextAnnotation(BaseModel):
     y: float
     width: float = 0.0
     height: float = 0.0
+
+
+class BrandKit(BaseModel):
+    """Per-project design tokens (App Uplift feature H). Styling-only:
+    the prompt block scopes these to colors/typography so strict fidelity
+    (Decision #19) is untouched."""
+
+    primaryColor: Optional[str] = None
+    secondaryColor: Optional[str] = None
+    accentColor: Optional[str] = None
+    fontFamily: Optional[str] = None
+
+    def as_prompt_dict(self) -> Dict[str, str]:
+        return {
+            k: v
+            for k, v in {
+                "primaryColor": self.primaryColor,
+                "secondaryColor": self.secondaryColor,
+                "accentColor": self.accentColor,
+                "fontFamily": self.fontFamily,
+            }.items()
+            if v
+        }
 
 
 class GenerateCodeRequest(BaseModel):
@@ -169,6 +286,30 @@ class GenerateCodeRequest(BaseModel):
     # Where sketchImage came from. Absent/"canvas" = Konva export (unchanged path);
     # "upload-photo"/"upload-clean" = uploaded image routed through photo normalization.
     sketchSource: Optional[str] = None
+    # HITL detection editor: when present, these user-reviewed boxes replace the
+    # Roboflow call entirely (the user already saw and corrected the detections
+    # via /api/detect). Container synthesis is also skipped — the corrected set
+    # is authoritative. Coordinates are in the same pixel space as sketchImage.
+    correctedElements: Optional[List["DetectedElement"]] = None
+    # Audit log of what the user changed in the review overlay (relabel/delete/
+    # add). Persisted to detection_corrections for a future fine-tuning dataset.
+    detectionCorrections: Optional[List[Dict[str, Any]]] = None
+    # Brand Kit (feature H): user-defined project design tokens, stamped into
+    # the Gemini prompt as a styling-only block. Absent = unchanged prompt.
+    brandKit: Optional[BrandKit] = None
+    # Incremental regeneration (feature D): the prior generation's code and
+    # detection set. When present and the new detection differs only slightly,
+    # the backend sends a delta prompt that patches the previous code instead
+    # of regenerating from scratch (preserving chat refinements/manual edits).
+    previousCode: Optional[str] = None
+    previousElements: Optional[List["DetectedElement"]] = None
+    # Multi-screen flows (feature A): names of all screens in the app plus
+    # which one this generation is for. When present (2+ screens), the prompt
+    # gains a NAVIGATION block wiring label-matched buttons/links to the host
+    # shell's window.ccNavigate(screenName). Absent = single-screen, prompt
+    # unchanged.
+    screens: Optional[List[str]] = None
+    currentScreen: Optional[str] = None
 
 
 class DetectedElement(BaseModel):
@@ -185,6 +326,99 @@ class GenerateCodeResponse(BaseModel):
     message: Optional[str] = None
     iteration_id: Optional[str] = None
     usedFallback: Optional[bool] = None
+    timing_ms: Optional[Dict[str, float]] = None
+    # True when the incremental (delta-patch) path produced this code.
+    usedIncremental: Optional[bool] = None
+
+
+class DetectRequest(BaseModel):
+    """Detection-only request for the HITL review step (no Gemini call)."""
+
+    projectId: str
+    userId: str
+    sketchImage: str
+    # Same semantics as GenerateCodeRequest.sketchSource.
+    sketchSource: Optional[str] = None
+    width: int = Field(default=1000, gt=0, le=8000)
+    height: int = Field(default=600, gt=0, le=8000)
+
+
+class DetectResponse(BaseModel):
+    success: bool
+    elements: List[DetectedElement]
+    # Pixel space the bounds live in (the image Roboflow actually saw).
+    imageWidth: Optional[float] = None
+    imageHeight: Optional[float] = None
+    # Uploads only: the preprocessed image (crop/normalize applied) as a data
+    # URL. The review overlay must draw boxes on THIS image, not the original
+    # upload, because the bounds are in post-preprocessing pixel space.
+    previewImage: Optional[str] = None
+    timing_ms: Optional[Dict[str, float]] = None
+
+
+class FidelityRequest(BaseModel):
+    projectId: str
+    userId: str
+    code: str
+    framework: str = "react"
+    elements: List[DetectedElement]
+    # Pixel space the original detection boxes live in (the sketch image dims).
+    width: int = Field(default=1000, gt=0, le=8000)
+    height: int = Field(default=600, gt=0, le=8000)
+
+
+class FidelityResponse(BaseModel):
+    success: bool
+    score: float
+    report: Dict[str, Any]
+    timing_ms: Optional[Dict[str, float]] = None
+
+
+class RepairRequest(BaseModel):
+    projectId: str
+    userId: str
+    code: str
+    framework: str = "react"
+    # Mismatch report from /api/fidelity: element dicts with type/bounds/label.
+    missing: List[Dict[str, Any]] = Field(default_factory=list)
+    extra: List[Dict[str, Any]] = Field(default_factory=list)
+    width: int = Field(default=1000, gt=0, le=8000)
+    height: int = Field(default=600, gt=0, le=8000)
+
+
+class RepairResponse(BaseModel):
+    success: bool
+    code: str
+    iteration_id: Optional[str] = None
+    message: Optional[str] = None
+
+
+class AnnotateRequest(BaseModel):
+    """Annotate-on-render refinement (App Uplift feature B).
+
+    The user drew markup ON the rendered preview and wrote an instruction.
+    ``targets`` are the rendered components the markup covered, resolved by
+    the frontend from the iframe's data-cc-id boxes ({ccId, tag?, rect});
+    ``region`` is the markup's own bounding box (fallback locator when the
+    markup hit no tagged element). All coordinates are render-viewport CSS px.
+    """
+
+    projectId: str
+    userId: str
+    code: str
+    framework: str = "react"
+    note: str
+    targets: List[Dict[str, Any]] = Field(default_factory=list)
+    region: Optional[Dict[str, Any]] = None
+    width: float = Field(default=1000, gt=0, le=16000)
+    height: float = Field(default=600, gt=0, le=64000)
+
+
+class AnnotateResponse(BaseModel):
+    success: bool
+    code: str
+    iteration_id: Optional[str] = None
+    message: Optional[str] = None
 
 
 sketch_detector = None
@@ -804,6 +1038,36 @@ def _attach_text_annotations(
     return unmatched
 
 
+def _corrected_elements_to_output(
+    corrected: List[DetectedElement],
+) -> "ExternalModelOutput":
+    """Build an ExternalModelOutput from the user-reviewed element set (HITL).
+
+    Elements are sorted in reading order (top-to-bottom, left-to-right within
+    a row) like the Roboflow path so the Gemini prompt reads in document order. Each element is tagged user_verified so
+    the prompt (and any debugging) can tell it came through human review.
+    """
+    from app.models.inference import ExternalModelElement, sort_reading_order
+
+    elements = [
+        ExternalModelElement(
+            id=f"corrected-{i}",
+            type=(el.type or "card").lower(),
+            confidence=el.confidence,
+            bounds=el.bounds,
+            label=el.label,
+            attributes={"user_verified": True},
+        )
+        for i, el in enumerate(corrected, 1)
+    ]
+    sort_reading_order(elements)
+    return ExternalModelOutput(
+        source="user-corrected",
+        elements=elements,
+        metadata={"human_in_the_loop": True},
+    )
+
+
 async def resolve_external_model_output(
     request: GenerateCodeRequest,
     canvas_data: Dict[str, Any],
@@ -811,6 +1075,22 @@ async def resolve_external_model_output(
     if request.externalModelOutput is not None:
         print("[trace] using request.externalModelOutput (skipping Roboflow)")
         return request.externalModelOutput
+
+    # HITL path: the user reviewed and corrected the detections in the overlay,
+    # so the corrected set replaces the Roboflow call. Synthesis is skipped too
+    # (the human decided what containers exist); text attachment, role hints and
+    # the Gemini call below run unchanged.
+    if request.correctedElements:
+        print(
+            f"[trace] HITL: using {len(request.correctedElements)} user-corrected "
+            "elements (skipping Roboflow + container synthesis)"
+        )
+        return await _generate_from_output(
+            _corrected_elements_to_output(request.correctedElements),
+            request,
+            roboflow_ms=0.0,
+            skip_synthesis=True,
+        )
 
     if request.useMockModelOutput or os.getenv("MODEL_OUTPUT_SOURCE", "").lower() == "mock":
         print("[trace] mock mode active (skipping Roboflow)")
@@ -848,6 +1128,7 @@ async def resolve_external_model_output(
     # v2 (YOLOv11 Fast) returned in 2–5s warm and ~15s cold, so 30s was safe.
     # v4 (YOLOv11 Small) is slower — observed >30s on cold start. 60s gives
     # headroom without hitting the 100s Next.js proxy ceiling.
+    _t_roboflow_start = time.perf_counter()
     try:
         roboflow_output = await asyncio.wait_for(
             asyncio.to_thread(
@@ -867,6 +1148,8 @@ async def resolve_external_model_output(
     except Exception as error:
         print(f"Roboflow call raised: {error}")
         return None
+    _roboflow_ms = (time.perf_counter() - _t_roboflow_start) * 1000
+    print(f"[timing] roboflow={_roboflow_ms:.0f}ms")
 
     if roboflow_output is None:
         print("[trace] detect_with_roboflow returned None → falling back to contour")
@@ -874,6 +1157,34 @@ async def resolve_external_model_output(
     if not roboflow_output.elements:
         print("[trace] Roboflow output had no elements → falling back to contour")
         return None
+
+    return await _generate_from_output(
+        roboflow_output,
+        request,
+        roboflow_ms=_roboflow_ms,
+        skip_synthesis=False,
+    )
+
+
+async def _generate_from_output(
+    roboflow_output: ExternalModelOutput,
+    request: GenerateCodeRequest,
+    *,
+    roboflow_ms: float,
+    skip_synthesis: bool,
+) -> Optional[ExternalModelOutput]:
+    """Shared generation tail: text attachment, role hints, Gemini call.
+
+    Fed either by the live Roboflow detection or by the HITL corrected element
+    set. ``skip_synthesis`` is True on the HITL path — the user's reviewed set
+    is authoritative, so fabricating extra containers behind their back would
+    defeat the point of the review step.
+    """
+    _roboflow_ms = roboflow_ms
+    canvas_size = (
+        int((request.canvasData.width if request.canvasData else 0) or 1000),
+        int((request.canvasData.height if request.canvasData else 0) or 600),
+    )
 
     roboflow_output.framework = request.framework
     roboflow_output.styling = request.styling
@@ -917,6 +1228,20 @@ async def resolve_external_model_output(
             gemini_image_bytes = base64.b64decode(processed_b64)
         except Exception as decode_error:
             print(f"[trace] could not decode processed upload image for Gemini: {decode_error}")
+    elif (
+        skip_synthesis  # HITL path: Roboflow was skipped, so no stashed image
+        and request.sketchSource in ("upload-photo", "upload-clean")
+        and request.sketchImage
+    ):
+        # The frontend sends back the preprocessed preview it got from
+        # /api/detect as sketchImage, so it is already in the same pixel space
+        # as the corrected boxes — decode it directly for Gemini text reading.
+        try:
+            from app.models.inference import _decode_sketch_image
+
+            gemini_image_bytes = _decode_sketch_image(request.sketchImage)
+        except Exception as decode_error:
+            print(f"[trace] could not decode HITL upload image for Gemini: {decode_error}")
 
     annotations = request.textAnnotations or []
     if debug and annotations:
@@ -925,18 +1250,66 @@ async def resolve_external_model_output(
             f"{int(image_w)}x{int(image_h)})"
         )
 
-    roboflow_output.elements = _synthesize_missing_containers(
-        roboflow_output.elements,
-        annotations,
-        inferred_canvas_size,
-        debug=debug,
-    )
+    if not skip_synthesis:
+        roboflow_output.elements = _synthesize_missing_containers(
+            roboflow_output.elements,
+            annotations,
+            inferred_canvas_size,
+            debug=debug,
+        )
 
     extra_text = _attach_text_annotations(
         roboflow_output.elements,
         annotations,
         debug=debug,
     )
+
+    # Deterministic prompt hints (after text attachment so label_text exists):
+    # unambiguous cards get an explicit role (input/button/image/nav item) and
+    # containers get their drawn child alignment. Gemini follows explicit
+    # per-element hints far more reliably than the prose heuristics alone.
+    annotate_role_hints(roboflow_output.elements)
+    annotate_alignment(roboflow_output.elements)
+
+    # Incremental regeneration (feature D): when the frontend sends the prior
+    # generation, diff old vs new detection sets and patch instead of
+    # regenerating — unchanged code (incl. chat refinements) stays intact.
+    incremental_prompt: Optional[str] = None
+    if request.previousCode and request.previousElements:
+        diff = diff_detection_sets(
+            [e.model_dump() for e in request.previousElements],
+            roboflow_output.elements,
+        )
+        n_changes = len(diff["added"]) + len(diff["removed"])
+        if n_changes == 0:
+            print("[incremental] no detection changes — keeping previous code (no Gemini call)")
+            roboflow_output.generated_code = request.previousCode
+            roboflow_output.metadata = {
+                **(roboflow_output.metadata or {}),
+                "code_generator": "incremental-noop",
+                "incremental": True,
+                "timing_ms": {"roboflow": round(_roboflow_ms), "gemini": 0},
+            }
+            return roboflow_output
+        # A huge delta means a substantially different sketch — a full
+        # regeneration is safer than a long patch instruction.
+        max_delta = max(4, len(roboflow_output.elements) // 2)
+        if diff["matched"] and n_changes <= max_delta:
+            print(
+                f"[incremental] delta prompt: +{len(diff['added'])} "
+                f"-{len(diff['removed'])} (matched {len(diff['matched'])})"
+            )
+            incremental_prompt = build_incremental_prompt(
+                request.previousCode,
+                request.framework,
+                roboflow_output.elements,
+                diff,
+            )
+        else:
+            print(
+                f"[incremental] delta too large (+{len(diff['added'])} "
+                f"-{len(diff['removed'])}, matched {len(diff['matched'])}) — full regeneration"
+            )
 
     if debug:
         prompt_preview = _build_gemini_prompt(
@@ -946,12 +1319,16 @@ async def resolve_external_model_output(
             request.description,
             extra_text=extra_text or None,
             has_image=gemini_image_bytes is not None,
+            brand_kit=request.brandKit.as_prompt_dict() if request.brandKit else None,
+            screens=request.screens,
+            current_screen=request.currentScreen,
         )
         print("[debug] Gemini prompt:")
         print("-" * 70)
         print(prompt_preview)
         print("-" * 70)
 
+    _t_gemini_start = time.perf_counter()
     try:
         generated_code = await asyncio.wait_for(
             asyncio.to_thread(
@@ -962,6 +1339,12 @@ async def resolve_external_model_output(
                 request.description,
                 extra_text=extra_text or None,
                 image_bytes=gemini_image_bytes,
+                brand_kit=request.brandKit.as_prompt_dict()
+                if request.brandKit
+                else None,
+                prompt_override=incremental_prompt,
+                screens=request.screens,
+                current_screen=request.currentScreen,
             ),
             timeout=GEMINI_TIMEOUT_SECONDS,
         )
@@ -996,10 +1379,15 @@ async def resolve_external_model_output(
         print(preview)
         print("=" * 70)
 
+    _gemini_ms = (time.perf_counter() - _t_gemini_start) * 1000
+    print(f"[timing] gemini={_gemini_ms:.0f}ms")
+
     roboflow_output.generated_code = generated_code
     roboflow_output.metadata = {
         **(roboflow_output.metadata or {}),
-        "code_generator": "gemini",
+        "code_generator": "gemini-incremental" if incremental_prompt else "gemini",
+        "incremental": bool(incremental_prompt),
+        "timing_ms": {"roboflow": round(_roboflow_ms), "gemini": round(_gemini_ms)},
     }
 
     return roboflow_output
@@ -1133,6 +1521,19 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
         project = load_project_or_403(supabase, request.projectId, request.userId)
         project_canvas_data = project.get("canvas_data") or {}
 
+        # HITL audit trail: what the user changed in the review overlay. Logged
+        # fire-and-forget — a logging failure must never block generation.
+        if request.detectionCorrections:
+            rows = _build_correction_rows(
+                request.projectId, request.userId, request.detectionCorrections
+            )
+            if rows:
+                try:
+                    supabase.table("detection_corrections").insert(rows).execute()
+                    print(f"[hitl] logged {len(rows)} detection correction(s)")
+                except Exception as log_error:
+                    print(f"Warning: could not log detection corrections: {log_error}")
+
         if request.mode == "chat":
             if not request.messages or not request.currentCode:
                 raise HTTPException(
@@ -1175,6 +1576,72 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
             raise HTTPException(status_code=400, detail="Invalid canvas data")
 
         canvas_data = request.canvasData.model_dump()
+
+        # Upload path: the frontend keeps the API payload lean (the image
+        # already travels as sketchImage), so canvasData carries no
+        # uploadedSketch stub. Stamp one in before persisting so version
+        # restore can bring the upload workspace back for THIS iteration.
+        if (
+            request.sketchSource in ("upload-photo", "upload-clean")
+            and request.sketchImage
+            and not canvas_data.get("uploadedSketch")
+        ):
+            _data_url = request.sketchImage
+            if not _data_url.startswith("data:"):
+                _data_url = "data:image/png;base64," + _data_url
+            canvas_data["uploadedSketch"] = {
+                "dataUrl": _data_url,
+                "source": request.sketchSource,
+                "width": canvas_data.get("width") or 1000,
+                "height": canvas_data.get("height") or 600,
+            }
+
+        # B12: Cache check. Same sketch + framework + labels → skip Roboflow+Gemini.
+        # Auth and rate-limit already passed above; still persist an iteration on
+        # hit so version history stays accurate for the user.
+        # HITL corrected sets bypass the cache entirely (read AND write): the
+        # cache key hashes the sketch image, not the corrections, so a cached
+        # result would silently ignore the user's edits.
+        cache_key: Optional[str] = None
+        if (
+            generation_cache is not None
+            and request.sketchImage
+            and not request.correctedElements
+            # Incremental requests depend on previousCode, which the key does
+            # not hash — a cache hit would ignore the user's sketch edit.
+            and not request.previousCode
+        ):
+            cache_key = _generation_cache_key(
+                request.sketchImage,
+                request.framework,
+                request.sketchSource,
+                request.textAnnotations,
+                request.brandKit,
+                request.screens,
+                request.currentScreen,
+            )
+            cached = generation_cache.get(cache_key)
+            if cached is not None:
+                print(f"[cache] HIT (key={cache_key[:20]}…) — skipping Roboflow+Gemini")
+                iteration_id = persist_generation_result(
+                    supabase,
+                    request.projectId,
+                    canvas_data,
+                    cached.generated_code,
+                    request.description,
+                )
+                return GenerateCodeResponse(
+                    code=cached.generated_code,
+                    success=True,
+                    detectedElements=[DetectedElement(**e) for e in cached.elements_json],
+                    message=None,
+                    iteration_id=iteration_id,
+                    usedFallback=False,
+                    timing_ms={"total": 0, "cache_hit": 1},
+                )
+            print(f"[cache] MISS (key={cache_key[:20]}…)")
+
+        _t_pipeline_start = time.perf_counter()
         external_model_output = await resolve_external_model_output(request, canvas_data)
         generation_framework = (
             external_model_output.framework
@@ -1221,12 +1688,50 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
 
         print(f"Generated {len(generated_code)} characters of code")
 
+        # Cache successful Gemini results. Skip for fallback/mock/template paths —
+        # those are degraded outputs and shouldn't crowd out real results.
+        if (
+            generation_cache is not None
+            and cache_key is not None
+            and external_model_output is not None
+            and getattr(external_model_output, "source", None) != "mock"
+            and getattr(external_model_output, "generated_code", None)
+        ):
+            generation_cache.put(
+                cache_key,
+                CachedResult(
+                    generated_code=generated_code,
+                    elements_json=detected_elements,
+                    source="gemini",
+                ),
+            )
+            print(f"[cache] stored (key={cache_key[:20]}…, size={generation_cache.size})")
+
         iteration_id = persist_generation_result(
             supabase,
             request.projectId,
             canvas_data,
             generated_code,
             generation_description,
+        )
+
+        _total_ms = (time.perf_counter() - _t_pipeline_start) * 1000
+        _stage_timing: Optional[Dict[str, float]] = (
+            (external_model_output.metadata or {}).get("timing_ms")
+            if external_model_output and external_model_output.metadata
+            else None
+        )
+        _timing_ms: Dict[str, float] = {"total": round(_total_ms)}
+        if _stage_timing:
+            _timing_ms.update(_stage_timing)
+        print(
+            f"[timing] total={_total_ms:.0f}ms"
+            + (
+                f" (roboflow={_stage_timing['roboflow']}ms"
+                f" gemini={_stage_timing['gemini']}ms)"
+                if _stage_timing
+                else ""
+            )
         )
 
         if external_model_output is None:
@@ -1248,6 +1753,11 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
             used_fallback = False
             response_message = None
 
+        used_incremental = bool(
+            external_model_output is not None
+            and (external_model_output.metadata or {}).get("incremental")
+        )
+
         return GenerateCodeResponse(
             code=generated_code,
             success=True,
@@ -1255,6 +1765,8 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
             message=response_message,
             iteration_id=iteration_id,
             usedFallback=used_fallback,
+            timing_ms=_timing_ms,
+            usedIncremental=used_incremental or None,
         )
 
     except HTTPException:
@@ -1262,6 +1774,421 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
     except Exception as error:
         print(f"Error in prediction pipeline: {str(error)}")
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(error)}")
+
+
+def _build_correction_rows(
+    project_id: str,
+    user_id: str,
+    corrections: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Normalize the review-overlay correction log into detection_corrections
+    rows. Unknown actions are dropped rather than rejected — the log is an
+    audit trail, not a contract, and must never break generation."""
+    rows: List[Dict[str, Any]] = []
+    for entry in corrections:
+        if not isinstance(entry, dict):
+            continue
+        action = str(entry.get("action") or "").lower()
+        if action not in ("relabel", "delete", "add"):
+            continue
+        rows.append(
+            {
+                "project_id": project_id,
+                "user_id": user_id,
+                "action": action,
+                "element_type": str(entry.get("elementType") or "") or None,
+                "previous_type": str(entry.get("previousType") or "") or None,
+                "bounds": entry.get("bounds") if isinstance(entry.get("bounds"), dict) else None,
+            }
+        )
+    return rows
+
+
+@app.post("/api/detect", response_model=DetectResponse)
+async def detect(request: DetectRequest, http_request: Request):
+    """Detection-only endpoint for the HITL review step (Idea #4).
+
+    Runs the same Roboflow call /api/predict would, but stops before Gemini so
+    the user can review, relabel, delete or add boxes in the overlay. The
+    corrected set then goes back through /api/predict as correctedElements
+    (which skips Roboflow — the detection budget is spent exactly once).
+    """
+    if not request.sketchImage.strip():
+        raise HTTPException(status_code=400, detail="No sketch image to detect on")
+
+    # Same per-user AI budget as /api/predict — this spends a Roboflow call.
+    if ai_rate_limiter is not None:
+        allowed, retry_after, _ = ai_rate_limiter.check(
+            _rate_limit_key(request, http_request)
+        )
+        if not allowed:
+            retry_secs = max(1, math.ceil(retry_after))
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "You're sending requests too quickly. "
+                    f"Please wait {retry_secs}s and try again."
+                ),
+                headers={"Retry-After": str(retry_secs)},
+            )
+
+    supabase = create_supabase_client()
+    load_project_or_403(supabase, request.projectId, request.userId)
+
+    _t_start = time.perf_counter()
+    try:
+        output = await asyncio.wait_for(
+            asyncio.to_thread(
+                detect_with_roboflow,
+                request.sketchImage,
+                (request.width, request.height),
+                sketch_source=request.sketchSource,
+            ),
+            timeout=60.0,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Sketch detection timed out — the Roboflow API did not respond in time. Please try again.",
+        )
+    except Exception as error:
+        print(f"[detect] Roboflow call raised: {error}")
+        raise HTTPException(status_code=502, detail="Sketch detection failed")
+
+    _detect_ms = (time.perf_counter() - _t_start) * 1000
+
+    if output is None or not output.elements:
+        # Not an error: a blank/unrecognizable sketch legitimately detects
+        # nothing. The frontend falls back to the direct generation path.
+        return DetectResponse(
+            success=True,
+            elements=[],
+            timing_ms={"total": round(_detect_ms)},
+        )
+
+    meta = output.metadata or {}
+
+    # Uploads: the boxes live in post-preprocessing pixel space, so the overlay
+    # must draw on the preprocessed image. Reuse the stashed Gemini copy (clean,
+    # non-binarized — most readable for the user) as the review preview.
+    preview_image: Optional[str] = None
+    processed_b64 = meta.pop("processed_image_b64", None)
+    if processed_b64 and request.sketchSource in ("upload-photo", "upload-clean"):
+        preview_image = f"data:image/png;base64,{processed_b64}"
+
+    elements = [
+        DetectedElement(
+            type=el.type,
+            confidence=el.confidence,
+            bounds=el.bounds,
+            label=el.label,
+        )
+        for el in output.elements
+    ]
+    print(f"[detect] {len(elements)} element(s) in {_detect_ms:.0f}ms (HITL review)")
+
+    return DetectResponse(
+        success=True,
+        elements=elements,
+        imageWidth=float(meta.get("image_width") or 0) or None,
+        imageHeight=float(meta.get("image_height") or 0) or None,
+        previewImage=preview_image,
+        timing_ms={"total": round(_detect_ms)},
+    )
+
+
+@app.post("/api/fidelity", response_model=FidelityResponse)
+async def fidelity(request: FidelityRequest, http_request: Request):
+    """Cyclic self-verification of a generation (Decision #25).
+
+    Renders the generated code headless, converts the screenshot back into
+    line-art (the detector's training domain), re-runs the SAME Roboflow
+    detector on it, and scores the re-detected boxes against the original
+    sketch's boxes. Returns a 0-1 fidelity score plus a per-element mismatch
+    report (missing / extra) the UI shows next to the code.
+    """
+    from app.utils.fidelity import (
+        FidelityUnavailableError,
+        elements_to_fidelity_boxes,
+        normalize_render_to_sketch_domain,
+        render_code_to_png,
+        score_fidelity,
+    )
+
+    if not request.elements:
+        raise HTTPException(status_code=400, detail="No detected elements to score against")
+    if not request.code.strip():
+        raise HTTPException(status_code=400, detail="No generated code to score")
+
+    # Shares the AI limiter with /api/predict — this endpoint also spends a
+    # Roboflow call, so it draws from the same per-user budget.
+    if ai_rate_limiter is not None:
+        allowed, retry_after, _ = ai_rate_limiter.check(
+            _rate_limit_key(request, http_request)
+        )
+        if not allowed:
+            retry_secs = max(1, math.ceil(retry_after))
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "You're sending requests too quickly. "
+                    f"Please wait {retry_secs}s and try again."
+                ),
+                headers={"Retry-After": str(retry_secs)},
+            )
+
+    supabase = create_supabase_client()
+    load_project_or_403(supabase, request.projectId, request.userId)
+
+    _t_start = time.perf_counter()
+    try:
+        render_png = await render_code_to_png(
+            request.code, request.framework, request.width, request.height
+        )
+    except FidelityUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error))
+    except Exception as error:
+        print(f"[fidelity] render failed: {error}")
+        raise HTTPException(status_code=500, detail=f"Render failed: {error}")
+    _render_ms = (time.perf_counter() - _t_start) * 1000
+
+    line_art_png = await asyncio.to_thread(normalize_render_to_sketch_domain, render_png)
+
+    if _debug_ai_enabled():
+        try:
+            debug_dir = BASE_DIR / "debug"
+            debug_dir.mkdir(exist_ok=True)
+            (debug_dir / "last_render.png").write_bytes(render_png)
+            (debug_dir / "last_render_lineart.png").write_bytes(line_art_png)
+            print(f"[fidelity] debug renders saved to {debug_dir}")
+        except Exception as dump_error:
+            print(f"[fidelity] could not save debug renders: {dump_error}")
+
+    _t_detect = time.perf_counter()
+    rendered_output = await asyncio.to_thread(
+        detect_with_roboflow,
+        base64.b64encode(line_art_png).decode("ascii"),
+        (request.width, request.height),
+    )
+    _detect_ms = (time.perf_counter() - _t_detect) * 1000
+    if rendered_output is None:
+        raise HTTPException(
+            status_code=502, detail="Re-detection on the rendered code failed"
+        )
+
+    original_boxes = elements_to_fidelity_boxes(
+        [e.model_dump() for e in request.elements]
+    )
+    rendered_boxes = elements_to_fidelity_boxes(
+        [
+            {"type": el.type, "confidence": el.confidence, "bounds": el.bounds}
+            for el in (rendered_output.elements or [])
+        ]
+    )
+    report = score_fidelity(
+        original_boxes, rendered_boxes, canvas_height=float(request.height)
+    )
+
+    _total_ms = (time.perf_counter() - _t_start) * 1000
+    print(
+        f"[fidelity] score={report['score']:.2f} "
+        f"(tp={report['counts']['tp']} fp={report['counts']['fp']} "
+        f"fn={report['counts']['fn']}) total={_total_ms:.0f}ms"
+    )
+
+    return FidelityResponse(
+        success=True,
+        score=report["score"],
+        report=report,
+        timing_ms={
+            "total": round(_total_ms),
+            "render": round(_render_ms),
+            "redetect": round(_detect_ms),
+        },
+    )
+
+
+@app.post("/api/repair", response_model=RepairResponse)
+async def repair(request: RepairRequest, http_request: Request):
+    """Auto-repair pass: one corrective Gemini call driven by the fidelity
+    mismatch report. Adds the missing elements, removes the extras, and is
+    instructed to leave everything else byte-identical. The client re-scores
+    the result via /api/fidelity to show the before/after.
+    """
+    if not request.code.strip():
+        raise HTTPException(status_code=400, detail="No code to repair")
+    if not request.missing and not request.extra:
+        raise HTTPException(status_code=400, detail="Nothing to repair")
+
+    # Same per-user AI budget as /api/predict — this is a full Gemini call.
+    if ai_rate_limiter is not None:
+        allowed, retry_after, _ = ai_rate_limiter.check(
+            _rate_limit_key(request, http_request)
+        )
+        if not allowed:
+            retry_secs = max(1, math.ceil(retry_after))
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "You're sending requests too quickly. "
+                    f"Please wait {retry_secs}s and try again."
+                ),
+                headers={"Retry-After": str(retry_secs)},
+            )
+
+    supabase = create_supabase_client()
+    project = load_project_or_403(supabase, request.projectId, request.userId)
+
+    prompt = build_repair_prompt(
+        request.code,
+        request.framework,
+        request.missing,
+        request.extra,
+        float(request.width),
+        float(request.height),
+    )
+
+    _t_start = time.perf_counter()
+    try:
+        repaired_code = await asyncio.wait_for(
+            asyncio.to_thread(
+                generate_with_gemini,
+                [],
+                request.framework,
+                "tailwind",
+                None,
+                prompt_override=prompt,
+            ),
+            timeout=GEMINI_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Repair timed out")
+    except GeminiRateLimited as error:
+        raise HTTPException(
+            status_code=429, detail=str(error), headers={"Retry-After": "60"}
+        )
+    except GeminiQuotaExhausted as error:
+        raise HTTPException(status_code=503, detail=str(error))
+    except Exception as error:
+        print(f"[repair] Gemini error: {error}")
+        raise HTTPException(status_code=500, detail=f"Repair failed: {error}")
+
+    if not repaired_code or not repaired_code.strip():
+        raise HTTPException(status_code=502, detail="Repair returned empty code")
+
+    # Version history stays truthful: the repaired code is a new iteration.
+    iteration_id = persist_generation_result(
+        supabase,
+        request.projectId,
+        project.get("canvas_data") or {},
+        repaired_code,
+        "Auto-repair pass (fidelity self-check)",
+    )
+
+    print(
+        f"[repair] ok chars={len(repaired_code)} "
+        f"missing={len(request.missing)} extra={len(request.extra)} "
+        f"took={(time.perf_counter() - _t_start) * 1000:.0f}ms"
+    )
+    return RepairResponse(success=True, code=repaired_code, iteration_id=iteration_id)
+
+
+@app.post("/api/annotate", response_model=AnnotateResponse)
+async def annotate(request: AnnotateRequest, http_request: Request):
+    """Annotate-on-render refinement: one targeted Gemini call driven by the
+    user's markup on the live preview. The markup resolves to data-cc-id
+    elements (or a raw region), and the prompt instructs Gemini to apply the
+    user's note to those parts only, byte-preserving everything else.
+    """
+    if not request.code.strip():
+        raise HTTPException(status_code=400, detail="No code to refine")
+    if not request.note.strip():
+        raise HTTPException(status_code=400, detail="Annotation note is empty")
+    if not request.targets and not request.region:
+        raise HTTPException(
+            status_code=400, detail="Annotation has no target elements or region"
+        )
+
+    # Same per-user AI budget as /api/predict — this is a full Gemini call.
+    if ai_rate_limiter is not None:
+        allowed, retry_after, _ = ai_rate_limiter.check(
+            _rate_limit_key(request, http_request)
+        )
+        if not allowed:
+            retry_secs = max(1, math.ceil(retry_after))
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "You're sending requests too quickly. "
+                    f"Please wait {retry_secs}s and try again."
+                ),
+                headers={"Retry-After": str(retry_secs)},
+            )
+
+    supabase = create_supabase_client()
+    project = load_project_or_403(supabase, request.projectId, request.userId)
+
+    prompt = build_annotation_prompt(
+        request.code,
+        request.framework,
+        request.note,
+        request.targets,
+        request.region,
+        float(request.width),
+        float(request.height),
+    )
+
+    _t_start = time.perf_counter()
+    try:
+        refined_code = await asyncio.wait_for(
+            asyncio.to_thread(
+                generate_with_gemini,
+                [],
+                request.framework,
+                "tailwind",
+                None,
+                prompt_override=prompt,
+            ),
+            timeout=GEMINI_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Annotation refinement timed out")
+    except GeminiRateLimited as error:
+        raise HTTPException(
+            status_code=429, detail=str(error), headers={"Retry-After": "60"}
+        )
+    except GeminiQuotaExhausted as error:
+        raise HTTPException(status_code=503, detail=str(error))
+    except Exception as error:
+        print(f"[annotate] Gemini error: {error}")
+        raise HTTPException(
+            status_code=500, detail=f"Annotation refinement failed: {error}"
+        )
+
+    if not refined_code or not refined_code.strip():
+        raise HTTPException(
+            status_code=502, detail="Annotation refinement returned empty code"
+        )
+
+    # Version history stays truthful: the refined code is a new iteration.
+    note_summary = request.note.strip().replace("\n", " ")
+    if len(note_summary) > 120:
+        note_summary = note_summary[:117] + "..."
+    iteration_id = persist_generation_result(
+        supabase,
+        request.projectId,
+        project.get("canvas_data") or {},
+        refined_code,
+        f"Annotation refinement: {note_summary}",
+    )
+
+    print(
+        f"[annotate] ok chars={len(refined_code)} targets={len(request.targets)} "
+        f"took={(time.perf_counter() - _t_start) * 1000:.0f}ms"
+    )
+    return AnnotateResponse(
+        success=True, code=refined_code, iteration_id=iteration_id
+    )
 
 
 if __name__ == "__main__":

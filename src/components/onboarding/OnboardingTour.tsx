@@ -8,7 +8,12 @@ const MONO = "var(--font-jetbrains-mono, ui-monospace, monospace)";
 const SANS = "var(--font-inter, ui-sans-serif, system-ui)";
 const SERIF = "var(--font-instrument-serif, ui-serif, Georgia, serif)";
 
-export type OnboardingPlacement = "right" | "left" | "top" | "bottom" | "center";
+export type OnboardingPlacement =
+  | "right"
+  | "left"
+  | "top"
+  | "bottom"
+  | "center";
 
 export interface OnboardingStep {
   id: string;
@@ -48,10 +53,13 @@ export default function OnboardingTour({
   onSkip,
   onFinish,
 }: OnboardingTourProps) {
-  const [highlightRect, setHighlightRect] = useState<HighlightRect | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(
+  const [highlightRect, setHighlightRect] = useState<HighlightRect | null>(
     null
   );
+  const [tooltipPos, setTooltipPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
 
   const currentStep = steps[stepIndex];
@@ -74,8 +82,14 @@ export default function OnboardingTour({
     const rect = target.getBoundingClientRect();
     const top = Math.max(rect.top - HIGHLIGHT_PADDING, VIEWPORT_PADDING);
     const left = Math.max(rect.left - HIGHLIGHT_PADDING, VIEWPORT_PADDING);
-    const bottom = Math.min(rect.bottom + HIGHLIGHT_PADDING, window.innerHeight - VIEWPORT_PADDING);
-    const right = Math.min(rect.right + HIGHLIGHT_PADDING, window.innerWidth - VIEWPORT_PADDING);
+    const bottom = Math.min(
+      rect.bottom + HIGHLIGHT_PADDING,
+      window.innerHeight - VIEWPORT_PADDING
+    );
+    const right = Math.min(
+      rect.right + HIGHLIGHT_PADDING,
+      window.innerWidth - VIEWPORT_PADDING
+    );
     const width = right - left;
     const height = bottom - top;
 
@@ -94,7 +108,9 @@ export default function OnboardingTour({
     handleUpdate();
 
     const target = currentStep
-      ? (document.querySelector(currentStep.targetSelector) as HTMLElement | null)
+      ? (document.querySelector(
+          currentStep.targetSelector
+        ) as HTMLElement | null)
       : null;
     const observer = target ? new ResizeObserver(handleUpdate) : null;
     if (observer && target) {
@@ -158,14 +174,21 @@ export default function OnboardingTour({
 
     if (!highlightRect || !currentStep) {
       setTooltipPos({
-        top: Math.max((viewportHeight - tooltipRect.height) / 2, VIEWPORT_PADDING),
-        left: Math.max((viewportWidth - tooltipRect.width) / 2, VIEWPORT_PADDING),
+        top: Math.max(
+          (viewportHeight - tooltipRect.height) / 2,
+          VIEWPORT_PADDING
+        ),
+        left: Math.max(
+          (viewportWidth - tooltipRect.width) / 2,
+          VIEWPORT_PADDING
+        ),
       });
       return;
     }
 
     const placement = currentStep.placement ?? "right";
-    let top = highlightRect.top + highlightRect.height / 2 - tooltipRect.height / 2;
+    let top =
+      highlightRect.top + highlightRect.height / 2 - tooltipRect.height / 2;
     let left = highlightRect.left + highlightRect.width + TOOLTIP_GAP;
 
     if (placement === "left") {
@@ -173,15 +196,19 @@ export default function OnboardingTour({
     }
     if (placement === "top") {
       top = highlightRect.top - tooltipRect.height - TOOLTIP_GAP;
-      left = highlightRect.left + highlightRect.width / 2 - tooltipRect.width / 2;
+      left =
+        highlightRect.left + highlightRect.width / 2 - tooltipRect.width / 2;
     }
     if (placement === "bottom") {
       top = highlightRect.top + highlightRect.height + TOOLTIP_GAP;
-      left = highlightRect.left + highlightRect.width / 2 - tooltipRect.width / 2;
+      left =
+        highlightRect.left + highlightRect.width / 2 - tooltipRect.width / 2;
     }
     if (placement === "center") {
-      top = highlightRect.top + highlightRect.height / 2 - tooltipRect.height / 2;
-      left = highlightRect.left + highlightRect.width / 2 - tooltipRect.width / 2;
+      top =
+        highlightRect.top + highlightRect.height / 2 - tooltipRect.height / 2;
+      left =
+        highlightRect.left + highlightRect.width / 2 - tooltipRect.width / 2;
     }
 
     const clampedTop = Math.min(

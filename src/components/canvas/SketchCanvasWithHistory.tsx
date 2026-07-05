@@ -10,7 +10,15 @@ import SketchCanvas, { type SketchCanvasRef } from "./SketchCanvas";
 
 interface CanvasShapeData {
   id?: string;
-  type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow" | "line";
+  type?:
+    | "text"
+    | "rectangle"
+    | "circle"
+    | "image"
+    | "ellipse"
+    | "triangle"
+    | "arrow"
+    | "line";
   x?: number;
   y?: number;
   width?: number;
@@ -63,9 +71,8 @@ interface SketchCanvasWithHistoryProps {
   onStateChange: (newState: CanvasTemplateData) => void;
 }
 
-export interface SketchCanvasWithHistoryRef extends SketchCanvasRef {
-  //  Additional methods if needed
-}
+// Alias for now; widen into an interface if history-specific methods appear.
+export type SketchCanvasWithHistoryRef = SketchCanvasRef;
 
 /**
  * Wrapper around SketchCanvas that integrates with the useHistory hook
@@ -151,7 +158,8 @@ const SketchCanvasWithHistory = forwardRef<
         onStateChange({
           lines: (data.lines ?? []) as CanvasLineData[],
           shapes: (data.shapes ?? []) as CanvasShapeData[],
-          componentGroups: (data.componentGroups ?? []) as CanvasComponentGroup[],
+          componentGroups: (data.componentGroups ??
+            []) as CanvasComponentGroup[],
         });
       },
     }));
@@ -163,7 +171,8 @@ const SketchCanvasWithHistory = forwardRef<
     // Uses replaceCanvasState so componentGroups (templates) survive the round-trip;
     // the previous clearCanvas + insertTemplate path silently dropped them.
     useEffect(() => {
-      if (!canvasState || !canvasRef.current || isApplyingHistoryRef.current) return;
+      if (!canvasState || !canvasRef.current || isApplyingHistoryRef.current)
+        return;
 
       const currentData = canvasRef.current.getCanvasData();
       const currentCanvasState = {

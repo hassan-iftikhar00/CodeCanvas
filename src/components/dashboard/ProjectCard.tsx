@@ -6,7 +6,9 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { recordProjectActivity } from "@/lib/dashboard-projects";
 import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
-import SketchThumbnail, { hasSketchContent } from "@/components/SketchThumbnail";
+import SketchThumbnail, {
+  hasSketchContent,
+} from "@/components/SketchThumbnail";
 import type { CanvasData } from "@/hooks/useProjectSave";
 
 interface Project {
@@ -87,6 +89,15 @@ export default function ProjectCard({
             src={project.thumbnailUrl}
             alt={project.title}
             className="relative z-10 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+          />
+        ) : project.canvasData?.uploadedSketch?.dataUrl ? (
+          // Upload-based project: no drawn strokes to render, show the
+          // uploaded sketch image itself.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={project.canvasData.uploadedSketch.dataUrl}
+            alt={project.title}
+            className="relative z-10 h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.02]"
           />
         ) : hasSketchContent(project.canvasData) ? (
           <SketchThumbnail canvasData={project.canvasData!} />
@@ -196,7 +207,9 @@ export default function ProjectCard({
                 border: `1px solid transparent`,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = isStarred ? T.cobaltInk : T.graphite;
+                e.currentTarget.style.color = isStarred
+                  ? T.cobaltInk
+                  : T.graphite;
                 e.currentTarget.style.borderColor = T.rule;
               }}
               onMouseLeave={(e) => {

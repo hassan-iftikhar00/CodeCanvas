@@ -3,7 +3,9 @@ import cv2
 from typing import Dict, List, Any, Tuple
 
 
-def preprocess_uploaded_photo(img_rgb: np.ndarray, *, binarize: bool) -> np.ndarray:
+def preprocess_uploaded_photo(
+    img_rgb: np.ndarray, *, binarize: bool, return_clean: bool = False
+):
     """
     Normalize an uploaded image so it reaches the Roboflow model looking like the
     clean line-art-on-white the model was trained on.
@@ -19,12 +21,18 @@ def preprocess_uploaded_photo(img_rgb: np.ndarray, *, binarize: bool) -> np.ndar
         img_rgb: HxWx3 uint8 RGB array (alpha already composited onto white).
         binarize: True for photos (threshold to black/white), False for clean
             digital wireframes (skip threshold, crop only).
+        return_clean: also return a NON-binarized copy with the exact same crop
+            geometry. Binarization is good for the detector but destroys faint /
+            blurred text, so the clean copy is what should be handed to Gemini
+            for text reading. Its pixel space matches the detector image (and
+            therefore the detection boxes) exactly.
 
     Returns:
-        HxWx3 uint8 RGB array, white background, ready to hand to Roboflow.
+        HxWx3 uint8 RGB array ready for Roboflow, or a (detector_img, clean_img)
+        tuple when return_clean=True.
     """
     if img_rgb is None or img_rgb.size == 0:
-        return img_rgb
+        return (img_rgb, img_rgb) if return_clean else img_rgb
 
     # Tolerate grayscale / RGBA inputs defensively.
     if img_rgb.ndim == 2:
@@ -66,7 +74,7 @@ def preprocess_uploaded_photo(img_rgb: np.ndarray, *, binarize: bool) -> np.ndar
     ys, xs = np.where(ink_mask)
     if ys.size == 0 or xs.size == 0:
         # Nothing detectable to crop to — return as-is and let detection decide.
-        return rgb_out
+        return (rgb_out, img_rgb) if return_clean else rgb_out
 
     h, w = work_gray.shape[:2]
     margin = max(8, int(0.02 * max(h, w)))
@@ -77,8 +85,10 @@ def preprocess_uploaded_photo(img_rgb: np.ndarray, *, binarize: bool) -> np.ndar
 
     # Guard against a degenerate crop (e.g. a near-blank image) collapsing the frame.
     if (y1 - y0) < 16 or (x1 - x0) < 16:
-        return rgb_out
+        return (rgb_out, img_rgb) if return_clean else rgb_out
 
+    if return_clean:
+        return rgb_out[y0:y1, x0:x1], img_rgb[y0:y1, x0:x1]
     return rgb_out[y0:y1, x0:x1]
 
 

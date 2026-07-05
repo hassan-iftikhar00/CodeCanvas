@@ -16,6 +16,7 @@ export async function GET() {
     }
 
     // Get profile from database
+    // eslint-disable-next-line prefer-const -- profile is reassigned below when a row is created
     let { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("*")

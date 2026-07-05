@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const STORAGE_BUCKETS = ["avatars", "sketch-exports", "project-assets"] as const;
+const STORAGE_BUCKETS = [
+  "avatars",
+  "sketch-exports",
+  "project-assets",
+] as const;
 
 export async function POST() {
   // Step 1: Verify the requesting user's session server-side.
@@ -72,8 +76,7 @@ export async function POST() {
     );
     return NextResponse.json(
       {
-        error:
-          "Failed to delete account. Please try again or contact support.",
+        error: "Failed to delete account. Please try again or contact support.",
       },
       { status: 500 }
     );

@@ -25,7 +25,10 @@ import { Instrument_Serif, Inter, JetBrains_Mono } from "next/font/google";
 import { createClient } from "@/lib/supabase/client";
 import { Instagram, Github, Twitter, Mail, Check, Send } from "lucide-react";
 import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
-import { DraftingMark as Mark, DraftingCross as Cross } from "@/lib/drafting-room/marks";
+import {
+  DraftingMark as Mark,
+  DraftingCross as Cross,
+} from "@/lib/drafting-room/marks";
 
 // GridScan removed from this page — the Three.js perspective tunnel fought the
 // precision register. Replaced with a static graph + cobalt scan tick + crosshair
@@ -99,7 +102,10 @@ const TESTIMONIALS = [
   },
 ];
 
-const FOOTER_COLS: Array<{ title: string; links: Array<{ label: string; href: string }> }> = [
+const FOOTER_COLS: Array<{
+  title: string;
+  links: Array<{ label: string; href: string }>;
+}> = [
   {
     title: "Product",
     links: [
@@ -127,7 +133,9 @@ export default function Home() {
   // ── state + handlers — preserved verbatim from previous landing ────────────
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokes, setStrokes] = useState<{ x: number; y: number }[][]>([]);
-  const [currentStroke, setCurrentStroke] = useState<{ x: number; y: number }[]>([]);
+  const [currentStroke, setCurrentStroke] = useState<
+    { x: number; y: number }[]
+  >([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const router = useRouter();
   const supabase = createClient();
@@ -217,21 +225,9 @@ export default function Home() {
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, rect.width, rect.height);
 
-    // Drafting graph — thin orthogonal lines at 16px
-    ctx.strokeStyle = T.tick;
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= rect.width; x += 16) {
-      ctx.beginPath();
-      ctx.moveTo(x + 0.5, 0);
-      ctx.lineTo(x + 0.5, rect.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= rect.height; y += 16) {
-      ctx.beginPath();
-      ctx.moveTo(0, y + 0.5);
-      ctx.lineTo(rect.width, y + 0.5);
-      ctx.stroke();
-    }
+    // No grid here: the hero already draws its own graph background, and a
+    // second grid inside this well made the mini-canvas blend into the page.
+    // Plain white surface reads as "canvas"; strokes carry the sketch feel.
 
     // Pen strokes in graphite
     ctx.strokeStyle = T.graphite;
@@ -249,7 +245,9 @@ export default function Home() {
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
-    <div className={`${serif.variable} ${sans.variable} ${mono.variable} d5-root min-h-screen`}>
+    <div
+      className={`${serif.variable} ${sans.variable} ${mono.variable} d5-root min-h-screen`}
+    >
       <style jsx global>{`
         :root {
           --d5-paper: ${T.paper};
@@ -338,7 +336,8 @@ export default function Home() {
           border: 1px solid var(--d5-rule);
           background: var(--d5-paper);
           color: var(--d5-graphite);
-          transition: background 120ms cubic-bezier(0.2, 0.7, 0.1, 1),
+          transition:
+            background 120ms cubic-bezier(0.2, 0.7, 0.1, 1),
             color 120ms cubic-bezier(0.2, 0.7, 0.1, 1),
             border-color 120ms cubic-bezier(0.2, 0.7, 0.1, 1);
           cursor: pointer;
@@ -454,8 +453,14 @@ export default function Home() {
         <div className="absolute inset-0 d5-grid pointer-events-none" />
 
         {/* silent margin guides */}
-        <div className="absolute left-0 right-0 h-px pointer-events-none" style={{ top: 64, background: T.tick, opacity: 0.5 }} />
-        <div className="absolute left-0 right-0 h-px pointer-events-none" style={{ bottom: 64, background: T.tick, opacity: 0.5 }} />
+        <div
+          className="absolute left-0 right-0 h-px pointer-events-none"
+          style={{ top: 64, background: T.tick, opacity: 0.5 }}
+        />
+        <div
+          className="absolute left-0 right-0 h-px pointer-events-none"
+          style={{ bottom: 64, background: T.tick, opacity: 0.5 }}
+        />
 
         {/* cobalt scan tick — slow traverse along bottom edge */}
         <div className="absolute left-0 bottom-0 w-full h-px pointer-events-none overflow-hidden">
@@ -487,22 +492,63 @@ export default function Home() {
             viewBox="0 0 40 40"
             style={{ transform: "translate(-50%, -50%)", color: T.cobalt }}
           >
-            <circle cx="20" cy="20" r="8" fill="none" stroke="currentColor" strokeWidth="1" />
-            <line x1="20" y1="0" x2="20" y2="14" stroke="currentColor" strokeWidth="1" />
-            <line x1="20" y1="26" x2="20" y2="40" stroke="currentColor" strokeWidth="1" />
-            <line x1="0" y1="20" x2="14" y2="20" stroke="currentColor" strokeWidth="1" />
-            <line x1="26" y1="20" x2="40" y2="20" stroke="currentColor" strokeWidth="1" />
+            <circle
+              cx="20"
+              cy="20"
+              r="8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1"
+            />
+            <line
+              x1="20"
+              y1="0"
+              x2="20"
+              y2="14"
+              stroke="currentColor"
+              strokeWidth="1"
+            />
+            <line
+              x1="20"
+              y1="26"
+              x2="20"
+              y2="40"
+              stroke="currentColor"
+              strokeWidth="1"
+            />
+            <line
+              x1="0"
+              y1="20"
+              x2="14"
+              y2="20"
+              stroke="currentColor"
+              strokeWidth="1"
+            />
+            <line
+              x1="26"
+              y1="20"
+              x2="40"
+              y2="20"
+              stroke="currentColor"
+              strokeWidth="1"
+            />
             <circle cx="20" cy="20" r="1.2" fill="currentColor" />
           </svg>
         </div>
 
         <div className="relative z-10 mx-auto max-w-7xl px-6 pt-20 pb-24 sm:pt-24 sm:pb-28 lg:px-10 pointer-events-none">
           {/* slug + coord row — left: figure ID, right: live cursor coords (drafting tool readout) */}
-          <div className="d5-mono mb-12 flex items-center justify-between text-[10px] tracking-[0.16em] uppercase pointer-events-auto" style={{ color: T.muted }}>
+          <div
+            className="d5-mono mb-12 flex items-center justify-between text-[10px] tracking-[0.16em] uppercase pointer-events-auto"
+            style={{ color: T.muted }}
+          >
             <span>
               FIG. 01 / TOOL VIEW · LIVE
               {strokes.length > 0 && (
-                <span style={{ color: T.cobalt }}>{" · "}{strokes.length} STROKES</span>
+                <span style={{ color: T.cobalt }}>
+                  {" · "}
+                  {strokes.length} STROKES
+                </span>
               )}
             </span>
             <span className="flex items-center gap-3 tabular-nums">
@@ -547,85 +593,108 @@ export default function Home() {
               </div>
 
               <div className="space-y-8 p-6 sm:p-8">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-                className="inline-flex items-center gap-2 d5-mono text-[10px] tracking-[0.18em] uppercase border px-3 py-1.5"
-                style={{ borderColor: T.rule, color: T.graphite, background: T.paper }}
-              >
-                <span
-                  className="d5-dot-pulse inline-block h-1.5 w-1.5"
-                  style={{ background: T.cobalt }}
-                />
-                Sketch to code · v0.1
-              </motion.div>
-
-              <div className="space-y-0">
-                {(["Draw.", "Describe.", "Ship."] as const).map((word, i) => (
-                  <motion.h1
-                    key={word}
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.7, delay: 0.1 + i * 0.1, ease: [0.65, 0, 0.35, 1] }}
-                    className="d5-serif"
-                    style={{
-                      fontSize: "clamp(56px, 9vw, 132px)",
-                      lineHeight: 0.92,
-                      letterSpacing: "-0.03em",
-                      color: i === 2 ? T.cobalt : T.graphite,
-                      fontStyle: i === 2 ? "italic" : "normal",
-                      fontWeight: 400,
-                    }}
-                  >
-                    {word}
-                  </motion.h1>
-                ))}
-              </div>
-
-              <motion.p
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="max-w-xl text-[18px] leading-[1.55]"
-                style={{ color: T.graphite }}
-              >
-                Convert rough sketches into production-ready frontends, with live preview and one-click export.
-              </motion.p>
-
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                className="flex flex-wrap items-center gap-3"
-              >
-                <button
-                  onClick={() => handleStartNav("/canvas")}
-                  className="d5-btn d5-btn-primary"
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                  className="inline-flex items-center gap-2 d5-mono text-[10px] tracking-[0.18em] uppercase border px-3 py-1.5"
+                  style={{
+                    borderColor: T.rule,
+                    color: T.graphite,
+                    background: T.paper,
+                  }}
                 >
-                  Open Canvas <span>→</span>
-                </button>
-                <button className="d5-btn">Watch Demo</button>
-              </motion.div>
-
-              {/* feature pills — hairline mono badges */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.85 }}
-                className="flex flex-wrap gap-2 pt-4"
-              >
-                {["LIVE PREVIEW", "AI RECOGNITION", "ONE-CLICK EXPORT"].map((label) => (
                   <span
-                    key={label}
-                    className="d5-mono inline-flex items-center gap-2 border px-3 py-1.5 text-[10px] tracking-[0.18em]"
-                    style={{ borderColor: T.rule, color: T.graphite, background: T.paper }}
+                    className="d5-dot-pulse inline-block h-1.5 w-1.5"
+                    style={{ background: T.cobalt }}
+                  />
+                  Sketch to code · v0.1
+                </motion.div>
+
+                <div className="space-y-0">
+                  {(["Draw.", "Describe.", "Ship."] as const).map((word, i) => (
+                    <motion.h1
+                      key={word}
+                      initial={{ opacity: 0, y: 24 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.7,
+                        delay: 0.1 + i * 0.1,
+                        ease: [0.65, 0, 0.35, 1],
+                      }}
+                      className="d5-serif"
+                      style={{
+                        fontSize: "clamp(56px, 9vw, 132px)",
+                        lineHeight: 0.92,
+                        letterSpacing: "-0.03em",
+                        color: i === 2 ? T.cobalt : T.graphite,
+                        fontStyle: i === 2 ? "italic" : "normal",
+                        fontWeight: 400,
+                      }}
+                    >
+                      {word}
+                    </motion.h1>
+                  ))}
+                </div>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.6,
+                    delay: 0.5,
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
+                  className="max-w-xl text-[18px] leading-[1.55]"
+                  style={{ color: T.graphite }}
+                >
+                  Convert rough sketches into production-ready frontends, with
+                  live preview and one-click export.
+                </motion.p>
+
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.6,
+                    delay: 0.6,
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
+                  className="flex flex-wrap items-center gap-3"
+                >
+                  <button
+                    onClick={() => handleStartNav("/canvas")}
+                    className="d5-btn d5-btn-primary"
                   >
-                    <Cross size={8} />
-                    {label}
-                  </span>
-                ))}
-              </motion.div>
+                    Open Canvas <span>→</span>
+                  </button>
+                  <button className="d5-btn">Watch Demo</button>
+                </motion.div>
+
+                {/* feature pills — hairline mono badges */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.6, delay: 0.85 }}
+                  className="flex flex-wrap gap-2 pt-4"
+                >
+                  {["LIVE PREVIEW", "AI RECOGNITION", "ONE-CLICK EXPORT"].map(
+                    (label) => (
+                      <span
+                        key={label}
+                        className="d5-mono inline-flex items-center gap-2 border px-3 py-1.5 text-[10px] tracking-[0.18em]"
+                        style={{
+                          borderColor: T.rule,
+                          color: T.graphite,
+                          background: T.paper,
+                        }}
+                      >
+                        <Cross size={8} />
+                        {label}
+                      </span>
+                    )
+                  )}
+                </motion.div>
               </div>
             </div>
 
@@ -633,7 +702,11 @@ export default function Home() {
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              transition={{
+                duration: 0.7,
+                delay: 0.4,
+                ease: [0.16, 1, 0.3, 1],
+              }}
               className="relative lg:col-span-5 pointer-events-auto"
             >
               <div
@@ -666,7 +739,11 @@ export default function Home() {
                     style={{
                       width: "100%",
                       height: 320,
-                      background: T.cobaltWash,
+                      // Pure white, not T.paper: the hero behind this card has
+                      // its own 8px/32px graph, and a paper-toned canvas with a
+                      // 16px graph visually merges into it. White separates the
+                      // drawing well so it reads as "the canvas".
+                      background: "#FFFFFF",
                       display: "block",
                     }}
                     onMouseDown={startDrawing}
@@ -679,11 +756,31 @@ export default function Home() {
                       className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3"
                       style={{ color: T.muted }}
                     >
-                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={T.cobalt} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        width="40"
+                        height="40"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={T.cobalt}
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <path d="M4 18 L 7 12 L 12 16 L 17 8 L 20 12" />
                       </svg>
-                      <span className="d5-mono text-[10px] tracking-[0.18em] uppercase">
-                        Any pen · any speed · rough is fine
+                      <span
+                        className="d5-serif"
+                        style={{
+                          fontSize: 22,
+                          lineHeight: 1,
+                          color: T.graphite,
+                        }}
+                      >
+                        Draw your UI here ~ No login required
+                      </span>
+
+                      <span className="d5-mono text-[12px] tracking-[0.18em] uppercase">
+                        Click and drag · any pen · rough is fine
                       </span>
                     </div>
                   )}
@@ -766,14 +863,23 @@ function TopBar() {
     >
       <Link href="/" className="flex items-center gap-3">
         <Mark size={22} color={T.graphite} />
-        <span className="text-[13px] tracking-[0.18em] uppercase" style={{ color: T.graphite }}>
+        <span
+          className="text-[13px] tracking-[0.18em] uppercase"
+          style={{ color: T.graphite }}
+        >
           CodeCanvas
         </span>
-        <span className="text-[10px] tracking-[0.16em] uppercase" style={{ color: T.muted }}>
+        <span
+          className="text-[10px] tracking-[0.16em] uppercase"
+          style={{ color: T.muted }}
+        >
           / DRAFTING ROOM
         </span>
       </Link>
-      <nav className="hidden items-center gap-6 text-[11px] tracking-[0.16em] uppercase md:flex" style={{ color: T.graphite }}>
+      <nav
+        className="hidden items-center gap-6 text-[11px] tracking-[0.16em] uppercase md:flex"
+        style={{ color: T.graphite }}
+      >
         <Link href="#features">Features</Link>
         <Link href="#stories">Stories</Link>
         <Link href="/canvas">Canvas</Link>
@@ -786,7 +892,11 @@ function TopBar() {
         >
           Log in
         </Link>
-        <Link href="/auth/signup" className="d5-btn d5-btn-primary" style={{ padding: "8px 16px", fontSize: 10 }}>
+        <Link
+          href="/auth/signup"
+          className="d5-btn d5-btn-primary"
+          style={{ padding: "8px 16px", fontSize: 10 }}
+        >
           Get Started →
         </Link>
       </div>
@@ -800,7 +910,9 @@ function HeroStatusBar({ strokes }: { strokes: number }) {
     const tick = () => {
       const d = new Date();
       const fmt = (n: number) => n.toString().padStart(2, "0");
-      setTime(`${fmt(d.getHours())}:${fmt(d.getMinutes())}:${fmt(d.getSeconds())}`);
+      setTime(
+        `${fmt(d.getHours())}:${fmt(d.getMinutes())}:${fmt(d.getSeconds())}`
+      );
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -813,7 +925,10 @@ function HeroStatusBar({ strokes }: { strokes: number }) {
     >
       <div className="flex items-center gap-5">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5" style={{ background: T.cobalt }} />
+          <span
+            className="inline-block w-1.5 h-1.5"
+            style={{ background: T.cobalt }}
+          />
           {strokes > 0 ? "DRAFTING" : "IDLE"}
         </span>
         <span>ZOOM 100%</span>
@@ -822,25 +937,50 @@ function HeroStatusBar({ strokes }: { strokes: number }) {
       </div>
       <div className="flex items-center gap-5">
         <span>GEMINI 2.5 · WARM</span>
-        <span>ROBOFLOW v2</span>
+        <span>ROBOFLOW v4</span>
         <span style={{ color: T.graphite }}>{time}</span>
       </div>
     </div>
   );
 }
 
-function SectionHeader({ index, title, caption }: { index: string; title: string; caption: string }) {
+function SectionHeader({
+  index,
+  title,
+  caption,
+}: {
+  index: string;
+  title: string;
+  caption: string;
+}) {
   return (
-    <div className="flex items-baseline justify-between border-b pb-5 mb-12" style={{ borderColor: T.rule }}>
+    <div
+      className="flex items-baseline justify-between border-b pb-5 mb-12"
+      style={{ borderColor: T.rule }}
+    >
       <div className="flex items-baseline gap-6">
-        <span className="d5-mono text-[12px] tracking-[0.2em]" style={{ color: T.cobalt }}>
+        <span
+          className="d5-mono text-[12px] tracking-[0.2em]"
+          style={{ color: T.cobalt }}
+        >
           {index}
         </span>
-        <h2 className="d5-serif" style={{ fontSize: 56, lineHeight: 1, letterSpacing: "-0.025em", fontWeight: 400 }}>
+        <h2
+          className="d5-serif"
+          style={{
+            fontSize: 56,
+            lineHeight: 1,
+            letterSpacing: "-0.025em",
+            fontWeight: 400,
+          }}
+        >
           {title}
         </h2>
       </div>
-      <span className="d5-mono text-[11px] tracking-[0.14em] uppercase hidden sm:inline" style={{ color: T.muted }}>
+      <span
+        className="d5-mono text-[11px] tracking-[0.14em] uppercase hidden sm:inline"
+        style={{ color: T.muted }}
+      >
         {caption}
       </span>
     </div>
@@ -851,7 +991,11 @@ function SeeInAction() {
   return (
     <section className="border-b" style={{ borderColor: T.rule }}>
       <div className="mx-auto max-w-7xl px-6 lg:px-10 py-24">
-        <SectionHeader index="01" title="See it in action" caption="Sketch → detect → generate · ≈1.2s" />
+        <SectionHeader
+          index="01"
+          title="See it in action"
+          caption="Sketch → detect → generate · ≈1.2s"
+        />
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -874,7 +1018,14 @@ function SeeInAction() {
           </div>
           {/* video well */}
           <div className="p-3">
-            <video className="w-full" autoPlay loop muted playsInline style={{ display: "block" }}>
+            <video
+              className="w-full"
+              autoPlay
+              loop
+              muted
+              playsInline
+              style={{ display: "block" }}
+            >
               <source
                 src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/media/demo-video.mp4`}
                 type="video/mp4"
@@ -918,31 +1069,53 @@ function WhyCodeCanvas() {
   return (
     <section id="features" className="border-b" style={{ borderColor: T.rule }}>
       <div className="mx-auto max-w-7xl px-6 lg:px-10 py-24">
-        <SectionHeader index="02" title="Why CodeCanvas" caption="Hairline-first. Cobalt as interaction ink." />
-        <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-3" style={{ background: T.rule }}>
+        <SectionHeader
+          index="02"
+          title="Why CodeCanvas"
+          caption="Hairline-first. Cobalt as interaction ink."
+        />
+        <div
+          className="grid gap-px sm:grid-cols-2 lg:grid-cols-3"
+          style={{ background: T.rule }}
+        >
           {features.map((f, i) => (
             <motion.div
               key={f.title}
               initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.5, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+              transition={{
+                duration: 0.5,
+                delay: i * 0.05,
+                ease: [0.16, 1, 0.3, 1],
+              }}
               className="p-8 transition-colors hover:bg-[var(--d5-vellum)]"
               style={{ background: T.paper }}
             >
               <div className="flex items-start justify-between mb-6">
-                <span className="d5-mono text-[11px] tracking-[0.2em]" style={{ color: T.cobalt }}>
+                <span
+                  className="d5-mono text-[11px] tracking-[0.2em]"
+                  style={{ color: T.cobalt }}
+                >
                   0{i + 1}
                 </span>
                 <Cross size={8} />
               </div>
               <h3
                 className="d5-serif mb-3"
-                style={{ fontSize: 28, lineHeight: 1, letterSpacing: "-0.02em", fontWeight: 400 }}
+                style={{
+                  fontSize: 28,
+                  lineHeight: 1,
+                  letterSpacing: "-0.02em",
+                  fontWeight: 400,
+                }}
               >
                 {f.title}
               </h3>
-              <p className="text-[14px] leading-[1.55]" style={{ color: T.muted }}>
+              <p
+                className="text-[14px] leading-[1.55]"
+                style={{ color: T.muted }}
+              >
                 {f.desc}
               </p>
             </motion.div>
@@ -958,14 +1131,21 @@ function TestimonialsBlock() {
   const [auto, setAuto] = useState(true);
   useEffect(() => {
     if (!auto) return;
-    const t = setInterval(() => setI((v) => (v + 1) % TESTIMONIALS.length), 5000);
+    const t = setInterval(
+      () => setI((v) => (v + 1) % TESTIMONIALS.length),
+      5000
+    );
     return () => clearInterval(t);
   }, [auto]);
   const t = TESTIMONIALS[i];
   return (
     <section id="stories" className="border-b" style={{ borderColor: T.rule }}>
       <div className="mx-auto max-w-7xl px-6 lg:px-10 py-24">
-        <SectionHeader index="03" title="Stories from the workshop" caption={`${TESTIMONIALS.length} VOICES · DESIGNERS & DEVELOPERS`} />
+        <SectionHeader
+          index="03"
+          title="Stories from the workshop"
+          caption={`${TESTIMONIALS.length} VOICES · DESIGNERS & DEVELOPERS`}
+        />
 
         <div className="grid gap-12 lg:grid-cols-12 items-start">
           {/* big quote */}
@@ -998,7 +1178,11 @@ function TestimonialsBlock() {
             >
               <span
                 className="inline-flex h-9 w-9 items-center justify-center border text-[11px]"
-                style={{ borderColor: T.rule, color: T.graphite, background: T.paper }}
+                style={{
+                  borderColor: T.rule,
+                  color: T.graphite,
+                  background: T.paper,
+                }}
               >
                 {t.avatar}
               </span>
@@ -1012,7 +1196,10 @@ function TestimonialsBlock() {
 
           {/* index column */}
           <div className="lg:col-span-3">
-            <div className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-3" style={{ color: T.muted }}>
+            <div
+              className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-3"
+              style={{ color: T.muted }}
+            >
               INDEX
             </div>
             <div className="space-y-2">
@@ -1030,7 +1217,8 @@ function TestimonialsBlock() {
                   }}
                 >
                   <span>
-                    {(idx + 1).toString().padStart(2, "0")} · {tx.name.split(" ")[0]}
+                    {(idx + 1).toString().padStart(2, "0")} ·{" "}
+                    {tx.name.split(" ")[0]}
                   </span>
                   <span>{tx.company}</span>
                 </button>
@@ -1070,7 +1258,10 @@ function CTABlock({ onStart }: { onStart: () => void }) {
             background: T.graphite,
           }}
         >
-          <span className="inline-block w-1.5 h-1.5" style={{ background: T.cobalt }} />
+          <span
+            className="inline-block w-1.5 h-1.5"
+            style={{ background: T.cobalt }}
+          />
           READY WHEN YOU ARE
         </div>
         <h2
@@ -1085,7 +1276,10 @@ function CTABlock({ onStart }: { onStart: () => void }) {
         >
           Ready to build <em style={{ color: T.cobalt }}>faster?</em>
         </h2>
-        <p className="d5-serif mx-auto mt-6 max-w-xl text-[18px]" style={{ color: "rgba(242,241,236,0.7)", fontStyle: "italic" }}>
+        <p
+          className="d5-serif mx-auto mt-6 max-w-xl text-[18px]"
+          style={{ color: "rgba(242,241,236,0.7)", fontStyle: "italic" }}
+        >
           Start sketching your next project today. No credit card required.
         </p>
         <div className="mt-12 flex items-center justify-center gap-3">
@@ -1119,15 +1313,25 @@ function FooterBlock() {
           <div className="lg:col-span-4">
             <Link href="/" className="flex items-center gap-3 mb-6">
               <Mark size={28} color={T.graphite} />
-              <span className="d5-mono text-[13px] tracking-[0.18em] uppercase" style={{ color: T.graphite }}>
+              <span
+                className="d5-mono text-[13px] tracking-[0.18em] uppercase"
+                style={{ color: T.graphite }}
+              >
                 CodeCanvas
               </span>
             </Link>
-            <p className="text-[14px] leading-[1.6] mb-8 max-w-sm" style={{ color: T.muted }}>
-              The workshop where rough wireframes become production-ready React. Drawn by you, drafted by the room.
+            <p
+              className="text-[14px] leading-[1.6] mb-8 max-w-sm"
+              style={{ color: T.muted }}
+            >
+              The workshop where rough wireframes become production-ready React.
+              Drawn by you, drafted by the room.
             </p>
 
-            <div className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-2" style={{ color: T.muted }}>
+            <div
+              className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-2"
+              style={{ color: T.muted }}
+            >
               Newsletter
             </div>
             <form onSubmit={handleSubscribe} className="flex items-end gap-2">
@@ -1145,16 +1349,36 @@ function FooterBlock() {
                 className="d5-btn"
                 style={{ padding: "8px 14px", fontSize: 10 }}
               >
-                {subscribed ? <Check className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                {subscribed ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
               </button>
             </form>
 
             <div className="mt-8 flex gap-2">
               {[
-                { Icon: Instagram, href: "https://instagram.com/trycodecanvas", label: "Instagram" },
-                { Icon: Twitter, href: "https://x.com/TryCodeCanvas", label: "X" },
-                { Icon: Github, href: "https://github.com/trycodecanvas", label: "GitHub" },
-                { Icon: Mail, href: "mailto:hassaniftikhardev@gmail.com", label: "Email" },
+                {
+                  Icon: Instagram,
+                  href: "https://instagram.com/trycodecanvas",
+                  label: "Instagram",
+                },
+                {
+                  Icon: Twitter,
+                  href: "https://x.com/TryCodeCanvas",
+                  label: "X",
+                },
+                {
+                  Icon: Github,
+                  href: "https://github.com/trycodecanvas",
+                  label: "GitHub",
+                },
+                {
+                  Icon: Mail,
+                  href: "mailto:hassaniftikhardev@gmail.com",
+                  label: "Email",
+                },
               ].map(({ Icon, href, label }) => (
                 <a
                   key={label}
@@ -1175,7 +1399,10 @@ function FooterBlock() {
           <div className="grid grid-cols-2 gap-8 lg:col-span-8">
             {FOOTER_COLS.map((col) => (
               <div key={col.title}>
-                <div className="d5-mono text-[10px] tracking-[0.2em] uppercase mb-4 pb-2 border-b" style={{ borderColor: T.rule, color: T.graphite }}>
+                <div
+                  className="d5-mono text-[10px] tracking-[0.2em] uppercase mb-4 pb-2 border-b"
+                  style={{ borderColor: T.rule, color: T.graphite }}
+                >
                   {col.title}
                 </div>
                 <ul className="space-y-2.5">

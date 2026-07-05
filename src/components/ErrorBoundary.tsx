@@ -126,7 +126,8 @@ function ErrorFallback({
 
         {/* Body */}
         <div className="px-6 pt-5 pb-2 text-center sm:text-left">
-          <div className="mb-4 inline-flex h-10 w-10 items-center justify-center"
+          <div
+            className="mb-4 inline-flex h-10 w-10 items-center justify-center"
             style={{
               border: `1px solid ${T.error}`,
               color: T.error,

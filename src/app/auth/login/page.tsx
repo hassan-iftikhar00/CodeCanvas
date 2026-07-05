@@ -129,10 +129,13 @@ function LoginPageInner() {
     }
   }, []);
 
-  // Pick up auth_code_exchange_failed redirect param from supabase callback
+  // Pick up error redirect params from supabase callback
   useEffect(() => {
     const errorParam = searchParams.get("error");
-    if (errorParam === "auth_code_exchange_failed") {
+    if (
+      errorParam === "auth_code_exchange_failed" ||
+      errorParam === "auth_failed"
+    ) {
       setError("Authentication failed. Please try again.");
     }
   }, [searchParams]);
@@ -220,7 +223,9 @@ function LoginPageInner() {
         setProviderLoading(false);
       }
     } catch {
-      setError(`Failed to connect to ${provider === "google" ? "Google" : "GitHub"}. Please try again.`);
+      setError(
+        `Failed to connect to ${provider === "google" ? "Google" : "GitHub"}. Please try again.`
+      );
       setProviderLoading(false);
     }
   };
@@ -236,7 +241,11 @@ function LoginPageInner() {
       footerNote={
         <span style={{ letterSpacing: "0.12em" }}>
           NEW HERE?{" "}
-          <Link href="/auth/signup" className="d5-link" style={{ color: T_AUTH.cobalt }}>
+          <Link
+            href="/auth/signup"
+            className="d5-link"
+            style={{ color: T_AUTH.cobalt }}
+          >
             CREATE AN ACCOUNT
           </Link>
         </span>

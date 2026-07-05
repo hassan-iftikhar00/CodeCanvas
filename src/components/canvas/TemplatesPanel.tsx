@@ -9,7 +9,9 @@ import {
 } from "@/data/templates";
 import DraftingModal from "./DraftingModal";
 import { T_CANVAS } from "./canvasTokens";
-import SketchThumbnail, { hasSketchContent } from "@/components/SketchThumbnail";
+import SketchThumbnail, {
+  hasSketchContent,
+} from "@/components/SketchThumbnail";
 
 interface TemplatesPanelProps {
   isOpen: boolean;
@@ -237,7 +239,10 @@ function TemplateCard({
     >
       <div
         className="relative aspect-[4/3] w-full"
-        style={{ background: T_CANVAS.vellum, borderBottom: `1px solid ${T_CANVAS.rule}` }}
+        style={{
+          background: T_CANVAS.vellum,
+          borderBottom: `1px solid ${T_CANVAS.rule}`,
+        }}
       >
         {hasSketchContent(template.canvasData) && (
           <SketchThumbnail canvasData={template.canvasData} />
@@ -262,8 +267,7 @@ function TemplateCard({
             style={{
               background: T_CANVAS.vellum,
               color: T_CANVAS.muted,
-              fontFamily:
-                "var(--font-jetbrains-mono, ui-monospace, monospace)",
+              fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
             }}
           >
             {template.category}

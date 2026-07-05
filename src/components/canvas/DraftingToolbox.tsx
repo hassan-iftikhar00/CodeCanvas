@@ -77,7 +77,9 @@ export default function DraftingToolbox({
             title="Collapse"
             className="flex h-5 w-5 items-center justify-center transition-colors"
             style={{ color: T_CANVAS.muted }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = T_CANVAS.graphite)
+            }
             onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
           >
             <svg
@@ -115,7 +117,9 @@ export default function DraftingToolbox({
               color: T_CANVAS.muted,
               borderBottom: `1px solid ${T_CANVAS.rule}`,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = T_CANVAS.graphite)
+            }
             onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
           >
             <svg
@@ -150,7 +154,9 @@ export default function DraftingToolbox({
               role="tab"
               aria-selected={isActive}
               aria-label={tab.label}
-              title={tab.shortcut ? `${tab.label} (${tab.shortcut})` : tab.label}
+              title={
+                tab.shortcut ? `${tab.label} (${tab.shortcut})` : tab.label
+              }
               onClick={onClickTab}
               className={`relative flex items-center justify-center gap-1.5 px-2 transition-colors ${
                 collapsed ? "h-10 w-full" : "h-9 flex-1"
@@ -200,10 +206,7 @@ export default function DraftingToolbox({
       {!collapsed && (
         <div className="flex flex-1 flex-col overflow-hidden">
           {active.banner ? (
-            <div
-              className="border-b"
-              style={{ borderColor: T_CANVAS.rule }}
-            >
+            <div className="border-b" style={{ borderColor: T_CANVAS.rule }}>
               {active.banner}
             </div>
           ) : null}

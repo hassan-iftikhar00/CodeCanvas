@@ -137,26 +137,23 @@ export const templates: Template[] = [
     name: "3-Column Cards",
     category: "cards",
     description: "Three feature cards in a row",
-    preview: "Three cards with icon, title, description",
+    preview: "Three cards with title and description",
     canvasData: {
       shapes: [
         // Card 1
         { type: "rectangle", x: 80, y: 100, width: 250, height: 200 },
-        { type: "circle", x: 205, y: 140, radius: 20 },
-        { type: "text", x: 150, y: 190, text: "Feature One" },
-        { type: "text", x: 120, y: 220, text: "Description here" },
+        { type: "text", x: 150, y: 160, text: "Feature One" },
+        { type: "text", x: 120, y: 200, text: "Description here" },
 
         // Card 2
         { type: "rectangle", x: 375, y: 100, width: 250, height: 200 },
-        { type: "circle", x: 500, y: 140, radius: 20 },
-        { type: "text", x: 445, y: 190, text: "Feature Two" },
-        { type: "text", x: 415, y: 220, text: "Description here" },
+        { type: "text", x: 445, y: 160, text: "Feature Two" },
+        { type: "text", x: 415, y: 200, text: "Description here" },
 
         // Card 3
         { type: "rectangle", x: 670, y: 100, width: 250, height: 200 },
-        { type: "circle", x: 795, y: 140, radius: 20 },
-        { type: "text", x: 735, y: 190, text: "Feature Three" },
-        { type: "text", x: 710, y: 220, text: "Description here" },
+        { type: "text", x: 735, y: 160, text: "Feature Three" },
+        { type: "text", x: 710, y: 200, text: "Description here" },
       ],
       lines: [],
     },
@@ -199,8 +196,8 @@ export const templates: Template[] = [
     id: "footer",
     name: "Footer",
     category: "layout",
-    description: "Website footer with links and social icons",
-    preview: "Links, social media icons, copyright",
+    description: "Website footer with links and social media",
+    preview: "Links, social media labels, copyright",
     canvasData: {
       shapes: [
         // Container
@@ -210,10 +207,10 @@ export const templates: Template[] = [
         { type: "text", x: 180, y: 450, text: "Services" },
         { type: "text", x: 270, y: 450, text: "Contact" },
         { type: "text", x: 360, y: 450, text: "Privacy" },
-        // Social Icons (circles)
-        { type: "circle", x: 750, y: 450, radius: 15 },
-        { type: "circle", x: 800, y: 450, radius: 15 },
-        { type: "circle", x: 850, y: 450, radius: 15 },
+        // Social links
+        { type: "text", x: 720, y: 450, text: "Twitter" },
+        { type: "text", x: 790, y: 450, text: "LinkedIn" },
+        { type: "text", x: 860, y: 450, text: "GitHub" },
         // Copyright
         { type: "text", x: 400, y: 520, text: "© 2026 Company Name" },
       ],
@@ -249,53 +246,25 @@ export const templates: Template[] = [
     tags: ["form", "contact", "message", "input"],
   },
   {
-    id: "dashboard-sidebar",
-    name: "Dashboard Sidebar",
-    category: "navigation",
-    description: "Sidebar navigation for dashboard",
-    preview: "Logo, navigation menu items",
-    canvasData: {
-      shapes: [
-        // Sidebar container
-        { type: "rectangle", x: 50, y: 50, width: 250, height: 500 },
-        // Logo area
-        { type: "text", x: 120, y: 100, text: "Dashboard" },
-        // Menu items
-        { type: "rectangle", x: 70, y: 150, width: 210, height: 40 },
-        { type: "text", x: 100, y: 170, text: "Home" },
-        { type: "rectangle", x: 70, y: 200, width: 210, height: 40 },
-        { type: "text", x: 100, y: 220, text: "Projects" },
-        { type: "rectangle", x: 70, y: 250, width: 210, height: 40 },
-        { type: "text", x: 100, y: 270, text: "Analytics" },
-        { type: "rectangle", x: 70, y: 300, width: 210, height: 40 },
-        { type: "text", x: 100, y: 320, text: "Settings" },
-      ],
-      lines: [],
-    },
-    tags: ["sidebar", "navigation", "dashboard", "menu"],
-  },
-  {
     id: "profile-card",
     name: "Profile Card",
     category: "cards",
     description: "User profile card component",
-    preview: "Avatar, name, bio, action button",
+    preview: "Avatar image, name, bio, action button",
     canvasData: {
       shapes: [
         // Card container
         { type: "rectangle", x: 150, y: 100, width: 300, height: 350 },
-        // Avatar circle
-        { type: "circle", x: 300, y: 180, radius: 50 },
+        // Avatar
+        { type: "rectangle", x: 225, y: 130, width: 150, height: 100 },
+        { type: "text", x: 265, y: 175, text: "[ image ]" },
         // Name
         { type: "text", x: 250, y: 260, text: "John Doe" },
         // Bio
         { type: "text", x: 220, y: 290, text: "Product Designer" },
-        // Stats bars
-        { type: "rectangle", x: 180, y: 330, width: 240, height: 30 },
-        { type: "text", x: 240, y: 345, text: "120 Projects" },
         // Action button
-        { type: "rectangle", x: 200, y: 390, width: 200, height: 40 },
-        { type: "text", x: 260, y: 410, text: "View Profile" },
+        { type: "rectangle", x: 200, y: 360, width: 200, height: 45 },
+        { type: "text", x: 260, y: 382, text: "View Profile" },
       ],
       lines: [],
     },

@@ -425,15 +425,21 @@ def detect_with_roboflow(
     # canvas export path (sketch_source None/"canvas") is intentionally skipped so
     # it stays byte-identical. Applied BEFORE the debug dump below so the saved PNG
     # reflects exactly what Roboflow receives.
+    gemini_pil_image = pil_image  # what Gemini gets for text reading (uploads only)
     if sketch_source in ("upload-photo", "upload-clean"):
         try:
             from app.utils.preprocessing import preprocess_uploaded_photo
 
-            processed = preprocess_uploaded_photo(
+            # Binarization helps the detector but destroys faint/blurred text,
+            # so Gemini gets the clean (non-binarized) copy with the exact same
+            # crop geometry — its pixel space still matches the boxes below.
+            processed, clean = preprocess_uploaded_photo(
                 np.array(pil_image),
                 binarize=(sketch_source == "upload-photo"),
+                return_clean=True,
             )
             pil_image = Image.fromarray(processed)
+            gemini_pil_image = Image.fromarray(clean)
         except Exception as prep_error:
             print(f"Roboflow: upload preprocessing failed, using raw image: {prep_error}")
 
@@ -476,9 +482,31 @@ def detect_with_roboflow(
             )
         except Exception as cfg_error:
             print(f"Roboflow: could not set custom confidence (using SDK defaults): {cfg_error}")
-        result = client.infer(pil_image, model_id=resolved_model_id)
     except Exception as error:
-        print(f"Roboflow inference failed: {error}")
+        print(f"Roboflow: could not create client: {error}")
+        return None
+
+    max_attempts = max(1, int(os.getenv("ROBOFLOW_MAX_RETRIES", "3")))
+    result = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = client.infer(pil_image, model_id=resolved_model_id)
+            break
+        except Exception as infer_error:
+            err_str = str(infer_error).lower()
+            # Credit exhaustion and auth failures cannot recover by retrying.
+            non_retryable = any(
+                k in err_str
+                for k in ("credit", "401", "403", "unauthorized", "forbidden")
+            )
+            if non_retryable or attempt == max_attempts:
+                print(f"Roboflow inference failed: {infer_error}")
+                return None
+            delay = 2.0 ** (attempt - 1)  # 1 s, then 2 s
+            print(f"Roboflow: attempt {attempt}/{max_attempts} failed, retrying in {delay:.0f}s: {infer_error}")
+            time.sleep(delay)
+
+    if result is None:
         return None
 
     predictions = result.get("predictions") if isinstance(result, dict) else None
@@ -570,7 +598,7 @@ def detect_with_roboflow(
             print("[debug] All predictions filtered out → returning None")
         return None
 
-    elements.sort(key=lambda el: el.bounds.get("y", 0.0))
+    sort_reading_order(elements)
 
     metadata: Dict[str, Any] = {
         "model_id": resolved_model_id,
@@ -590,7 +618,7 @@ def detect_with_roboflow(
     if sketch_source in ("upload-photo", "upload-clean"):
         try:
             buf = io.BytesIO()
-            pil_image.save(buf, format="PNG")
+            gemini_pil_image.save(buf, format="PNG")
             metadata["processed_image_b64"] = base64.b64encode(buf.getvalue()).decode("ascii")
         except Exception as enc_error:
             print(f"Roboflow: could not stash processed image for Gemini: {enc_error}")
@@ -603,6 +631,479 @@ def detect_with_roboflow(
     )
 
 
+def _position_phrase(bounds: Dict[str, Any], width: float, height: float) -> str:
+    """Human phrasing for a box's location, so the repair prompt can say
+    'near the top, spanning the full width' instead of raw pixels alone."""
+    x = float(bounds.get("x", 0))
+    y = float(bounds.get("y", 0))
+    w = float(bounds.get("width", 0))
+    h = float(bounds.get("height", 0))
+    cx = (x + w / 2) / width if width else 0.5
+    cy = (y + h / 2) / height if height else 0.5
+
+    vertical = "top" if cy < 1 / 3 else ("middle" if cy < 2 / 3 else "bottom")
+    horizontal = "left" if cx < 1 / 3 else ("center" if cx < 2 / 3 else "right")
+    span = ", spanning the full width" if width and w / width > 0.85 else ""
+    return f"{vertical} {horizontal} of the page{span}"
+
+
+def build_repair_prompt(
+    code: str,
+    framework: str,
+    missing: List[Dict[str, Any]],
+    extra: List[Dict[str, Any]],
+    width: float,
+    height: float,
+) -> str:
+    """Corrective prompt for the auto-repair pass (Decision #25 follow-up).
+
+    The fidelity check re-rendered the generated code and re-detected its
+    components with the same vision model that grounded the original
+    generation. ``missing``/``extra`` are that check's mismatch report
+    (element dicts with type/bounds/optional label). The instruction set is
+    deliberately surgical: fix ONLY the listed discrepancies, byte-preserve
+    everything else.
+    """
+    lines: List[str] = [
+        "You previously generated UI code from a hand-drawn sketch. An automated",
+        "verification step rendered your code and re-detected its components with",
+        "the same vision model that analyzed the original sketch. It found the",
+        "discrepancies listed below.",
+        "",
+        f"The layout viewport is {width:.0f}x{height:.0f} pixels.",
+        "",
+    ]
+
+    if missing:
+        lines.append(
+            "MISSING — these sketch elements did not appear in your rendered "
+            "output. ADD each one at the described position:"
+        )
+        for i, el in enumerate(missing, start=1):
+            bounds = el.get("bounds") or {}
+            label = el.get("label")
+            label_part = f' labeled "{label}"' if label else ""
+            lines.append(
+                f"{i}. {el.get('type', 'element')}{label_part} at "
+                f"x={bounds.get('x', 0):.0f}, y={bounds.get('y', 0):.0f}, "
+                f"w={bounds.get('width', 0):.0f}, h={bounds.get('height', 0):.0f} "
+                f"({_position_phrase(bounds, width, height)})"
+            )
+        lines.append("")
+
+    if extra:
+        lines.append(
+            "EXTRA — these components appeared in your rendered output but are "
+            "NOT in the sketch. REMOVE each one (or merge it into a legitimate "
+            "neighbour if it is a duplicate):"
+        )
+        for i, el in enumerate(extra, start=1):
+            bounds = el.get("bounds") or {}
+            lines.append(
+                f"{i}. {el.get('type', 'element')} at "
+                f"x={bounds.get('x', 0):.0f}, y={bounds.get('y', 0):.0f}, "
+                f"w={bounds.get('width', 0):.0f}, h={bounds.get('height', 0):.0f} "
+                f"({_position_phrase(bounds, width, height)})"
+            )
+        lines.append("")
+
+    lines += [
+        "RULES:",
+        "- Fix ONLY the discrepancies listed above. Do not restyle, rename,",
+        "  reorder, or rewrite anything else — unchanged parts of the code must",
+        "  remain byte-identical.",
+        "- Do not invent content: added elements get minimal placeholder text",
+        "  consistent with their type (or the label given above).",
+        f"- Keep the output a complete, valid {framework} file in the same",
+        "  structure as the current code (same component name, same export).",
+        "- Return ONLY the complete updated code. No explanations, no markdown",
+        "  fences, no commentary.",
+        "",
+        "CURRENT CODE:",
+        code,
+    ]
+    return "\n".join(lines)
+
+
+def build_annotation_prompt(
+    code: str,
+    framework: str,
+    note: str,
+    targets: List[Dict[str, Any]],
+    region: Optional[Dict[str, Any]],
+    viewport_width: float,
+    viewport_height: float,
+) -> str:
+    """Prompt for the annotate-on-render refinement (App Uplift feature B).
+
+    The user drew directly ON the rendered preview (red-pen markup) and wrote
+    an instruction. The frontend resolved the marked region against the
+    rendered elements' ``data-cc-id`` boxes, so ``targets`` names the exact
+    components the markup covers ({ccId, tag?, rect{x,y,width,height}}).
+    ``region`` is the markup's bounding box in the same render-viewport pixel
+    space — kept as a fallback locator when no cc-id element intersected the
+    markup (e.g. the user circled empty whitespace to ask for something there).
+
+    Like the repair prompt (Decision #26), the instruction set is surgical:
+    apply the note ONLY to the marked part, byte-preserve everything else,
+    and never drop the data-cc-id grounding attributes (Decision #28).
+    """
+    lines: List[str] = [
+        "You previously generated UI code from a hand-drawn sketch. The user",
+        "reviewed the RENDERED page, drew a markup directly on top of it, and",
+        "wrote the instruction below. Apply that instruction to the marked",
+        "part of the page only.",
+        "",
+        f"The rendered viewport is {viewport_width:.0f}x{viewport_height:.0f} pixels.",
+        "",
+        f'USER INSTRUCTION: "{note.strip()}"',
+        "",
+    ]
+
+    if targets:
+        lines.append(
+            "MARKED ELEMENTS — the markup covers these components (identified "
+            "by their data-cc-id attribute in the current code):"
+        )
+        for i, t in enumerate(targets, start=1):
+            rect = t.get("rect") or {}
+            tag = t.get("tag")
+            tag_part = f" (<{tag}>)" if tag else ""
+            lines.append(
+                f'{i}. data-cc-id="{t.get("ccId", "?")}"{tag_part} at '
+                f"x={rect.get('x', 0):.0f}, y={rect.get('y', 0):.0f}, "
+                f"w={rect.get('width', 0):.0f}, h={rect.get('height', 0):.0f} "
+                f"({_position_phrase(rect, viewport_width, viewport_height)})"
+            )
+        lines.append("")
+    elif region:
+        lines.append(
+            "MARKED REGION — the markup did not land on a tagged component. "
+            "Its bounding box in the rendered page is:"
+        )
+        lines.append(
+            f"x={region.get('x', 0):.0f}, y={region.get('y', 0):.0f}, "
+            f"w={region.get('width', 0):.0f}, h={region.get('height', 0):.0f} "
+            f"({_position_phrase(region, viewport_width, viewport_height)})"
+        )
+        lines.append(
+            "Apply the instruction to whatever the code renders in that area."
+        )
+        lines.append("")
+
+    lines += [
+        "RULES:",
+        "- Apply the instruction ONLY to the marked elements/region. Do not",
+        "  restyle, rename, reorder, or rewrite anything else — unchanged parts",
+        "  of the code must remain byte-identical.",
+        '- Keep every data-cc-id="cc-N" attribute exactly as it is. If the',
+        "  instruction asks to remove a marked element, remove its whole tagged",
+        "  block; never renumber the remaining ids.",
+        "- Do not invent content beyond what the instruction asks for.",
+        f"- Keep the output a complete, valid {framework} file in the same",
+        "  structure as the current code (same component name, same export).",
+        "- Return ONLY the complete updated code. No explanations, no markdown",
+        "  fences, no commentary.",
+        "",
+        "CURRENT CODE:",
+        code,
+    ]
+    return "\n".join(lines)
+
+
+def _cards_share_row(a: "ExternalModelElement", b: "ExternalModelElement") -> bool:
+    """True when two boxes' y-intervals overlap by >= 50% of the shorter box."""
+    ab, bb = a.bounds or {}, b.bounds or {}
+    ay, ah = float(ab.get("y", 0.0)), float(ab.get("height", 0.0))
+    by, bh = float(bb.get("y", 0.0)), float(bb.get("height", 0.0))
+    overlap = min(ay + ah, by + bh) - max(ay, by)
+    shorter = min(ah, bh)
+    return shorter > 0 and (overlap / shorter) >= 0.5
+
+
+def sort_reading_order(elements: List["ExternalModelElement"]) -> None:
+    """Sort elements in reading order: top-to-bottom, left-to-right within a row.
+
+    A plain y-sort leaves same-row boxes in arbitrary order — hand-drawn rows
+    are never pixel-aligned, so a few pixels of y jitter decides which cell is
+    listed first, and Gemini follows the list order when composing grids
+    (two cells in one row can render swapped). Consecutive `card` runs whose
+    y-intervals chain-overlap are re-sorted by x. Containers keep pure y order:
+    they y-overlap their own children and must stay listed before them.
+    """
+    elements.sort(key=lambda el: float((el.bounds or {}).get("y", 0.0)))
+    i = 0
+    while i < len(elements):
+        if elements[i].type != "card":
+            i += 1
+            continue
+        j = i + 1
+        while (
+            j < len(elements)
+            and elements[j].type == "card"
+            and _cards_share_row(elements[j - 1], elements[j])
+        ):
+            j += 1
+        if j - i > 1:
+            elements[i:j] = sorted(
+                elements[i:j], key=lambda el: float((el.bounds or {}).get("x", 0.0))
+            )
+        i = j
+
+
+def _bounds_tuple(el: Any) -> Tuple[float, float, float, float]:
+    bounds = (el.get("bounds") if isinstance(el, dict) else el.bounds) or {}
+    return (
+        float(bounds.get("x", 0)),
+        float(bounds.get("y", 0)),
+        float(bounds.get("width", 0)),
+        float(bounds.get("height", 0)),
+    )
+
+
+def _element_type(el: Any) -> str:
+    t = el.get("type") if isinstance(el, dict) else el.type
+    return (t or "card").lower()
+
+
+def _median(vals: List[float]) -> float:
+    if not vals:
+        return 0.0
+    s = sorted(vals)
+    mid = len(s) // 2
+    return s[mid] if len(s) % 2 else (s[mid - 1] + s[mid]) / 2.0
+
+
+def _align_old_boxes(
+    old_elements: List[Any],
+    new_elements: List[Any],
+    old_boxes: List[Tuple[float, float, float, float]],
+    new_boxes: List[Tuple[float, float, float, float]],
+) -> List[Tuple[float, float, float, float]]:
+    """Map old-run boxes into the new run's pixel space.
+
+    Two detection runs of the same (or an edited) sketch live in different
+    pixel spaces — the canvas export is a tight CROP of the drawn content, so
+    adding or removing one element shifts and rescales every coordinate.
+    Assuming most elements are unchanged, robust statistics recover the
+    transform: scale = median width/height ratio over all same-class pairs
+    (unchanged pairs dominate the median), translation = median center delta
+    after scaling. Envelope normalization is NOT used because removing an
+    element on the envelope edge (e.g. the footer) would distort every other
+    coordinate.
+    """
+    ratios_x: List[float] = []
+    ratios_y: List[float] = []
+    for oi, old_el in enumerate(old_elements):
+        for ni, new_el in enumerate(new_elements):
+            if _element_type(old_el) != _element_type(new_el):
+                continue
+            ow, oh = old_boxes[oi][2], old_boxes[oi][3]
+            nw, nh = new_boxes[ni][2], new_boxes[ni][3]
+            if ow > 0 and 0.2 <= nw / ow <= 5.0:
+                ratios_x.append(nw / ow)
+            if oh > 0 and 0.2 <= nh / oh <= 5.0:
+                ratios_y.append(nh / oh)
+    sx = _median(ratios_x) or 1.0
+    sy = _median(ratios_y) or 1.0
+
+    scaled = [(b[0] * sx, b[1] * sy, b[2] * sx, b[3] * sy) for b in old_boxes]
+
+    deltas_x: List[float] = []
+    deltas_y: List[float] = []
+    for oi, old_el in enumerate(old_elements):
+        for ni, new_el in enumerate(new_elements):
+            if _element_type(old_el) != _element_type(new_el):
+                continue
+            deltas_x.append(
+                (new_boxes[ni][0] + new_boxes[ni][2] / 2)
+                - (scaled[oi][0] + scaled[oi][2] / 2)
+            )
+            deltas_y.append(
+                (new_boxes[ni][1] + new_boxes[ni][3] / 2)
+                - (scaled[oi][1] + scaled[oi][3] / 2)
+            )
+    tx = _median(deltas_x)
+    ty = _median(deltas_y)
+
+    return [(b[0] + tx, b[1] + ty, b[2], b[3]) for b in scaled]
+
+
+def _box_iou(
+    a: Tuple[float, float, float, float],
+    b: Tuple[float, float, float, float],
+) -> float:
+    ax2, ay2 = a[0] + a[2], a[1] + a[3]
+    bx2, by2 = b[0] + b[2], b[1] + b[3]
+    ix = max(0.0, min(ax2, bx2) - max(a[0], b[0]))
+    iy = max(0.0, min(ay2, by2) - max(a[1], b[1]))
+    inter = ix * iy
+    union = a[2] * a[3] + b[2] * b[3] - inter
+    return inter / union if union > 0 else 0.0
+
+
+def diff_detection_sets(
+    old_elements: List[Any],
+    new_elements: List[Any],
+    iou_threshold: float = 0.4,
+) -> Dict[str, Any]:
+    """Diff two detection sets for incremental regeneration (feature D).
+
+    Elements may be dicts or pydantic objects with type/bounds. The old set
+    is first aligned into the new set's pixel space (see ``_align_old_boxes``
+    for why raw pixels can't be compared across runs), then matched with
+    greedy per-class IoU.
+
+    Returns dict with 0-based indices into the input lists:
+      matched: list of (old_index, new_index) pairs
+      removed: old indices with no counterpart in the new set
+      added:   new indices with no counterpart in the old set
+    """
+    raw_old = [_bounds_tuple(e) for e in old_elements]
+    new_boxes = [_bounds_tuple(e) for e in new_elements]
+    old_boxes = (
+        _align_old_boxes(old_elements, new_elements, raw_old, new_boxes)
+        if old_elements and new_elements
+        else raw_old
+    )
+
+    candidates: List[Tuple[float, int, int]] = []
+    for oi, old_el in enumerate(old_elements):
+        for ni, new_el in enumerate(new_elements):
+            if _element_type(old_el) != _element_type(new_el):
+                continue
+            iou = _box_iou(old_boxes[oi], new_boxes[ni])
+            if iou >= iou_threshold:
+                candidates.append((iou, oi, ni))
+
+    candidates.sort(reverse=True)
+    matched: List[Tuple[int, int]] = []
+    used_old: set = set()
+    used_new: set = set()
+    for iou, oi, ni in candidates:
+        if oi in used_old or ni in used_new:
+            continue
+        used_old.add(oi)
+        used_new.add(ni)
+        matched.append((oi, ni))
+
+    removed = [i for i in range(len(old_elements)) if i not in used_old]
+    added = [i for i in range(len(new_elements)) if i not in used_new]
+    return {"matched": matched, "removed": removed, "added": added}
+
+
+def build_incremental_prompt(
+    previous_code: str,
+    framework: str,
+    new_elements: List[ExternalModelElement],
+    diff: Dict[str, Any],
+) -> str:
+    """Delta prompt for incremental regeneration (feature D, Decision #10 style).
+
+    Instead of regenerating the whole page (which loses chat refinements and
+    reshuffles everything Gemini felt like reshuffling), we hand back the
+    existing code plus ONLY the changes the sketch diff found. The data-cc-id
+    attributes from the Element↔Code Linker make removals precise; a final
+    re-stamping rule keeps the id ↔ element-list mapping valid for the next run.
+    """
+    lines: List[str] = [
+        "You previously generated UI code from a hand-drawn sketch. The user has",
+        "since EDITED the sketch. An object detector compared the old and new",
+        "sketches; apply ONLY the changes listed below to the existing code.",
+        "",
+    ]
+
+    removed = diff.get("removed") or []
+    added = diff.get("added") or []
+
+    if removed:
+        lines.append(
+            "REMOVE — these components are no longer in the sketch. Delete each "
+            "one from the code (they are identified by their data-cc-id):"
+        )
+        for oi in removed:
+            lines.append(f'- the element with data-cc-id="cc-{oi + 1}"')
+        lines.append("")
+
+    if added:
+        # Page extents for human-readable position phrases ("bottom edge,
+        # spanning the full width" beats raw pixels for placement decisions).
+        page_w = max(
+            (float((e.bounds or {}).get("x", 0)) + float((e.bounds or {}).get("width", 0)))
+            for e in new_elements
+        ) or 1.0
+        page_h = max(
+            (float((e.bounds or {}).get("y", 0)) + float((e.bounds or {}).get("height", 0)))
+            for e in new_elements
+        ) or 1.0
+        lines.append(
+            "ADD — these components are new in the sketch. Insert each one at "
+            "the described position relative to the existing layout:"
+        )
+        for ni in added:
+            el = new_elements[ni]
+            bounds = el.bounds or {}
+            attrs = el.attributes or {}
+            label = attrs.get("label_text") or el.label
+            label_part = f' with text "{label}"' if label else ""
+            role_hint = attrs.get("role_hint")
+            role_part = f" (render as: {role_hint})" if role_hint else ""
+            lines.append(
+                f"- a {el.type}{label_part}{role_part} at x={bounds.get('x', 0):.0f}, "
+                f"y={bounds.get('y', 0):.0f}, w={bounds.get('width', 0):.0f}, "
+                f"h={bounds.get('height', 0):.0f} "
+                f"({_position_phrase(bounds, page_w, page_h)})"
+            )
+        lines += [
+            "",
+            "The type names above are DETECTOR CLASSES, not content. `card` "
+            "means one generic content unit — infer its real role from its "
+            "size, aspect ratio, position and any text: a wide flat bar at the "
+            "very bottom of the layout is a FOOTER bar; a wide flat bar at the "
+            "top is a navbar; a small wide rectangle is a button; a long thin "
+            "one is an input; a large box is an image or content panel. NEVER "
+            "render the class name itself ('card', 'section') as visible text, "
+            "a placeholder, or an input value.",
+        ]
+        lines.append("")
+
+    lines.append(
+        "For reference, the FULL component list of the edited sketch, in reading "
+        "order (top-to-bottom, left-to-right within a row):"
+    )
+    for index, el in enumerate(new_elements, start=1):
+        bounds = el.bounds or {}
+        attrs = el.attributes or {}
+        label = attrs.get("label_text") or el.label
+        label_part = f' — text: "{label}"' if label else ""
+        lines.append(
+            f"{index}. {el.type} (x={bounds.get('x', 0):.0f}, y={bounds.get('y', 0):.0f}, "
+            f"w={bounds.get('width', 0):.0f}, h={bounds.get('height', 0):.0f}){label_part}"
+        )
+
+    lines += [
+        "",
+        "RULES:",
+        "- Apply ONLY the ADD/REMOVE changes listed above. Every other part of",
+        "  the code must remain byte-identical — same styling, same text, same",
+        "  structure, same refinements. You are patching, not regenerating.",
+        "- Added elements get minimal placeholder content consistent with their",
+        "  type and the text given above. Do not invent extra copy.",
+        "- AFTER applying the changes, RE-STAMP every data-cc-id attribute so it",
+        "  matches the FULL component list above: the component listed as 1 gets",
+        '  data-cc-id="cc-1", 2 gets "cc-2", and so on. This renumbering is the',
+        "  ONLY permitted edit to otherwise-unchanged elements.",
+        f"- Keep the output a complete, valid {framework} file in the same",
+        "  structure as the current code (same component name, same export).",
+        "- Return ONLY the complete updated code. No explanations, no markdown",
+        "  fences, no commentary.",
+        "",
+        "CURRENT CODE:",
+        previous_code,
+    ]
+    return "\n".join(lines)
+
+
 def _build_gemini_prompt(
     elements: List[ExternalModelElement],
     framework: str,
@@ -610,6 +1111,9 @@ def _build_gemini_prompt(
     description: Optional[str],
     extra_text: Optional[List[str]] = None,
     has_image: bool = False,
+    brand_kit: Optional[Dict[str, str]] = None,
+    screens: Optional[List[str]] = None,
+    current_screen: Optional[str] = None,
 ) -> str:
     element_lines = []
     for index, element in enumerate(elements, start=1):
@@ -627,6 +1131,28 @@ def _build_gemini_prompt(
             )
         if label_text:
             suffix_parts.append(f' — contains text: "{label_text}"')
+
+        role_hint = attrs.get("role_hint")
+        if role_hint:
+            reason = attrs.get("role_hint_reason")
+            reason_suffix = f" ({reason})" if reason else ""
+            if attrs.get("role_hint_firm", True):
+                suffix_parts.append(f" → RENDER AS: {role_hint}{reason_suffix}")
+            else:
+                # Shape-only guess — the text drawn in the attached image (if
+                # any) must be allowed to override it.
+                suffix_parts.append(
+                    f" → likely: {role_hint}{reason_suffix} — shape-only guess; "
+                    "if the attached image shows action-style text here it is a "
+                    "button, heading-style text a heading. The drawn text wins."
+                )
+
+        child_alignment = attrs.get("child_alignment")
+        if child_alignment:
+            suffix_parts.append(
+                f" — drawn child alignment: {child_alignment.upper()}"
+                " (reproduce this alignment exactly)"
+            )
 
         line = (
             f"{index}. {element.type} "
@@ -668,6 +1194,86 @@ def _build_gemini_prompt(
 
     description_block = f"User description: {description}\n" if description else ""
 
+    # Brand Kit: user-defined per-project design tokens (colors + font).
+    # Styling-only by design — it must never loosen strict fidelity, so the
+    # block explicitly scopes itself to colors/typography.
+    brand_block = ""
+    if brand_kit:
+        brand_lines: List[str] = []
+        primary = brand_kit.get("primaryColor")
+        secondary = brand_kit.get("secondaryColor")
+        accent = brand_kit.get("accentColor")
+        font = brand_kit.get("fontFamily")
+        if primary:
+            brand_lines.append(
+                f"- Primary color: {primary} — use for primary action buttons, "
+                "active/emphasized nav links, and key accents (Tailwind arbitrary "
+                f"values, e.g. bg-[{primary}], text-[{primary}], border-[{primary}])."
+            )
+        if secondary:
+            brand_lines.append(
+                f"- Secondary color: {secondary} — use for secondary buttons, "
+                "borders, dividers, and subtle background tints."
+            )
+        if accent:
+            brand_lines.append(
+                f"- Accent color: {accent} — sparing highlights only (links, "
+                "focus rings, small badges)."
+            )
+        if font:
+            brand_lines.append(
+                f'- Font family: "{font}" — apply to ALL text via a Tailwind '
+                f"arbitrary value on the root element (font-['{font}']) with a "
+                "sensible generic fallback. For React/Vue output do NOT add "
+                "<link> tags, imports, or comments about loading the font — "
+                "the hosting page already loads it. Only a standalone HTML "
+                "document gets the matching Google Fonts <link> in <head>."
+            )
+        if brand_lines:
+            brand_block = (
+                "\nBRAND KIT (user-defined design tokens for this project — apply them consistently):\n"
+                + "\n".join(brand_lines)
+                + "\n- The brand kit affects COLORS and TYPOGRAPHY ONLY. It is never a reason to add, "
+                "remove, resize, or rearrange components — strict fidelity still holds.\n"
+            )
+
+    # Multi-screen flows (App Uplift feature A): when the sketch is one screen
+    # of a multi-screen app, wire label-matched nav elements to the host
+    # shell's window.ccNavigate(screenName). Navigation is bound by label
+    # match only — strict fidelity still decides WHAT exists.
+    navigation_block = ""
+    if screens and len(screens) > 1 and current_screen:
+        other_screens = [s for s in screens if s != current_screen]
+        screen_list = ", ".join(f'"{s}"' for s in screens)
+        other_list = ", ".join(f'"{s}"' for s in other_screens)
+        if framework == "html":
+            nav_syntax = (
+                "give the element href=\"#\" and "
+                "onclick=\"window.ccNavigate && window.ccNavigate('ScreenName'); return false;\""
+            )
+        elif framework == "vue":
+            nav_syntax = (
+                "define a method `goTo(name) { window.ccNavigate && window.ccNavigate(name); }` "
+                "in the script block and bind @click.prevent=\"goTo('ScreenName')\" on the element"
+            )
+        else:
+            nav_syntax = (
+                "add onClick={() => window.ccNavigate && window.ccNavigate('ScreenName')} "
+                "to the element"
+            )
+        navigation_block = (
+            "\nMULTI-SCREEN APP — NAVIGATION:\n"
+            f"This sketch is ONE screen of a multi-screen app. The app's screens are: {screen_list}. "
+            f'You are generating the "{current_screen}" screen.\n'
+            "- The host shell provides a global function window.ccNavigate(screenName). Do NOT define it, "
+            "do NOT add a router, do NOT render the other screens.\n"
+            f"- When a button, link, or nav item's text names another screen ({other_list}) — exactly, or "
+            'clearly (e.g. "Go to Dashboard", "Back to Home" for a screen named "Home") — wire it to '
+            f"navigate there: {nav_syntax}. Use the screen's exact name string as the argument.\n"
+            "- Elements whose text does NOT name another screen get NO navigation. Never invent nav "
+            "elements that are not in the detected list — strict fidelity still holds.\n"
+        )
+
     # When the caller attaches the actual sketch image (upload path), the detector
     # only gives boxes — it can't read text. This block tells Gemini to READ the
     # baked-in text off the image and bind it to the detected boxes, WITHOUT using
@@ -691,6 +1297,20 @@ def _build_gemini_prompt(
             "readable text in the image, fall back to the short generic placeholder rule below.\n"
             "- An X-cross, or a box crossed by diagonal lines, is the wireframe convention for an image / media "
             "placeholder — render an empty <img> placeholder there, never a literal X character.\n"
+            "- A box whose ONLY text is an image-marker word — \"[ image ]\", \"image\", \"img\", \"photo\", "
+            "\"[ X ]\", \"img placeholder\", \"picture\" — is ALSO an image / media placeholder. The word marks the "
+            "slot; render an empty <img> placeholder there, NOT the literal text.\n"
+            "- A box filled with horizontal wavy / zigzag / scribbled lines is the wireframe convention for a TEXT "
+            "BLOCK — render it as a short placeholder paragraph (1-2 sentences of lorem ipsum, e.g. \"Lorem ipsum "
+            "dolor sit amet, consectetur adipiscing elit.\"), NOT as skeleton bars, NOT as an image placeholder.\n"
+            "- A wide-thin box whose in-image text is a field-style word or phrase (Password, Confirm password, "
+            "Email, Name, Address, Phone, Search, Username…) is ALWAYS an <input> with that text as its "
+            "placeholder — never a <p>, heading, or plain text row.\n"
+            "- Reproduce the HORIZONTAL POSITION of items as drawn in the image. If nav items are drawn clustered "
+            "in the center of the bar, center them; if a button is drawn on the right edge, put it on the right. "
+            "Do not re-arrange items into more conventional positions.\n"
+            "- If a piece of text in the image is blurred or unreadable, do NOT guess a specific word — use the "
+            "generic placeholder rule below for that component instead.\n"
         )
 
     return (
@@ -698,9 +1318,11 @@ def _build_gemini_prompt(
         f"Target framework: {framework}\n"
         f"Styling: {styling}\n"
         f"{description_block}\n"
-        "Detected components (ordered top to bottom):\n"
+        "Detected components (in READING ORDER: top-to-bottom, and left-to-right within each row — preserve this exact order when composing rows/grids):\n"
         f"{elements_block}\n"
         f"{extra_text_block}"
+        f"{brand_block}"
+        f"{navigation_block}"
         f"{image_block}\n"
         "How the detector was trained (read this carefully — the labels are not what their names suggest):\n"
         "- `navbar` = the top horizontal bar region. CONTAINER, not content.\n"
@@ -715,8 +1337,10 @@ def _build_gemini_prompt(
         "- An element marked `[SYNTHESIZED CONTAINER]` was NOT returned by the detector — the pipeline inferred it from clustered text annotations in the top or bottom band of the canvas. Treat it as a real navbar/footer/section. Do not skip it and do not render its text as raw paragraph copy — its `inner text labels` block lists the user's annotations with their positions, render each item at its indicated position.\n\n"
         "Layout rules:\n"
         "- STRICT FIDELITY (most important rule, overrides every other instinct). Render ONLY the detected components above plus any unbound text below. Do NOT invent extra elements — no page titles, no headings, no subtitles, no taglines, no footer copyright lines, no branding text, no decorative dividers, no helper text, no \"this would look better with X\" additions. If the user drew three components, the output has exactly those three. The detector and canvas annotations are the source of truth; you are a renderer, not a designer. A login form drawn as just email + password + button must render as just email + password + button — not as email + password + button + a 'Sign In' heading you decided to add.\n"
-        "- Compose the components in the order given (which is top-to-bottom on the canvas). A `navbar` MUST render at the top of the page; a `footer` MUST render at the bottom; everything else goes between them in canvas-y order.\n"
-        "- Inside a navbar, multiple cards / text labels are nav items — arrange them horizontally, with the leftmost one (smallest x) typically being the brand/logo and the rightmost ones being the nav links.\n"
+        "- Compose the components in the order given (which is reading order: top-to-bottom, left-to-right within a row — same-row items must keep the listed left-to-right order). A `navbar` MUST render at the top of the page; a `footer` MUST render at the bottom; everything else goes between them in canvas-y order.\n"
+        "- Inside a navbar, multiple cards / text labels are nav items — arrange them horizontally in canvas x order. Do NOT impose the conventional logo-left/links-right pattern: place the items where the user drew them. If the container line carries a `drawn child alignment` hint, that alignment is mandatory (CENTER → cluster the items in the middle; LEFT/RIGHT → push the group to that side; SPACE-BETWEEN → spread across the full width; STACKED → one per row).\n"
+        "- ALIGNMENT FIDELITY: reproduce the drawn alignment exactly, even when it is unconventional. A navbar with logo and links clustered in the center must render centered — not spread to the edges because that is more common. You are a renderer, not a designer.\n"
+        "- When an element line carries `RENDER AS:`, that role was computed deterministically from the drawing (label keywords, shape, position). It OVERRIDES your own inference — render exactly that element type. A `RENDER AS: input` card is ALWAYS an <input> with its label as the placeholder, never a <p> or heading. A `likely:` hint is only a shape-based default — the text drawn on/in the component (from its annotation or the attached image) wins over it.\n"
         "- Inside a footer, multiple cards / text labels are footer columns or links — when 2+ items share an overlapping y-range with distinct x positions, render them as horizontally-arranged columns (flex/grid row), NOT stacked rows. Use canvas x positions to decide column order (smallest x = leftmost column). Only stack vertically when items have similar x but increasing y (one above the other on the canvas).\n"
         "- GENERAL HORIZONTAL/VERTICAL RULE (applies to any container, including section): when 2+ sibling cards or labels share an overlapping y-range (their canvas y intervals intersect) but have clearly distinct x positions, render them as a horizontal row (flex/grid columns) in left-to-right canvas x order. Stack vertically only when siblings share similar x but increasing y. Three cards drawn side-by-side on the canvas must NEVER be rendered as three stacked rows.\n"
         "- Inside a section with stacked cards / text labels (similar x, increasing y), arrange them vertically. Group an `Email:`-style label with the wide-thin card immediately below or beside it as a labelled input.\n"
@@ -725,8 +1349,15 @@ def _build_gemini_prompt(
         "- When an element has an `inner text labels` block listing multiple positioned items, render each item as its OWN element at the indicated position. Do NOT concatenate the items into one string. Do NOT pick one and drop the others. Each positioned label is a separate piece of content the user drew.\n"
         "- For DETECTED components WITHOUT any text annotation, use a SHORT GENERIC placeholder appropriate to the inferred role (unlabelled button → \"Button\", unlabelled input → placeholder \"Enter text\", unlabelled image card → empty image placeholder, unlabelled heading-shaped card → \"Heading\"). Do NOT invent product-specific copy like \"Welcome\", \"Sign In\", \"Get started today\", \"Subscribe to our newsletter\". Generic placeholders only — if the user wanted real copy, they would have written it on the canvas.\n"
         "- The \"Additional text the user wrote on the canvas\" list (if present) is unbound text — place each item somewhere reasonable, verbatim, no augmentation.\n"
-        "- The output should be visually clean and responsive, but visual polish must NEVER lead to adding elements that are not in the detection list.\n\n"
+        "- The output should be visually clean and responsive, but visual polish must NEVER lead to adding elements that are not in the detection list.\n"
+        "- RESPONSIVE BEHAVIOUR: the sketch depicts the DESKTOP layout. Write mobile-first Tailwind so the page degrades gracefully on small screens: horizontal rows of siblings stack vertically by default and restore the drawn side-by-side arrangement from the `md:` breakpoint up (e.g. `flex flex-col md:flex-row`, `grid grid-cols-1 md:grid-cols-3`). Navbar and footer items may wrap to multiple lines on narrow screens. Responsiveness must NEVER change WHAT is rendered: do not hide elements (`hidden`, `md:hidden`), do not add hamburger menus or mobile-only substitutes — every detected component stays visible at every viewport width, only the arrangement adapts.\n\n"
         f"Output rules:\n- {framework_rule}\n"
+        "- COMPONENT IDS (required): stamp every rendered component's ROOT tag with a data-cc-id attribute "
+        "matching its number in the detected components list above — the component listed as `1.` gets "
+        'data-cc-id="cc-1", `2.` gets data-cc-id="cc-2", and so on. Exactly one data-cc-id per detected '
+        "component, on its outermost element only (a container component like navbar/section/footer gets the id "
+        "on the container tag; its child cards each carry their own id). Never invent ids for elements not in "
+        "the list, never skip or renumber. These ids are machine-read for element-to-code linking.\n"
         "- Return ONLY the code. No prose, no markdown fences, no explanations."
     )
 
@@ -841,8 +1472,17 @@ def generate_with_gemini(
     api_key: Optional[str] = None,
     extra_text: Optional[List[str]] = None,
     image_bytes: Optional[bytes] = None,
+    prompt_override: Optional[str] = None,
+    brand_kit: Optional[Dict[str, str]] = None,
+    screens: Optional[List[str]] = None,
+    current_screen: Optional[str] = None,
 ) -> str:
     """Call Gemini to synthesize code from detected elements.
+
+    ``prompt_override`` bypasses ``_build_gemini_prompt`` entirely (the repair
+    pass sends its own corrective prompt) while keeping the key rotation,
+    cooldown, and model-fallback machinery below. ``elements`` is ignored when
+    it is set.
 
     ``image_bytes`` (upload path only) is the processed sketch PNG. When present
     it is sent to Gemini alongside the text prompt so the model can READ the text
@@ -902,13 +1542,16 @@ def generate_with_gemini(
             print(f"[gemini] could not decode attached image, proceeding text-only: {img_error}")
             sketch_image_part = None
 
-    prompt = _build_gemini_prompt(
+    prompt = prompt_override or _build_gemini_prompt(
         elements,
         framework,
         styling,
         description,
         extra_text=extra_text,
         has_image=sketch_image_part is not None,
+        brand_kit=brand_kit,
+        screens=screens,
+        current_screen=current_screen,
     )
 
     any_daily_exhausted = False
@@ -940,7 +1583,14 @@ def generate_with_gemini(
                 continue
 
             try:
-                model = genai.GenerativeModel(model_name)
+                # Low temperature: this is a rendering task, not a creative one.
+                # Default (~1.0) made Gemini invent/move elements between runs on
+                # the same sketch. 0.1 instead of 0.0 — pure greedy decoding can
+                # degenerate into repetition loops on long outputs.
+                model = genai.GenerativeModel(
+                    model_name,
+                    generation_config={"temperature": 0.1, "top_p": 0.8},
+                )
                 content = (
                     [prompt, sketch_image_part]
                     if sketch_image_part is not None

@@ -6,7 +6,11 @@ import { Instrument_Serif, Inter, JetBrains_Mono } from "next/font/google";
 import { DRAFTING_TOKENS } from "@/lib/drafting-room/tokens";
 import { DraftingMark as Mark } from "@/lib/drafting-room/marks";
 
-const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", style: ["normal", "italic"] });
+const serif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+});
 const sans = Inter({ subsets: ["latin"], weight: ["400", "500", "600"] });
 const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"] });
 
@@ -93,7 +97,10 @@ export default function AuthShell({
           border: 1px solid var(--d5-rule);
           background: var(--d5-paper);
           color: var(--d5-graphite);
-          transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+          transition:
+            background 120ms ease,
+            color 120ms ease,
+            border-color 120ms ease;
           cursor: pointer;
           display: inline-flex;
           align-items: center;
@@ -170,9 +177,18 @@ export default function AuthShell({
           text-underline-offset: 3px;
         }
         @keyframes d5-auth-shake {
-          0%, 100% { transform: translateX(0); }
-          20%, 60% { transform: translateX(-3px); }
-          40%, 80% { transform: translateX(3px); }
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          20%,
+          60% {
+            transform: translateX(-3px);
+          }
+          40%,
+          80% {
+            transform: translateX(3px);
+          }
         }
         .d5-auth-root .d5-shake {
           animation: d5-auth-shake 0.32s ease-in-out;
@@ -284,7 +300,9 @@ export default function AuthShell({
           </div>
 
           {/* form area */}
-          <div className="px-6 pb-6 pt-4 sm:px-8 sm:pb-8 sm:pt-5">{children}</div>
+          <div className="px-6 pb-6 pt-4 sm:px-8 sm:pb-8 sm:pt-5">
+            {children}
+          </div>
 
           {footerNote && (
             <div
@@ -304,7 +322,11 @@ export default function AuthShell({
       {/* ─── BOTTOM STATUS LINE ─────────────────────────────────── */}
       <div
         className="d5-mono relative border-t flex items-center justify-between px-5 py-2 text-[10px] tracking-[0.14em] uppercase sm:px-6"
-        style={{ borderColor: T_AUTH.rule, background: T_AUTH.paper, color: T_AUTH.muted }}
+        style={{
+          borderColor: T_AUTH.rule,
+          background: T_AUTH.paper,
+          color: T_AUTH.muted,
+        }}
       >
         <span className="flex items-center gap-1.5">
           <span

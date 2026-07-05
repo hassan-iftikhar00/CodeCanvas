@@ -3,7 +3,7 @@
 
 export interface SelectedElement {
   id: string;
-  type: 'line' | 'shape' | 'text';
+  type: "line" | "shape" | "text";
   bounds: {
     x: number;
     y: number;
@@ -20,14 +20,16 @@ export interface SelectionBounds {
 }
 
 export interface ResizeHandle {
-  name: 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+  name: "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
   x: number;
   y: number;
   cursor: string;
 }
 
 // Calculate bounding box for multiple elements
-export function calculateSelectionBounds(elements: SelectedElement[]): SelectionBounds | null {
+export function calculateSelectionBounds(
+  elements: SelectedElement[]
+): SelectionBounds | null {
   if (elements.length === 0) return null;
 
   let minX = Infinity;
@@ -56,14 +58,54 @@ export function getResizeHandles(bounds: SelectionBounds): ResizeHandle[] {
   const handleSize = 8;
 
   return [
-    { name: 'nw', x: x - handleSize / 2, y: y - handleSize / 2, cursor: 'nw-resize' },
-    { name: 'n', x: x + width / 2 - handleSize / 2, y: y - handleSize / 2, cursor: 'n-resize' },
-    { name: 'ne', x: x + width - handleSize / 2, y: y - handleSize / 2, cursor: 'ne-resize' },
-    { name: 'e', x: x + width - handleSize / 2, y: y + height / 2 - handleSize / 2, cursor: 'e-resize' },
-    { name: 'se', x: x + width - handleSize / 2, y: y + height - handleSize / 2, cursor: 'se-resize' },
-    { name: 's', x: x + width / 2 - handleSize / 2, y: y + height - handleSize / 2, cursor: 's-resize' },
-    { name: 'sw', x: x - handleSize / 2, y: y + height - handleSize / 2, cursor: 'sw-resize' },
-    { name: 'w', x: x - handleSize / 2, y: y + height / 2 - handleSize / 2, cursor: 'w-resize' },
+    {
+      name: "nw",
+      x: x - handleSize / 2,
+      y: y - handleSize / 2,
+      cursor: "nw-resize",
+    },
+    {
+      name: "n",
+      x: x + width / 2 - handleSize / 2,
+      y: y - handleSize / 2,
+      cursor: "n-resize",
+    },
+    {
+      name: "ne",
+      x: x + width - handleSize / 2,
+      y: y - handleSize / 2,
+      cursor: "ne-resize",
+    },
+    {
+      name: "e",
+      x: x + width - handleSize / 2,
+      y: y + height / 2 - handleSize / 2,
+      cursor: "e-resize",
+    },
+    {
+      name: "se",
+      x: x + width - handleSize / 2,
+      y: y + height - handleSize / 2,
+      cursor: "se-resize",
+    },
+    {
+      name: "s",
+      x: x + width / 2 - handleSize / 2,
+      y: y + height - handleSize / 2,
+      cursor: "s-resize",
+    },
+    {
+      name: "sw",
+      x: x - handleSize / 2,
+      y: y + height - handleSize / 2,
+      cursor: "sw-resize",
+    },
+    {
+      name: "w",
+      x: x - handleSize / 2,
+      y: y + height / 2 - handleSize / 2,
+      cursor: "w-resize",
+    },
   ];
 }
 
@@ -86,7 +128,7 @@ export function getHandleAtPoint(
   handles: ResizeHandle[]
 ): ResizeHandle | null {
   const handleSize = 8;
-  
+
   for (const handle of handles) {
     if (
       point.x >= handle.x &&
@@ -97,7 +139,7 @@ export function getHandleAtPoint(
       return handle;
     }
   }
-  
+
   return null;
 }
 
@@ -115,37 +157,37 @@ export function calculateResizedBounds(
 
   // Adjust based on handle
   switch (handle.name) {
-    case 'nw':
+    case "nw":
       newX = x + delta.x;
       newY = y + delta.y;
       newWidth = width - delta.x;
       newHeight = height - delta.y;
       break;
-    case 'n':
+    case "n":
       newY = y + delta.y;
       newHeight = height - delta.y;
       break;
-    case 'ne':
+    case "ne":
       newY = y + delta.y;
       newWidth = width + delta.x;
       newHeight = height - delta.y;
       break;
-    case 'e':
+    case "e":
       newWidth = width + delta.x;
       break;
-    case 'se':
+    case "se":
       newWidth = width + delta.x;
       newHeight = height + delta.y;
       break;
-    case 's':
+    case "s":
       newHeight = height + delta.y;
       break;
-    case 'sw':
+    case "sw":
       newX = x + delta.x;
       newWidth = width - delta.x;
       newHeight = height + delta.y;
       break;
-    case 'w':
+    case "w":
       newX = x + delta.x;
       newWidth = width - delta.x;
       break;
@@ -183,7 +225,7 @@ export function selectMultiple(
     }
     return [...currentSelection, newId];
   }
-  
+
   // Replace selection
   return [newId];
 }

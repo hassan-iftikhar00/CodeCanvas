@@ -73,7 +73,10 @@ export async function POST(request: Request) {
       clearTimeout(timeoutId);
       if (fetchError instanceof Error && fetchError.name === "AbortError") {
         return NextResponse.json(
-          { error: "Detection timed out - the AI took too long. Please try again." },
+          {
+            error:
+              "Detection timed out - the AI took too long. Please try again.",
+          },
           { status: 504 }
         );
       }

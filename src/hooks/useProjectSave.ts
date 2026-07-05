@@ -3,7 +3,15 @@ import { createClient } from "@/lib/supabase/client";
 
 export interface CanvasShapeData {
   id?: string;
-  type?: "text" | "rectangle" | "circle" | "image" | "ellipse" | "triangle" | "arrow" | "line";
+  type?:
+    | "text"
+    | "rectangle"
+    | "circle"
+    | "image"
+    | "ellipse"
+    | "triangle"
+    | "arrow"
+    | "line";
   x?: number;
   y?: number;
   width?: number;
@@ -42,6 +50,17 @@ export interface CanvasData {
     shapes?: CanvasShapeData[];
     selected?: boolean;
   }>;
+  // When the workspace input was an uploaded image (not a drawing), the image
+  // itself is the sketch. Persisting it here lets a reload of /canvas?id=...
+  // restore the upload view instead of showing an empty canvas. Stored only in
+  // the DB row — never sent to the generation API (the image already travels
+  // separately as `sketchImage`).
+  uploadedSketch?: {
+    dataUrl: string;
+    source: "upload-photo" | "upload-clean";
+    width: number;
+    height: number;
+  };
 }
 
 interface Project {

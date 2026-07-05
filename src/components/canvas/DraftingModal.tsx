@@ -209,7 +209,11 @@ export function ModalButton({
 }) {
   const isPrimary = variant === "primary";
   const isDanger = variant === "danger";
-  const bg = isPrimary ? T_CANVAS.cobalt : isDanger ? T_CANVAS.error : T_CANVAS.paper;
+  const bg = isPrimary
+    ? T_CANVAS.cobalt
+    : isDanger
+      ? T_CANVAS.error
+      : T_CANVAS.paper;
   const border = isPrimary
     ? T_CANVAS.cobalt
     : isDanger

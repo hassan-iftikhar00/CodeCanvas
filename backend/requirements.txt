@@ -8,3 +8,7 @@ opencv-python==4.10.0.84
 pillow==11.1.0
 inference-sdk==0.64.8
 google-generativeai==0.8.3
+# Fidelity scoring (headless render of generated code). After install, fetch the
+# browser once with:  python -m playwright install chromium
+# The server runs fine without it — /api/fidelity returns 503 until installed.
+playwright==1.49.1

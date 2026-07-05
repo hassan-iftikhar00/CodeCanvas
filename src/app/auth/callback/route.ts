@@ -8,17 +8,20 @@ export async function GET(request: Request) {
   const next = searchParams.get("next") ?? "/dashboard";
 
   if (!code) {
-    console.error("Missing authorization code");
     return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`);
   }
 
   const cookieStore = await cookies();
 
-  // Wait for setAll to be called with a Promise
-  let resolveSetAll: (cookies: any[]) => void;
-  const setAllPromise = new Promise<any[]>((resolve) => {
-    resolveSetAll = resolve;
-  });
+  // Collect cookies synchronously as the SDK emits them via setAll.
+  // Previously this used a Promise that only resolved when setAll was called —
+  // if the exchange failed (bad code, network error) setAll was never called
+  // and Promise.all deadlocked, leaving the browser spinning indefinitely.
+  const pendingCookies: Array<{
+    name: string;
+    value: string;
+    options: Record<string, unknown>;
+  }> = [];
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,43 +32,29 @@ export async function GET(request: Request) {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          console.log("setAll called with", cookiesToSet.length, "cookies");
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-          // Resolve the promise with the cookies
-          resolveSetAll!(cookiesToSet);
+          pendingCookies.push(...cookiesToSet);
         },
       },
     }
   );
 
-  // Start the session exchange
-  console.log("Exchanging code for session...");
-  const exchangePromise = supabase.auth.exchangeCodeForSession(code);
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
 
-  // Wait for BOTH the exchange AND setAll to complete
-  const [{ error }, responseCookies] = await Promise.all([
-    exchangePromise,
-    setAllPromise,
-  ]);
+  // @supabase/ssr 0.8.0 does NOT write the session cookie synchronously inside
+  // exchangeCodeForSession. It writes it from an async onAuthStateChange handler
+  // (fires on SIGNED_IN, awaits applyServerStorage -> our setAll). That handler
+  // is queued as a task, so without yielding the event loop here pendingCookies
+  // is still empty when we build the redirect below, only the code-verifier goes
+  // out, and the next request has no session (proxy bounces back to /auth/login).
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
-  if (error) {
-    console.error("Exchange failed:", error.message);
-    return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`);
-  }
+  const redirectTo = error
+    ? `${origin}/auth/login?error=auth_failed`
+    : `${origin}${next}`;
 
-  console.log("Session created, cookies captured:", responseCookies.length);
-
-  // Now create the redirect with the captured cookies
-  const redirectUrl = `${origin}${next}`;
-  const response = NextResponse.redirect(redirectUrl);
-
-  // Apply all cookies to the redirect response
-  responseCookies.forEach(({ name, value, options }) => {
+  const response = NextResponse.redirect(redirectTo);
+  pendingCookies.forEach(({ name, value, options }) => {
     response.cookies.set(name, value, options);
   });
-
-  console.log("Cookies applied to redirect response");
   return response;
 }

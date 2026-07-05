@@ -93,10 +93,7 @@ export default function ProfileSkeleton() {
         }}
       >
         <Strip slug="Account information" />
-        <div
-          className="divide-y px-5"
-          style={{ borderColor: T.rule }}
-        >
+        <div className="divide-y px-5" style={{ borderColor: T.rule }}>
           {[0, 1].map((i) => (
             <div
               key={`a-${i}`}

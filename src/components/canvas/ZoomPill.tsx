@@ -69,7 +69,9 @@ export default function ZoomPill({
           color: T_CANVAS.graphite,
           fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = T_CANVAS.vellum)}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.background = T_CANVAS.vellum)
+        }
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
         {zoom}%

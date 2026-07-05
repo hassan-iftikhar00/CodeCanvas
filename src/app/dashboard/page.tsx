@@ -77,9 +77,10 @@ export default function DashboardPage() {
   );
   const [showOnboardingPrompt, setShowOnboardingPrompt] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<Record<string, unknown> | null>(
-    null
-  );
+  const [userProfile, setUserProfile] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const supabase = createClient();
   const router = useRouter();
@@ -176,8 +177,7 @@ export default function DashboardPage() {
     const localSeen = window.localStorage.getItem(localKey);
     const profileCompleted = Boolean(
       userProfile &&
-        (userProfile as { onboarding_completed?: boolean })
-          .onboarding_completed
+      (userProfile as { onboarding_completed?: boolean }).onboarding_completed
     );
 
     if (window.localStorage.getItem(ONBOARDING_DEBUG_KEY) === "true") {
@@ -204,16 +204,14 @@ export default function DashboardPage() {
   const persistOnboardingCompletion = useCallback(async () => {
     if (!userId) return;
     try {
-      await supabase
-        .from("profiles")
-        .upsert(
-          {
-            id: userId,
-            onboarding_completed: true,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "id" }
-        );
+      await supabase.from("profiles").upsert(
+        {
+          id: userId,
+          onboarding_completed: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
       setUserProfile({ onboarding_completed: true });
     } catch (error) {
       console.error("Failed to persist onboarding completion:", error);
@@ -360,7 +358,9 @@ export default function DashboardPage() {
       current.filter((project) => project.id !== projectId)
     );
     setStarredProjectIds((current) => {
-      const next = current.filter((projectIdToKeep) => projectIdToKeep !== projectId);
+      const next = current.filter(
+        (projectIdToKeep) => projectIdToKeep !== projectId
+      );
       writeStarredProjectIds(next);
       return next;
     });
@@ -557,13 +557,7 @@ export default function DashboardPage() {
     });
 
     return result;
-  }, [
-    dateFilter,
-    frameworkFilter,
-    projects,
-    searchQuery,
-    sortBy,
-  ]);
+  }, [dateFilter, frameworkFilter, projects, searchQuery, sortBy]);
 
   const recentProjectCards = useMemo(() => {
     return recentActivity
@@ -599,706 +593,717 @@ export default function DashboardPage() {
         <DashboardSkeleton />
       ) : (
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div
-              className="text-[10px] tracking-[0.18em] uppercase"
-              style={{ color: T.muted, fontFamily: MONO }}
-            >
-              Workspace · Projects
-            </div>
-            <h1
-              className="mt-1 text-[36px] leading-[1.05] tracking-[-0.02em]"
-              style={{
-                color: T.graphite,
-                fontFamily: SERIF,
-                fontWeight: 400,
-              }}
-            >
-              Projects.
-            </h1>
-            <p
-              className="mt-1.5 text-[13px] leading-[1.55]"
-              style={{ color: T.muted, fontFamily: SANS }}
-            >
-              Search, organize, and jump back into your sketch-to-code work.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <StatPill label="Total" value={String(projects.length)} />
-            <StatPill label="Starred" value={String(starredCount)} />
-            <NewProjectButton
-              forwardRef={newProjectButtonRef}
-              onClick={handleCreateProject}
-            />
-          </div>
-        </div>
-
-        <section
-          style={{
-            background: T.paper,
-            border: `1px solid ${T.rule}`,
-          }}
-        >
-          <div
-            className="flex items-center justify-between gap-2 border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
-            style={{
-              background: T.vellum,
-              borderColor: T.rule,
-              color: T.muted,
-              fontFamily: MONO,
-            }}
-          >
-            <span style={{ color: T.graphite }}>Recent activity</span>
-            <span>Latest opens · creations</span>
-          </div>
-
-          <div className="p-4">
-            {recentProjectCards.length === 0 ? (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
               <div
-                className="px-4 py-8 text-center text-[12px]"
-                style={{
-                  border: `1px dashed ${T.rule}`,
-                  background: T.paper,
-                  color: T.muted,
-                  fontFamily: SANS,
-                }}
+                className="text-[10px] tracking-[0.18em] uppercase"
+                style={{ color: T.muted, fontFamily: MONO }}
               >
-                Open a project or create one from the dashboard to build your
-                recent activity feed.
+                Workspace · Projects
               </div>
-            ) : (
-              <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
-                {recentProjectCards.map(({ entry, project }) => (
-                  <motion.button
-                    whileHover={{ y: -2 }}
-                    transition={{
-                      duration: 0.18,
-                      ease: [0.22, 0.9, 0.28, 1],
-                    }}
-                    key={`${entry.projectId}-${entry.timestamp}`}
-                    onClick={() => {
-                      setRecentActivity(
-                        recordProjectActivity(project.id, "opened")
-                      );
-                      router.push(`/canvas?id=${project.id}`);
-                    }}
-                    className="group p-3 text-left transition-colors"
-                    style={{
-                      background: T.paper,
-                      border: `1px solid ${T.rule}`,
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.borderColor = T.cobalt)
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.borderColor = T.rule)
-                    }
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className="px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
-                        style={{
-                          background: T.cobaltWash,
-                          color: T.cobaltInk,
-                          border: `1px solid ${T.cobalt}`,
-                          fontFamily: MONO,
-                        }}
-                      >
-                        {entry.type}
-                      </span>
-                      <span
-                        className="text-[10px] tracking-[0.14em] uppercase"
-                        style={{ color: T.muted, fontFamily: MONO }}
-                      >
-                        {formatDistanceToNow(new Date(entry.timestamp), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                    <div
-                      className="mt-3 truncate text-[14px] leading-tight"
-                      style={{
-                        color: T.graphite,
-                        fontFamily: SANS,
-                        fontWeight: 500,
-                      }}
-                    >
-                      {project.title}
-                    </div>
-                    <div
-                      className="mt-1 truncate text-[10px] tracking-[0.14em] uppercase"
-                      style={{ color: T.muted, fontFamily: MONO }}
-                    >
-                      {project.framework.toUpperCase()} · Updated{" "}
-                      {formatDistanceToNow(new Date(project.updatedAt), {
-                        addSuffix: true,
-                      })}
-                    </div>
-                  </motion.button>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section
-          style={{
-            background: T.paper,
-            border: `1px solid ${T.rule}`,
-          }}
-        >
-          <div
-            className="flex items-center justify-between border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
-            style={{
-              background: T.vellum,
-              borderColor: T.rule,
-              color: T.muted,
-              fontFamily: MONO,
-            }}
-          >
-            <span style={{ color: T.graphite }}>Filter · Sort</span>
-            <span>{filteredProjects.length} shown · {projects.length} total</span>
-          </div>
-
-          <div className="grid gap-px lg:grid-cols-[minmax(0,1.8fr)_repeat(3,minmax(0,1fr))]"
-            style={{ background: T.rule }}
-          >
-            <label
-              className="flex items-center gap-2.5 px-4 py-2.5 transition-colors"
-              style={{ background: T.paper }}
-            >
-              <svg
-                className="h-3.5 w-3.5 flex-none"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.75}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                style={{ color: T.cobalt }}
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search by title, framework, or description"
-                aria-label="Search projects"
-                className="w-full bg-transparent text-[13px] focus:outline-none"
+              <h1
+                className="mt-1 text-[36px] leading-[1.05] tracking-[-0.02em]"
                 style={{
                   color: T.graphite,
-                  fontFamily: SANS,
+                  fontFamily: SERIF,
+                  fontWeight: 400,
                 }}
-              />
-            </label>
-
-            <FilterSelect
-              label="Framework"
-              value={frameworkFilter}
-              onChange={setFrameworkFilter}
-              options={frameworkOptions.map((option) => ({
-                value: option,
-                label:
-                  option === "all" ? "All frameworks" : option.toUpperCase(),
-              }))}
-            />
-
-            <FilterSelect
-              label="Updated"
-              value={dateFilter}
-              onChange={(value) => setDateFilter(value as DateFilter)}
-              options={[
-                { value: "all", label: "Any time" },
-                { value: "7d", label: "Last 7 days" },
-                { value: "30d", label: "Last 30 days" },
-              ]}
-            />
-
-            <FilterSelect
-              label="Sort"
-              value={sortBy}
-              onChange={(value) => setSortBy(value as SortOption)}
-              options={[
-                { value: "recent", label: "Recent first" },
-                { value: "oldest", label: "Oldest first" },
-                { value: "alphabetical", label: "Alphabetical" },
-              ]}
-            />
-          </div>
-        </section>
-
-        {deleteError && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            role="alert"
-            aria-live="polite"
-            className="px-4 py-3 text-[12px]"
-            style={{
-              border: `1px solid ${T.error}`,
-              background: `${T.error}10`,
-              color: T.error,
-              fontFamily: SANS,
-            }}
-          >
-            {deleteError}
-          </motion.div>
-        )}
-
-        {filteredProjects.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center py-20 text-center"
-            style={{
-              border: `1px dashed ${T.rule}`,
-              background: T.paper,
-            }}
-          >
-            <div
-              className="mb-5 flex h-10 w-10 items-center justify-center"
-              style={{
-                border: `1px solid ${T.rule}`,
-                color: T.muted,
-                background: T.vellum,
-              }}
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-                aria-hidden="true"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                />
-              </svg>
+                Projects.
+              </h1>
+              <p
+                className="mt-1.5 text-[13px] leading-[1.55]"
+                style={{ color: T.muted, fontFamily: SANS }}
+              >
+                Search, organize, and jump back into your sketch-to-code work.
+              </p>
             </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <StatPill label="Total" value={String(projects.length)} />
+              <StatPill label="Starred" value={String(starredCount)} />
+              <NewProjectButton
+                forwardRef={newProjectButtonRef}
+                onClick={handleCreateProject}
+              />
+            </div>
+          </div>
+
+          <section
+            style={{
+              background: T.paper,
+              border: `1px solid ${T.rule}`,
+            }}
+          >
             <div
-              className="text-[10px] tracking-[0.18em] uppercase"
-              style={{ color: T.muted, fontFamily: MONO }}
-            >
-              {projects.length === 0 ? "Nothing here yet" : "No matches"}
-            </div>
-            <h3
-              className="mt-1 text-[24px] leading-tight"
-              style={{ color: T.graphite, fontFamily: SERIF, fontWeight: 400 }}
-            >
-              {projects.length === 0
-                ? "Start your first sketch."
-                : "Nothing matches those filters."}
-            </h3>
-            <p
-              className="mt-1.5 text-[12px]"
-              style={{ color: T.muted, fontFamily: SANS }}
-            >
-              {projects.length === 0
-                ? "Open the canvas to draw a UI and let the model generate the code."
-                : "Try another search term, framework, or date range."}
-            </p>
-            <button
-              onClick={
-                projects.length === 0
-                  ? handleCreateProject
-                  : () => {
-                      setSearchQuery("");
-                      setFrameworkFilter("all");
-                      setDateFilter("all");
-                      setSortBy("recent");
-                    }
-              }
-              className="mt-5 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+              className="flex items-center justify-between gap-2 border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
               style={{
-                background: projects.length === 0 ? T.cobalt : T.paper,
-                color: projects.length === 0 ? T.paper : T.graphite,
-                border: `1px solid ${
-                  projects.length === 0 ? T.cobalt : T.rule
-                }`,
+                background: T.vellum,
+                borderColor: T.rule,
+                color: T.muted,
                 fontFamily: MONO,
               }}
-              onMouseEnter={(e) => {
-                if (projects.length === 0) {
-                  e.currentTarget.style.background = T.cobaltInk;
-                  e.currentTarget.style.borderColor = T.cobaltInk;
-                } else {
-                  e.currentTarget.style.background = T.graphite;
-                  e.currentTarget.style.color = T.paper;
-                  e.currentTarget.style.borderColor = T.graphite;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (projects.length === 0) {
-                  e.currentTarget.style.background = T.cobalt;
-                  e.currentTarget.style.borderColor = T.cobalt;
-                } else {
-                  e.currentTarget.style.background = T.paper;
-                  e.currentTarget.style.color = T.graphite;
-                  e.currentTarget.style.borderColor = T.rule;
-                }
-              }}
             >
-              {projects.length === 0 ? "Create project →" : "Clear filters"}
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={{
-                  id: project.id,
-                  title: project.title,
-                  description: project.description,
-                  framework: project.framework,
-                  thumbnailUrl: project.thumbnailUrl,
-                  canvasData: (project.raw.canvas_data as CanvasData | null | undefined) ?? null,
-                  updated_at: project.updatedAt,
-                }}
-                onRequestDelete={handleRequestDelete}
-                onRename={handleRenameProject}
-                onToggleStar={handleToggleStar}
-                isStarred={starredProjectIds.includes(project.id)}
-                deleteDisabled={Boolean(
-                  deleteDialogProject || deletingProjectId
-                )}
-              />
-            ))}
-          </div>
-        )}
+              <span style={{ color: T.graphite }}>Recent activity</span>
+              <span>Latest opens · creations</span>
+            </div>
 
-        <AnimatePresence>
-          {deleteDialogProject && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
-              style={{
-                background: "rgba(14, 14, 15, 0.55)",
-                backdropFilter: "blur(4px)",
-              }}
-              onClick={() => {
-                if (!deletingProjectId) {
-                  closeDeleteDialog();
-                }
-              }}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 8 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.97, y: 4 }}
-                transition={{ duration: 0.2, ease: [0.22, 1.4, 0.32, 1] }}
-                ref={deleteDialogRef}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="delete-project-title"
-                aria-describedby="delete-project-description"
-                tabIndex={-1}
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={handleDeleteDialogKeyDown}
-                className="w-full max-w-md"
-                style={{
-                  background: T.paper,
-                  border: `1px solid ${T.rule}`,
-                }}
-              >
+            <div className="p-4">
+              {recentProjectCards.length === 0 ? (
                 <div
-                  className="flex items-center justify-between border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                  className="px-4 py-8 text-center text-[12px]"
                   style={{
-                    background: T.vellum,
-                    borderColor: T.rule,
+                    border: `1px dashed ${T.rule}`,
+                    background: T.paper,
                     color: T.muted,
-                    fontFamily: MONO,
+                    fontFamily: SANS,
                   }}
                 >
-                  <span style={{ color: T.graphite }}>
-                    Confirm · Delete project
-                  </span>
-                  <button
-                    type="button"
-                    onClick={closeDeleteDialog}
-                    disabled={Boolean(deletingProjectId)}
-                    aria-label="Close"
-                    className="flex h-5 w-5 items-center justify-center transition-colors disabled:opacity-40"
-                    style={{ color: T.muted }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.color = T.graphite)
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.color = T.muted)
-                    }
-                  >
-                    <svg
-                      className="h-3 w-3"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.75}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  Open a project or create one from the dashboard to build your
+                  recent activity feed.
                 </div>
-
-                <div className="px-6 pt-5 pb-4">
-                  <h2
-                    id="delete-project-title"
-                    className="text-[26px] leading-[1.1] tracking-[-0.01em]"
-                    style={{
-                      color: T.graphite,
-                      fontFamily: SERIF,
-                      fontWeight: 400,
-                    }}
-                  >
-                    Delete this project?
-                  </h2>
-                  <p
-                    id="delete-project-description"
-                    className="mt-2 text-[12px] leading-[1.55]"
-                    style={{ color: T.muted, fontFamily: SANS }}
-                  >
-                    This action cannot be undone. The project and all its
-                    iterations will be removed.
-                  </p>
-                  <div
-                    className="mt-4 flex items-start gap-2.5 px-3 py-2"
-                    style={{
-                      background: T.vellum,
-                      border: `1px solid ${T.rule}`,
-                    }}
-                  >
-                    <span
-                      className="mt-[2px] inline-block h-1.5 w-1.5"
-                      style={{ background: T.error }}
-                      aria-hidden="true"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className="text-[10px] tracking-[0.16em] uppercase"
-                        style={{ color: T.muted, fontFamily: MONO }}
-                      >
-                        Target
+              ) : (
+                <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+                  {recentProjectCards.map(({ entry, project }) => (
+                    <motion.button
+                      whileHover={{ y: -2 }}
+                      transition={{
+                        duration: 0.18,
+                        ease: [0.22, 0.9, 0.28, 1],
+                      }}
+                      key={`${entry.projectId}-${entry.timestamp}`}
+                      onClick={() => {
+                        setRecentActivity(
+                          recordProjectActivity(project.id, "opened")
+                        );
+                        router.push(`/canvas?id=${project.id}`);
+                      }}
+                      className="group p-3 text-left transition-colors"
+                      style={{
+                        background: T.paper,
+                        border: `1px solid ${T.rule}`,
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.borderColor = T.cobalt)
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.borderColor = T.rule)
+                      }
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className="px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
+                          style={{
+                            background: T.cobaltWash,
+                            color: T.cobaltInk,
+                            border: `1px solid ${T.cobalt}`,
+                            fontFamily: MONO,
+                          }}
+                        >
+                          {entry.type}
+                        </span>
+                        <span
+                          className="text-[10px] tracking-[0.14em] uppercase"
+                          style={{ color: T.muted, fontFamily: MONO }}
+                        >
+                          {formatDistanceToNow(new Date(entry.timestamp), {
+                            addSuffix: true,
+                          })}
+                        </span>
                       </div>
                       <div
-                        className="mt-0.5 truncate text-[13px]"
+                        className="mt-3 truncate text-[14px] leading-tight"
                         style={{
                           color: T.graphite,
                           fontFamily: SANS,
                           fontWeight: 500,
                         }}
                       >
-                        {deleteDialogProject.title}
+                        {project.title}
+                      </div>
+                      <div
+                        className="mt-1 truncate text-[10px] tracking-[0.14em] uppercase"
+                        style={{ color: T.muted, fontFamily: MONO }}
+                      >
+                        {project.framework.toUpperCase()} · Updated{" "}
+                        {formatDistanceToNow(new Date(project.updatedAt), {
+                          addSuffix: true,
+                        })}
+                      </div>
+                    </motion.button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section
+            style={{
+              background: T.paper,
+              border: `1px solid ${T.rule}`,
+            }}
+          >
+            <div
+              className="flex items-center justify-between border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
+              style={{
+                background: T.vellum,
+                borderColor: T.rule,
+                color: T.muted,
+                fontFamily: MONO,
+              }}
+            >
+              <span style={{ color: T.graphite }}>Filter · Sort</span>
+              <span>
+                {filteredProjects.length} shown · {projects.length} total
+              </span>
+            </div>
+
+            <div
+              className="grid gap-px lg:grid-cols-[minmax(0,1.8fr)_repeat(3,minmax(0,1fr))]"
+              style={{ background: T.rule }}
+            >
+              <label
+                className="flex items-center gap-2.5 px-4 py-2.5 transition-colors"
+                style={{ background: T.paper }}
+              >
+                <svg
+                  className="h-3.5 w-3.5 flex-none"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  style={{ color: T.cobalt }}
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by title, framework, or description"
+                  aria-label="Search projects"
+                  className="w-full bg-transparent text-[13px] focus:outline-none"
+                  style={{
+                    color: T.graphite,
+                    fontFamily: SANS,
+                  }}
+                />
+              </label>
+
+              <FilterSelect
+                label="Framework"
+                value={frameworkFilter}
+                onChange={setFrameworkFilter}
+                options={frameworkOptions.map((option) => ({
+                  value: option,
+                  label:
+                    option === "all" ? "All frameworks" : option.toUpperCase(),
+                }))}
+              />
+
+              <FilterSelect
+                label="Updated"
+                value={dateFilter}
+                onChange={(value) => setDateFilter(value as DateFilter)}
+                options={[
+                  { value: "all", label: "Any time" },
+                  { value: "7d", label: "Last 7 days" },
+                  { value: "30d", label: "Last 30 days" },
+                ]}
+              />
+
+              <FilterSelect
+                label="Sort"
+                value={sortBy}
+                onChange={(value) => setSortBy(value as SortOption)}
+                options={[
+                  { value: "recent", label: "Recent first" },
+                  { value: "oldest", label: "Oldest first" },
+                  { value: "alphabetical", label: "Alphabetical" },
+                ]}
+              />
+            </div>
+          </section>
+
+          {deleteError && (
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              role="alert"
+              aria-live="polite"
+              className="px-4 py-3 text-[12px]"
+              style={{
+                border: `1px solid ${T.error}`,
+                background: `${T.error}10`,
+                color: T.error,
+                fontFamily: SANS,
+              }}
+            >
+              {deleteError}
+            </motion.div>
+          )}
+
+          {filteredProjects.length === 0 ? (
+            <div
+              className="flex flex-col items-center justify-center py-20 text-center"
+              style={{
+                border: `1px dashed ${T.rule}`,
+                background: T.paper,
+              }}
+            >
+              <div
+                className="mb-5 flex h-10 w-10 items-center justify-center"
+                style={{
+                  border: `1px solid ${T.rule}`,
+                  color: T.muted,
+                  background: T.vellum,
+                }}
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
+                </svg>
+              </div>
+              <div
+                className="text-[10px] tracking-[0.18em] uppercase"
+                style={{ color: T.muted, fontFamily: MONO }}
+              >
+                {projects.length === 0 ? "Nothing here yet" : "No matches"}
+              </div>
+              <h3
+                className="mt-1 text-[24px] leading-tight"
+                style={{
+                  color: T.graphite,
+                  fontFamily: SERIF,
+                  fontWeight: 400,
+                }}
+              >
+                {projects.length === 0
+                  ? "Start your first sketch."
+                  : "Nothing matches those filters."}
+              </h3>
+              <p
+                className="mt-1.5 text-[12px]"
+                style={{ color: T.muted, fontFamily: SANS }}
+              >
+                {projects.length === 0
+                  ? "Open the canvas to draw a UI and let the model generate the code."
+                  : "Try another search term, framework, or date range."}
+              </p>
+              <button
+                onClick={
+                  projects.length === 0
+                    ? handleCreateProject
+                    : () => {
+                        setSearchQuery("");
+                        setFrameworkFilter("all");
+                        setDateFilter("all");
+                        setSortBy("recent");
+                      }
+                }
+                className="mt-5 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                style={{
+                  background: projects.length === 0 ? T.cobalt : T.paper,
+                  color: projects.length === 0 ? T.paper : T.graphite,
+                  border: `1px solid ${
+                    projects.length === 0 ? T.cobalt : T.rule
+                  }`,
+                  fontFamily: MONO,
+                }}
+                onMouseEnter={(e) => {
+                  if (projects.length === 0) {
+                    e.currentTarget.style.background = T.cobaltInk;
+                    e.currentTarget.style.borderColor = T.cobaltInk;
+                  } else {
+                    e.currentTarget.style.background = T.graphite;
+                    e.currentTarget.style.color = T.paper;
+                    e.currentTarget.style.borderColor = T.graphite;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (projects.length === 0) {
+                    e.currentTarget.style.background = T.cobalt;
+                    e.currentTarget.style.borderColor = T.cobalt;
+                  } else {
+                    e.currentTarget.style.background = T.paper;
+                    e.currentTarget.style.color = T.graphite;
+                    e.currentTarget.style.borderColor = T.rule;
+                  }
+                }}
+              >
+                {projects.length === 0 ? "Create project →" : "Clear filters"}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredProjects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={{
+                    id: project.id,
+                    title: project.title,
+                    description: project.description,
+                    framework: project.framework,
+                    thumbnailUrl: project.thumbnailUrl,
+                    canvasData:
+                      (project.raw.canvas_data as
+                        | CanvasData
+                        | null
+                        | undefined) ?? null,
+                    updated_at: project.updatedAt,
+                  }}
+                  onRequestDelete={handleRequestDelete}
+                  onRename={handleRenameProject}
+                  onToggleStar={handleToggleStar}
+                  isStarred={starredProjectIds.includes(project.id)}
+                  deleteDisabled={Boolean(
+                    deleteDialogProject || deletingProjectId
+                  )}
+                />
+              ))}
+            </div>
+          )}
+
+          <AnimatePresence>
+            {deleteDialogProject && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+                style={{
+                  background: "rgba(14, 14, 15, 0.55)",
+                  backdropFilter: "blur(4px)",
+                }}
+                onClick={() => {
+                  if (!deletingProjectId) {
+                    closeDeleteDialog();
+                  }
+                }}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97, y: 4 }}
+                  transition={{ duration: 0.2, ease: [0.22, 1.4, 0.32, 1] }}
+                  ref={deleteDialogRef}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="delete-project-title"
+                  aria-describedby="delete-project-description"
+                  tabIndex={-1}
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={handleDeleteDialogKeyDown}
+                  className="w-full max-w-md"
+                  style={{
+                    background: T.paper,
+                    border: `1px solid ${T.rule}`,
+                  }}
+                >
+                  <div
+                    className="flex items-center justify-between border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                    style={{
+                      background: T.vellum,
+                      borderColor: T.rule,
+                      color: T.muted,
+                      fontFamily: MONO,
+                    }}
+                  >
+                    <span style={{ color: T.graphite }}>
+                      Confirm · Delete project
+                    </span>
+                    <button
+                      type="button"
+                      onClick={closeDeleteDialog}
+                      disabled={Boolean(deletingProjectId)}
+                      aria-label="Close"
+                      className="flex h-5 w-5 items-center justify-center transition-colors disabled:opacity-40"
+                      style={{ color: T.muted }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.color = T.graphite)
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.color = T.muted)
+                      }
+                    >
+                      <svg
+                        className="h-3 w-3"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.75}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="px-6 pt-5 pb-4">
+                    <h2
+                      id="delete-project-title"
+                      className="text-[26px] leading-[1.1] tracking-[-0.01em]"
+                      style={{
+                        color: T.graphite,
+                        fontFamily: SERIF,
+                        fontWeight: 400,
+                      }}
+                    >
+                      Delete this project?
+                    </h2>
+                    <p
+                      id="delete-project-description"
+                      className="mt-2 text-[12px] leading-[1.55]"
+                      style={{ color: T.muted, fontFamily: SANS }}
+                    >
+                      This action cannot be undone. The project and all its
+                      iterations will be removed.
+                    </p>
+                    <div
+                      className="mt-4 flex items-start gap-2.5 px-3 py-2"
+                      style={{
+                        background: T.vellum,
+                        border: `1px solid ${T.rule}`,
+                      }}
+                    >
+                      <span
+                        className="mt-[2px] inline-block h-1.5 w-1.5"
+                        style={{ background: T.error }}
+                        aria-hidden="true"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className="text-[10px] tracking-[0.16em] uppercase"
+                          style={{ color: T.muted, fontFamily: MONO }}
+                        >
+                          Target
+                        </div>
+                        <div
+                          className="mt-0.5 truncate text-[13px]"
+                          style={{
+                            color: T.graphite,
+                            fontFamily: SANS,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {deleteDialogProject.title}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div
-                  className="flex flex-col-reverse gap-2 border-t px-6 py-3.5 sm:flex-row sm:justify-end"
-                  style={{
-                    background: T.vellum,
-                    borderColor: T.rule,
-                  }}
-                >
-                  <button
-                    ref={deleteCancelRef}
-                    type="button"
-                    onClick={closeDeleteDialog}
-                    disabled={Boolean(deletingProjectId)}
-                    className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  <div
+                    className="flex flex-col-reverse gap-2 border-t px-6 py-3.5 sm:flex-row sm:justify-end"
                     style={{
-                      background: T.paper,
-                      border: `1px solid ${T.rule}`,
-                      color: T.graphite,
-                      fontFamily: MONO,
-                      minHeight: 36,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (deletingProjectId) return;
-                      e.currentTarget.style.background = T.graphite;
-                      e.currentTarget.style.color = T.paper;
-                      e.currentTarget.style.borderColor = T.graphite;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = T.paper;
-                      e.currentTarget.style.color = T.graphite;
-                      e.currentTarget.style.borderColor = T.rule;
+                      background: T.vellum,
+                      borderColor: T.rule,
                     }}
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConfirmDelete}
-                    disabled={Boolean(deletingProjectId)}
-                    aria-busy={Boolean(deletingProjectId)}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-70"
-                    style={{
-                      background: T.error,
-                      border: `1px solid ${T.error}`,
-                      color: T.paper,
-                      fontFamily: MONO,
-                      minHeight: 36,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (deletingProjectId) return;
-                      e.currentTarget.style.opacity = "0.85";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = "1";
-                    }}
-                  >
-                    {deletingProjectId ? (
-                      <>
-                        <span
-                          className="h-3 w-3 animate-spin"
-                          style={{
-                            border: `1.5px solid ${T.paper}`,
-                            borderTopColor: "transparent",
-                            borderRadius: "50%",
-                          }}
-                        />
-                        Deleting
-                      </>
-                    ) : (
-                      "Delete →"
-                    )}
-                  </button>
-                </div>
+                    <button
+                      ref={deleteCancelRef}
+                      type="button"
+                      onClick={closeDeleteDialog}
+                      disabled={Boolean(deletingProjectId)}
+                      className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      style={{
+                        background: T.paper,
+                        border: `1px solid ${T.rule}`,
+                        color: T.graphite,
+                        fontFamily: MONO,
+                        minHeight: 36,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (deletingProjectId) return;
+                        e.currentTarget.style.background = T.graphite;
+                        e.currentTarget.style.color = T.paper;
+                        e.currentTarget.style.borderColor = T.graphite;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = T.paper;
+                        e.currentTarget.style.color = T.graphite;
+                        e.currentTarget.style.borderColor = T.rule;
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmDelete}
+                      disabled={Boolean(deletingProjectId)}
+                      aria-busy={Boolean(deletingProjectId)}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-70"
+                      style={{
+                        background: T.error,
+                        border: `1px solid ${T.error}`,
+                        color: T.paper,
+                        fontFamily: MONO,
+                        minHeight: 36,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (deletingProjectId) return;
+                        e.currentTarget.style.opacity = "0.85";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.opacity = "1";
+                      }}
+                    >
+                      {deletingProjectId ? (
+                        <>
+                          <span
+                            className="h-3 w-3 animate-spin"
+                            style={{
+                              border: `1.5px solid ${T.paper}`,
+                              borderTopColor: "transparent",
+                              borderRadius: "50%",
+                            }}
+                          />
+                          Deleting
+                        </>
+                      ) : (
+                        "Delete →"
+                      )}
+                    </button>
+                  </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </AnimatePresence>
 
-        <AnimatePresence>
-          {showOnboardingPrompt && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
-              style={{
-                background: "rgba(14, 14, 15, 0.55)",
-                backdropFilter: "blur(4px)",
-              }}
-            >
+          <AnimatePresence>
+            {showOnboardingPrompt && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.96, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98, y: 8 }}
-                transition={{ duration: 0.2, ease: [0.22, 1.1, 0.32, 1] }}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="onboarding-title"
-                aria-describedby="onboarding-description"
-                className="w-full max-w-md"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
                 style={{
-                  background: T.paper,
-                  border: `1px solid ${T.rule}`,
+                  background: "rgba(14, 14, 15, 0.55)",
+                  backdropFilter: "blur(4px)",
                 }}
               >
-                <div
-                  className="border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: 8 }}
+                  transition={{ duration: 0.2, ease: [0.22, 1.1, 0.32, 1] }}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="onboarding-title"
+                  aria-describedby="onboarding-description"
+                  className="w-full max-w-md"
                   style={{
-                    background: T.vellum,
-                    borderColor: T.rule,
-                    color: T.graphite,
-                    fontFamily: MONO,
+                    background: T.paper,
+                    border: `1px solid ${T.rule}`,
                   }}
                 >
-                  Welcome · Quick tour
-                </div>
-
-                <div className="px-6 pt-5 pb-4">
-                  <h2
-                    id="onboarding-title"
-                    className="text-[26px] leading-[1.1] tracking-[-0.01em]"
+                  <div
+                    className="border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
                     style={{
-                      color: T.graphite,
-                      fontFamily: SERIF,
-                      fontWeight: 400,
-                    }}
-                  >
-                    First time here?
-                  </h2>
-                  <p
-                    id="onboarding-description"
-                    className="mt-2 text-[12px] leading-[1.55]"
-                    style={{ color: T.muted, fontFamily: SANS }}
-                  >
-                    We will walk you through Draw, Generate, and Export in the
-                    canvas so you can get productive fast.
-                  </p>
-                </div>
-
-                <div
-                  className="flex flex-col-reverse gap-2 border-t px-6 py-3.5 sm:flex-row sm:justify-end"
-                  style={{
-                    background: T.vellum,
-                    borderColor: T.rule,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={handleSkipOnboarding}
-                    className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
-                    style={{
-                      background: T.paper,
-                      border: `1px solid ${T.rule}`,
+                      background: T.vellum,
+                      borderColor: T.rule,
                       color: T.graphite,
                       fontFamily: MONO,
-                      minHeight: 36,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = T.graphite;
-                      e.currentTarget.style.color = T.paper;
-                      e.currentTarget.style.borderColor = T.graphite;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = T.paper;
-                      e.currentTarget.style.color = T.graphite;
-                      e.currentTarget.style.borderColor = T.rule;
                     }}
                   >
-                    Skip
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleStartOnboarding}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                    Welcome · Quick tour
+                  </div>
+
+                  <div className="px-6 pt-5 pb-4">
+                    <h2
+                      id="onboarding-title"
+                      className="text-[26px] leading-[1.1] tracking-[-0.01em]"
+                      style={{
+                        color: T.graphite,
+                        fontFamily: SERIF,
+                        fontWeight: 400,
+                      }}
+                    >
+                      First time here?
+                    </h2>
+                    <p
+                      id="onboarding-description"
+                      className="mt-2 text-[12px] leading-[1.55]"
+                      style={{ color: T.muted, fontFamily: SANS }}
+                    >
+                      We will walk you through Draw, Generate, and Export in the
+                      canvas so you can get productive fast.
+                    </p>
+                  </div>
+
+                  <div
+                    className="flex flex-col-reverse gap-2 border-t px-6 py-3.5 sm:flex-row sm:justify-end"
                     style={{
-                      background: T.cobalt,
-                      border: `1px solid ${T.cobalt}`,
-                      color: T.paper,
-                      fontFamily: MONO,
-                      minHeight: 36,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = T.cobaltInk;
-                      e.currentTarget.style.borderColor = T.cobaltInk;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = T.cobalt;
-                      e.currentTarget.style.borderColor = T.cobalt;
+                      background: T.vellum,
+                      borderColor: T.rule,
                     }}
                   >
-                    Start walkthrough →
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={handleSkipOnboarding}
+                      className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                      style={{
+                        background: T.paper,
+                        border: `1px solid ${T.rule}`,
+                        color: T.graphite,
+                        fontFamily: MONO,
+                        minHeight: 36,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = T.graphite;
+                        e.currentTarget.style.color = T.paper;
+                        e.currentTarget.style.borderColor = T.graphite;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = T.paper;
+                        e.currentTarget.style.color = T.graphite;
+                        e.currentTarget.style.borderColor = T.rule;
+                      }}
+                    >
+                      Skip
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStartOnboarding}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                      style={{
+                        background: T.cobalt,
+                        border: `1px solid ${T.cobalt}`,
+                        color: T.paper,
+                        fontFamily: MONO,
+                        minHeight: 36,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = T.cobaltInk;
+                        e.currentTarget.style.borderColor = T.cobaltInk;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = T.cobalt;
+                        e.currentTarget.style.borderColor = T.cobalt;
+                      }}
+                    >
+                      Start walkthrough →
+                    </button>
+                  </div>
+                </motion.div>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            )}
+          </AnimatePresence>
+        </div>
       )}
     </DashboardLayout>
   );

@@ -8,7 +8,13 @@ import DraftingModal, {
 } from "@/components/canvas/DraftingModal";
 import { T_CANVAS } from "@/components/canvas/canvasTokens";
 
-export type ExportFormat = "png" | "svg" | "json" | "zip" | "copy";
+export type ExportFormat =
+  | "png"
+  | "svg"
+  | "json"
+  | "zip"
+  | "copy"
+  | "stackblitz";
 export type CodeFramework = "react" | "vue" | "html" | "nextjs";
 export type StylingOption = "tailwind" | "css" | "styled-components";
 
@@ -37,7 +43,9 @@ export default function ExportDialog({
 }: ExportDialogProps) {
   const [exportType, setExportType] = useState<"image" | "code">("code");
   const [imageFormat, setImageFormat] = useState<"png" | "svg">("png");
-  const [codeFormat, setCodeFormat] = useState<"zip" | "json" | "copy">("copy");
+  const [codeFormat, setCodeFormat] = useState<
+    "zip" | "json" | "copy" | "stackblitz"
+  >("copy");
   const [framework, setFramework] = useState<CodeFramework>("react");
   const [styling, setStyling] = useState<StylingOption>("tailwind");
   const [quality, setQuality] = useState(100);
@@ -77,6 +85,7 @@ export default function ExportDialog({
   };
 
   const isCopyMode = exportType === "code" && codeFormat === "copy";
+  const isStackBlitzMode = exportType === "code" && codeFormat === "stackblitz";
 
   return (
     <DraftingModal
@@ -99,6 +108,11 @@ export default function ExportDialog({
               <>
                 <CopyIcon />
                 COPY TO CLIPBOARD
+              </>
+            ) : isStackBlitzMode ? (
+              <>
+                <BoltIcon />
+                OPEN IN STACKBLITZ
               </>
             ) : (
               <>
@@ -133,7 +147,7 @@ export default function ExportDialog({
       {exportType === "code" ? (
         <>
           <ModalSection label="METHOD">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <ModalOption
                 active={codeFormat === "copy"}
                 onClick={() => setCodeFormat("copy")}
@@ -151,6 +165,13 @@ export default function ExportDialog({
                 onClick={() => setCodeFormat("json")}
                 icon={<JsonIcon />}
                 label="JSON"
+              />
+              <ModalOption
+                active={codeFormat === "stackblitz"}
+                onClick={() => setCodeFormat("stackblitz")}
+                icon={<BoltIcon />}
+                label="STACKBLITZ"
+                hint="Open live in browser"
               />
             </div>
           </ModalSection>
@@ -312,6 +333,13 @@ function VectorIcon() {
   return (
     <svg {...ic}>
       <polygon points="12 2 22 12 12 22 2 12" />
+    </svg>
+  );
+}
+function BoltIcon() {
+  return (
+    <svg {...ic}>
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
     </svg>
   );
 }

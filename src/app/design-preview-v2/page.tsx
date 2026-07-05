@@ -267,7 +267,11 @@ export default function DesignPreviewV2() {
         <Section index="01" title="Palette" caption="Two inks. One process.">
           <PaletteBlock />
         </Section>
-        <Section index="02" title="Typography" caption="Editorial · Sans · Mono. Nothing else.">
+        <Section
+          index="02"
+          title="Typography"
+          caption="Editorial · Sans · Mono. Nothing else."
+        >
           <TypographyBlock />
         </Section>
         <Section
@@ -277,10 +281,18 @@ export default function DesignPreviewV2() {
         >
           <WorkspaceBlock />
         </Section>
-        <Section index="04" title="Components" caption="Hairline-first. Cobalt as interaction ink.">
+        <Section
+          index="04"
+          title="Components"
+          caption="Hairline-first. Cobalt as interaction ink."
+        >
           <ComponentsBlock />
         </Section>
-        <Section index="05" title="Motion" caption="Mechanical, not bouncy. 120–400ms.">
+        <Section
+          index="05"
+          title="Motion"
+          caption="Mechanical, not bouncy. 120–400ms."
+        >
           <MotionBlock />
         </Section>
         <Section
@@ -307,7 +319,9 @@ function TopBar() {
     >
       <div className="flex items-center gap-3">
         <Mark size={20} color="var(--d5-graphite)" />
-        <span className="text-[13px] tracking-[0.18em] uppercase">CodeCanvas</span>
+        <span className="text-[13px] tracking-[0.18em] uppercase">
+          CodeCanvas
+        </span>
         <span className="text-[10px]" style={{ color: "var(--d5-muted)" }}>
           / DRAFTING ROOM v0.1
         </span>
@@ -372,8 +386,14 @@ function Hero() {
       {/* coarse 32px grid */}
       <div className="absolute inset-0 d5-grid opacity-60 pointer-events-none" />
       {/* horizontal margin rules — silent, no labels (labels collided with slug + status bar) */}
-      <div className="absolute left-0 right-0 d5-rule-h h-px pointer-events-none" style={{ top: 56, opacity: 0.35 }} />
-      <div className="absolute left-0 right-0 d5-rule-h h-px pointer-events-none" style={{ bottom: 56, opacity: 0.35 }} />
+      <div
+        className="absolute left-0 right-0 d5-rule-h h-px pointer-events-none"
+        style={{ top: 56, opacity: 0.35 }}
+      />
+      <div
+        className="absolute left-0 right-0 d5-rule-h h-px pointer-events-none"
+        style={{ bottom: 56, opacity: 0.35 }}
+      />
 
       <div className="relative px-10 pt-20 pb-28 max-w-[1400px] mx-auto">
         {/* slug + counter row */}
@@ -384,7 +404,9 @@ function Hero() {
           <span>FIG. 01 / DRAFT — TOOL VIEW</span>
           <span className="flex items-center gap-2">
             <Cross size={8} />
-            x: {coord.active ? coord.x.toString().padStart(4, "0") : "—— "} y:{" "}
+            x: {coord.active
+              ? coord.x.toString().padStart(4, "0")
+              : "—— "} y:{" "}
             {coord.active ? coord.y.toString().padStart(4, "0") : "—— "}
           </span>
         </div>
@@ -520,7 +542,9 @@ function StatusBar() {
     const tick = () => {
       const d = new Date();
       const fmt = (n: number) => n.toString().padStart(2, "0");
-      setTime(`${fmt(d.getHours())}:${fmt(d.getMinutes())}:${fmt(d.getSeconds())}`);
+      setTime(
+        `${fmt(d.getHours())}:${fmt(d.getMinutes())}:${fmt(d.getSeconds())}`
+      );
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -568,11 +592,46 @@ function Crosshair() {
         color: "var(--d5-cobalt)",
       }}
     >
-      <circle cx="20" cy="20" r="8" fill="none" stroke="currentColor" strokeWidth="1" />
-      <line x1="20" y1="0" x2="20" y2="14" stroke="currentColor" strokeWidth="1" />
-      <line x1="20" y1="26" x2="20" y2="40" stroke="currentColor" strokeWidth="1" />
-      <line x1="0" y1="20" x2="14" y2="20" stroke="currentColor" strokeWidth="1" />
-      <line x1="26" y1="20" x2="40" y2="20" stroke="currentColor" strokeWidth="1" />
+      <circle
+        cx="20"
+        cy="20"
+        r="8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1"
+      />
+      <line
+        x1="20"
+        y1="0"
+        x2="20"
+        y2="14"
+        stroke="currentColor"
+        strokeWidth="1"
+      />
+      <line
+        x1="20"
+        y1="26"
+        x2="20"
+        y2="40"
+        stroke="currentColor"
+        strokeWidth="1"
+      />
+      <line
+        x1="0"
+        y1="20"
+        x2="14"
+        y2="20"
+        stroke="currentColor"
+        strokeWidth="1"
+      />
+      <line
+        x1="26"
+        y1="20"
+        x2="40"
+        y2="20"
+        stroke="currentColor"
+        strokeWidth="1"
+      />
       <circle cx="20" cy="20" r="1.2" fill="currentColor" />
     </svg>
   );
@@ -587,7 +646,13 @@ function Cross({ size = 8 }: { size?: number }) {
   );
 }
 
-function Mark({ size = 28, color = "currentColor" }: { size?: number; color?: string }) {
+function Mark({
+  size = 28,
+  color = "currentColor",
+}: {
+  size?: number;
+  color?: string;
+}) {
   // The CodeCanvas 'C' — three rounded slabs, but with sharper feel for drafting
   return (
     <svg viewBox="0 0 200 200" width={size} height={size} fill={color}>
@@ -666,14 +731,32 @@ function PaletteBlock() {
     { name: "Vellum", hex: LIGHT.vellum, role: "Secondary surface" },
     { name: "Tick", hex: LIGHT.tick, role: "Graph + dividers" },
     { name: "Rule", hex: LIGHT.rule, role: "Hairlines", fg: LIGHT.paper },
-    { name: "Graphite", hex: LIGHT.graphite, role: "Type + ink", fg: LIGHT.paper },
-    { name: "Cobalt", hex: LIGHT.cobalt, role: "Interaction · Mark", fg: LIGHT.paper },
-    { name: "Cobalt Ink", hex: LIGHT.cobaltInk, role: "Pressed · active", fg: LIGHT.paper },
+    {
+      name: "Graphite",
+      hex: LIGHT.graphite,
+      role: "Type + ink",
+      fg: LIGHT.paper,
+    },
+    {
+      name: "Cobalt",
+      hex: LIGHT.cobalt,
+      role: "Interaction · Mark",
+      fg: LIGHT.paper,
+    },
+    {
+      name: "Cobalt Ink",
+      hex: LIGHT.cobaltInk,
+      role: "Pressed · active",
+      fg: LIGHT.paper,
+    },
     { name: "Cobalt Wash", hex: LIGHT.cobaltWash, role: "Selection bg" },
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-px" style={{ background: "var(--d5-rule)" }}>
+    <div
+      className="grid grid-cols-4 gap-px"
+      style={{ background: "var(--d5-rule)" }}
+    >
       {swatches.map((s) => (
         <div
           key={s.name}
@@ -711,7 +794,10 @@ function TypographyBlock() {
     <div className="grid grid-cols-12 gap-x-8 gap-y-12">
       {/* Display serif */}
       <div className="col-span-12 grid grid-cols-12 gap-x-8 items-end border-b d5-hair pb-10">
-        <div className="col-span-2 d5-mono text-[10px] tracking-[0.16em] uppercase" style={{ color: "var(--d5-muted)" }}>
+        <div
+          className="col-span-2 d5-mono text-[10px] tracking-[0.16em] uppercase"
+          style={{ color: "var(--d5-muted)" }}
+        >
           DISPLAY / SERIF
           <div className="mt-1" style={{ color: "var(--d5-graphite)" }}>
             INSTRUMENT SERIF · 400
@@ -722,8 +808,8 @@ function TypographyBlock() {
           className="col-span-10 d5-serif"
           style={{ fontSize: 120, lineHeight: 1, letterSpacing: "-0.03em" }}
         >
-          Drawn by you,{" "}
-          <em style={{ color: "var(--d5-cobalt)" }}>drafted</em> by the room.
+          Drawn by you, <em style={{ color: "var(--d5-cobalt)" }}>drafted</em>{" "}
+          by the room.
         </div>
       </div>
 
@@ -745,11 +831,12 @@ function TypographyBlock() {
             production-ready React. Drawn by you, drafted by the room. Every
             stroke gets a coordinate, every coordinate gets a component.
           </p>
-          <p style={{ fontSize: 16, lineHeight: 1.6, color: "var(--d5-muted)" }}>
+          <p
+            style={{ fontSize: 16, lineHeight: 1.6, color: "var(--d5-muted)" }}
+          >
             Body copy is set in Inter at 16/24 by default, 14/20 for dense
-            telemetry rows, 18/28 for hero descriptions. Weight discipline:
-            400 for prose, 500 for UI labels, 600 only for headings and
-            buttons.
+            telemetry rows, 18/28 for hero descriptions. Weight discipline: 400
+            for prose, 500 for UI labels, 600 only for headings and buttons.
           </p>
         </div>
       </div>
@@ -767,11 +854,9 @@ function TypographyBlock() {
           <div className="mt-1">10 / 11 / 13</div>
         </div>
         <div className="col-span-10 d5-mono space-y-2.5 max-w-3xl">
-          <div
-            className="text-[13px]"
-            style={{ color: "var(--d5-graphite)" }}
-          >
-            const sketch = await canvas.export({"{"} format: "png", scale: 2 {"}"});
+          <div className="text-[13px]" style={{ color: "var(--d5-graphite)" }}>
+            const sketch = await canvas.export({"{"} format: "png", scale: 2{" "}
+            {"}"});
           </div>
           <div
             className="text-[11px] tracking-[0.12em] uppercase"
@@ -813,9 +898,7 @@ function WorkspaceBlock() {
         }}
       >
         <div className="flex items-center gap-4">
-          <span style={{ color: "var(--d5-graphite)" }}>
-            UNTITLED PROJECT
-          </span>
+          <span style={{ color: "var(--d5-graphite)" }}>UNTITLED PROJECT</span>
           <span>· ITER 12</span>
           <span>· EDITED 2 MIN AGO</span>
         </div>
@@ -827,7 +910,10 @@ function WorkspaceBlock() {
       </div>
 
       {/* two-panel workspace */}
-      <div className="grid grid-cols-2 d5-hair" style={{ borderColor: "var(--d5-rule)" }}>
+      <div
+        className="grid grid-cols-2 d5-hair"
+        style={{ borderColor: "var(--d5-rule)" }}
+      >
         {/* left — canvas / sketch */}
         <div
           className="relative border-r p-8"
@@ -888,9 +974,7 @@ function WorkspaceBlock() {
           </span>
         </div>
         <div className="flex items-center gap-5">
-          <span style={{ color: "var(--d5-graphite)" }}>
-            GEMINI 2.5 · 1.2s
-          </span>
+          <span style={{ color: "var(--d5-graphite)" }}>GEMINI 2.5 · 1.2s</span>
           <span
             className="inline-block w-1.5 h-1.5"
             style={{ background: "var(--d5-cobalt)" }}
@@ -964,8 +1048,15 @@ function Box({
         shapeRendering="crispEdges"
       />
       {/* corner registration ticks in cobalt (top-left + bottom-right) */}
-      <g stroke="var(--d5-cobalt)" strokeWidth="1" fill="none" shapeRendering="crispEdges">
-        <path d={`M ${x - 5} ${y} L ${x + 5} ${y} M ${x} ${y - 5} L ${x} ${y + 5}`} />
+      <g
+        stroke="var(--d5-cobalt)"
+        strokeWidth="1"
+        fill="none"
+        shapeRendering="crispEdges"
+      >
+        <path
+          d={`M ${x - 5} ${y} L ${x + 5} ${y} M ${x} ${y - 5} L ${x} ${y + 5}`}
+        />
         <path
           d={`M ${x + w - 5} ${y + h} L ${x + w + 5} ${y + h} M ${x + w} ${y + h - 5} L ${x + w} ${y + h + 5}`}
         />
@@ -1000,19 +1091,137 @@ function Box({
 
 function CodeWell() {
   const lines = [
-    { n: 1, t: <><Tk c="m">import</Tk> {" "}<Tk>React</Tk> {" "}<Tk c="m">from</Tk>{" "}<Tk c="s">"react"</Tk>;</> },
+    {
+      n: 1,
+      t: (
+        <>
+          <Tk c="m">import</Tk> <Tk>React</Tk> <Tk c="m">from</Tk>{" "}
+          <Tk c="s">"react"</Tk>;
+        </>
+      ),
+    },
     { n: 2, t: <></> },
-    { n: 3, t: <><Tk c="m">export default function</Tk> <Tk c="f">Page</Tk>() {"{"}</> },
-    { n: 4, t: <><Tk c="m">  return</Tk> (</> },
-    { n: 5, t: <>    {"<"}<Tk c="t">main</Tk> <Tk c="a">className</Tk>={"\""}<Tk c="s">min-h-screen</Tk>{"\""}{">"}</> },
-    { n: 6, t: <>      {"<"}<Tk c="t">nav</Tk> <Tk c="a">className</Tk>={"\""}<Tk c="s">flex items-center</Tk>{"\""}{">"}</> },
-    { n: 7, t: <>        {"<"}<Tk c="t">a</Tk> <Tk c="a">href</Tk>={"\""}<Tk c="s">/</Tk>{"\""}{">"}<Tk>Home</Tk>{"</"}<Tk c="t">a</Tk>{">"}</> },
-    { n: 8, t: <>      {"</"}<Tk c="t">nav</Tk>{">"}</> },
-    { n: 9, t: <>      {"<"}<Tk c="t">section</Tk> <Tk c="a">className</Tk>={"\""}<Tk c="s">grid grid-cols-2</Tk>{"\""}{">"}</> },
-    { n: 10, t: <>        {"<"}<Tk c="t">article</Tk>{">"}<Tk>Card</Tk>{"</"}<Tk c="t">article</Tk>{">"}</> },
-    { n: 11, t: <>      {"</"}<Tk c="t">section</Tk>{">"}</> },
-    { n: 12, t: <>    {"</"}<Tk c="t">main</Tk>{">"}</> },
-    { n: 13, t: <>  );</> },
+    {
+      n: 3,
+      t: (
+        <>
+          <Tk c="m">export default function</Tk> <Tk c="f">Page</Tk>() {"{"}
+        </>
+      ),
+    },
+    {
+      n: 4,
+      t: (
+        <>
+          <Tk c="m"> return</Tk> (
+        </>
+      ),
+    },
+    {
+      n: 5,
+      t: (
+        <>
+          {" "}
+          {"<"}
+          <Tk c="t">main</Tk> <Tk c="a">className</Tk>={'"'}
+          <Tk c="s">min-h-screen</Tk>
+          {'"'}
+          {">"}
+        </>
+      ),
+    },
+    {
+      n: 6,
+      t: (
+        <>
+          {" "}
+          {"<"}
+          <Tk c="t">nav</Tk> <Tk c="a">className</Tk>={'"'}
+          <Tk c="s">flex items-center</Tk>
+          {'"'}
+          {">"}
+        </>
+      ),
+    },
+    {
+      n: 7,
+      t: (
+        <>
+          {" "}
+          {"<"}
+          <Tk c="t">a</Tk> <Tk c="a">href</Tk>={'"'}
+          <Tk c="s">/</Tk>
+          {'"'}
+          {">"}
+          <Tk>Home</Tk>
+          {"</"}
+          <Tk c="t">a</Tk>
+          {">"}
+        </>
+      ),
+    },
+    {
+      n: 8,
+      t: (
+        <>
+          {" "}
+          {"</"}
+          <Tk c="t">nav</Tk>
+          {">"}
+        </>
+      ),
+    },
+    {
+      n: 9,
+      t: (
+        <>
+          {" "}
+          {"<"}
+          <Tk c="t">section</Tk> <Tk c="a">className</Tk>={'"'}
+          <Tk c="s">grid grid-cols-2</Tk>
+          {'"'}
+          {">"}
+        </>
+      ),
+    },
+    {
+      n: 10,
+      t: (
+        <>
+          {" "}
+          {"<"}
+          <Tk c="t">article</Tk>
+          {">"}
+          <Tk>Card</Tk>
+          {"</"}
+          <Tk c="t">article</Tk>
+          {">"}
+        </>
+      ),
+    },
+    {
+      n: 11,
+      t: (
+        <>
+          {" "}
+          {"</"}
+          <Tk c="t">section</Tk>
+          {">"}
+        </>
+      ),
+    },
+    {
+      n: 12,
+      t: (
+        <>
+          {" "}
+          {"</"}
+          <Tk c="t">main</Tk>
+          {">"}
+        </>
+      ),
+    },
+    { n: 13, t: <> );</> },
     { n: 14, t: <>{"}"}</> },
   ];
   return (
@@ -1067,9 +1276,7 @@ function CodeWell() {
       >
         <span>TS · REACT 19</span>
         <span>LN 14 · COL 1</span>
-        <span style={{ color: "var(--d5-cobalt)" }}>
-          GENERATED · 1.2s
-        </span>
+        <span style={{ color: "var(--d5-cobalt)" }}>GENERATED · 1.2s</span>
       </div>
     </div>
   );
@@ -1106,7 +1313,11 @@ function ComponentsBlock() {
           <button className="d5-btn d5-btn-primary">Open canvas</button>
           <button className="d5-btn">Secondary</button>
           <button className="d5-btn d5-btn-ghost">Ghost</button>
-          <button className="d5-btn" disabled style={{ opacity: 0.4, cursor: "not-allowed" }}>
+          <button
+            className="d5-btn"
+            disabled
+            style={{ opacity: 0.4, cursor: "not-allowed" }}
+          >
             Disabled
           </button>
         </div>
@@ -1177,7 +1388,10 @@ function ComponentsBlock() {
         </div>
         <RuleSep />
         <div className="d5-tag mb-2">NUMERIC / TABULAR</div>
-        <div className="flex gap-6 d5-mono text-[24px]" style={{ fontVariantNumeric: "tabular-nums" }}>
+        <div
+          className="flex gap-6 d5-mono text-[24px]"
+          style={{ fontVariantNumeric: "tabular-nums" }}
+        >
           <span>012</span>
           <span>247</span>
           <span style={{ color: "var(--d5-cobalt)" }}>1,840</span>
@@ -1196,11 +1410,19 @@ function PanelCard({
   span?: 4 | 6 | 8 | 12;
   children: React.ReactNode;
 }) {
-  const colMap = { 4: "col-span-4", 6: "col-span-6", 8: "col-span-8", 12: "col-span-12" } as const;
+  const colMap = {
+    4: "col-span-4",
+    6: "col-span-6",
+    8: "col-span-8",
+    12: "col-span-12",
+  } as const;
   return (
     <div
       className={`relative d5-reg p-6 ${colMap[span]}`}
-      style={{ border: "1px solid var(--d5-rule)", background: "var(--d5-paper)" }}
+      style={{
+        border: "1px solid var(--d5-rule)",
+        background: "var(--d5-paper)",
+      }}
     >
       <div
         className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-5 pb-2 border-b d5-hair"
@@ -1214,12 +1436,7 @@ function PanelCard({
 }
 
 function RuleSep() {
-  return (
-    <div
-      className="my-5 d5-rule-h h-px"
-      style={{ opacity: 0.5 }}
-    />
-  );
+  return <div className="my-5 d5-rule-h h-px" style={{ opacity: 0.5 }} />;
 }
 
 function Field({
@@ -1261,7 +1478,10 @@ function ProjectCard() {
   return (
     <div
       className="relative d5-reg p-5"
-      style={{ border: "1px solid var(--d5-rule)", background: "var(--d5-vellum)" }}
+      style={{
+        border: "1px solid var(--d5-rule)",
+        background: "var(--d5-vellum)",
+      }}
     >
       <div className="flex items-start justify-between mb-4">
         <span
@@ -1270,7 +1490,10 @@ function ProjectCard() {
         >
           P-0247
         </span>
-        <span className="d5-mono text-[10px]" style={{ color: "var(--d5-muted)" }}>
+        <span
+          className="d5-mono text-[10px]"
+          style={{ color: "var(--d5-muted)" }}
+        >
           ITER 12
         </span>
       </div>
@@ -1317,9 +1540,7 @@ function Toast({ type }: { type: "success" | "error" }) {
       <span className="text-[13px]">
         {isOk ? "Project committed." : "Couldn't reach Roboflow."}
       </span>
-      <span
-        className="d5-mono ml-auto text-[10px] tracking-[0.14em] uppercase opacity-60"
-      >
+      <span className="d5-mono ml-auto text-[10px] tracking-[0.14em] uppercase opacity-60">
         {isOk ? "0.4s ago" : "RETRY"}
       </span>
     </div>
@@ -1331,7 +1552,10 @@ function DropdownMock() {
   return (
     <div
       className="d5-reg relative inline-block min-w-[220px]"
-      style={{ border: "1px solid var(--d5-rule)", background: "var(--d5-paper)" }}
+      style={{
+        border: "1px solid var(--d5-rule)",
+        background: "var(--d5-paper)",
+      }}
     >
       <div
         className="d5-mono text-[10px] tracking-[0.16em] uppercase px-3 py-2 border-b d5-hair"
@@ -1384,7 +1608,10 @@ function Tabs() {
           </div>
         ))}
       </div>
-      <div className="mt-5 d5-mono text-[12px]" style={{ color: "var(--d5-muted)" }}>
+      <div
+        className="mt-5 d5-mono text-[12px]"
+        style={{ color: "var(--d5-muted)" }}
+      >
         Preview is selected. The cobalt tick anchors the active tab.
       </div>
     </div>
@@ -1453,11 +1680,18 @@ function MotionDemo({
   span: 4 | 6 | 12;
   children: React.ReactNode;
 }) {
-  const colMap = { 4: "col-span-4", 6: "col-span-6", 12: "col-span-12" } as const;
+  const colMap = {
+    4: "col-span-4",
+    6: "col-span-6",
+    12: "col-span-12",
+  } as const;
   return (
     <div
       className={`relative d5-reg p-6 ${colMap[span]}`}
-      style={{ border: "1px solid var(--d5-rule)", background: "var(--d5-paper)" }}
+      style={{
+        border: "1px solid var(--d5-rule)",
+        background: "var(--d5-paper)",
+      }}
     >
       <div
         className="d5-mono text-[10px] tracking-[0.16em] uppercase mb-4 pb-2 border-b d5-hair"
@@ -1465,7 +1699,9 @@ function MotionDemo({
       >
         {title}
       </div>
-      <div className="flex items-center justify-center min-h-[160px]">{children}</div>
+      <div className="flex items-center justify-center min-h-[160px]">
+        {children}
+      </div>
     </div>
   );
 }
@@ -1484,10 +1720,15 @@ function DrawDemo() {
           strokeLinejoin="round"
           strokeDasharray="600"
           strokeDashoffset="600"
-          style={{ animation: "d5-draw 1.6s cubic-bezier(0.2,0.7,0.1,1) forwards" }}
+          style={{
+            animation: "d5-draw 1.6s cubic-bezier(0.2,0.7,0.1,1) forwards",
+          }}
         />
       </svg>
-      <button className="d5-btn d5-btn-ghost" onClick={() => setK((v) => v + 1)}>
+      <button
+        className="d5-btn d5-btn-ghost"
+        onClick={() => setK((v) => v + 1)}
+      >
         Replay
       </button>
     </div>
@@ -1534,8 +1775,20 @@ function CompassLoader() {
   return (
     <div className="flex flex-col items-center gap-2">
       <svg width="56" height="56" viewBox="0 0 56 56">
-        <g style={{ transformOrigin: "28px 28px", animation: "d5-compass-spin 1.6s linear infinite" }}>
-          <circle cx="28" cy="28" r="22" fill="none" stroke="var(--d5-tick)" strokeWidth="1" />
+        <g
+          style={{
+            transformOrigin: "28px 28px",
+            animation: "d5-compass-spin 1.6s linear infinite",
+          }}
+        >
+          <circle
+            cx="28"
+            cy="28"
+            r="22"
+            fill="none"
+            stroke="var(--d5-tick)"
+            strokeWidth="1"
+          />
           <path
             d="M 28 6 A 22 22 0 0 1 49.5 30"
             fill="none"
@@ -1566,7 +1819,11 @@ function NumeralRoll() {
     <div className="flex flex-col items-center gap-2">
       <div
         className="d5-mono"
-        style={{ fontSize: 56, fontVariantNumeric: "tabular-nums", letterSpacing: "0.02em" }}
+        style={{
+          fontSize: 56,
+          fontVariantNumeric: "tabular-nums",
+          letterSpacing: "0.02em",
+        }}
       >
         {n.toLocaleString()}
       </div>
@@ -1624,7 +1881,10 @@ function TickSweepDemo() {
 
 function DarkModeBlock() {
   return (
-    <div className="grid grid-cols-2 gap-px" style={{ background: "var(--d5-rule)" }}>
+    <div
+      className="grid grid-cols-2 gap-px"
+      style={{ background: "var(--d5-rule)" }}
+    >
       <ThemePreview tokens={LIGHT} label="LIGHT — DAY DRAFT" />
       <ThemePreview tokens={DARK} label="DARK — NIGHT DRAFT" />
     </div>
@@ -1650,10 +1910,16 @@ function ThemePreview({ tokens, label }: { tokens: Tokens; label: string }) {
 
       <div
         className="d5-serif"
-        style={{ fontSize: 64, lineHeight: 0.95, letterSpacing: "-0.03em", color: tokens.graphite }}
+        style={{
+          fontSize: 64,
+          lineHeight: 0.95,
+          letterSpacing: "-0.03em",
+          color: tokens.graphite,
+        }}
       >
         Sketches{" "}
-        <em style={{ color: tokens.cobalt, fontStyle: "italic" }}>become</em> code.
+        <em style={{ color: tokens.cobalt, fontStyle: "italic" }}>become</em>{" "}
+        code.
       </div>
 
       <div className="mt-8 flex items-center gap-3">
@@ -1691,7 +1957,10 @@ function ThemePreview({ tokens, label }: { tokens: Tokens; label: string }) {
 
       <div
         className="mt-8 p-4"
-        style={{ background: tokens.vellum, border: `1px solid ${tokens.rule}` }}
+        style={{
+          background: tokens.vellum,
+          border: `1px solid ${tokens.rule}`,
+        }}
       >
         <div
           className="d5-mono text-[10px] tracking-[0.18em] uppercase pb-2 mb-3 border-b"
@@ -1699,7 +1968,10 @@ function ThemePreview({ tokens, label }: { tokens: Tokens; label: string }) {
         >
           P-0247 · PRICING PAGE
         </div>
-        <div className="d5-mono text-[10px] tracking-[0.14em] uppercase" style={{ color: tokens.muted }}>
+        <div
+          className="d5-mono text-[10px] tracking-[0.14em] uppercase"
+          style={{ color: tokens.muted }}
+        >
           EDITED 2 MIN AGO · 6 ELEMENTS
         </div>
       </div>
@@ -1728,12 +2000,15 @@ function Colophon() {
         <div>
           <div style={{ color: "var(--d5-graphite)" }}>COLOPHON</div>
           <div className="mt-2">
-            Set in Instrument Serif, Inter, JetBrains Mono. Drawn on a 32px grid.
+            Set in Instrument Serif, Inter, JetBrains Mono. Drawn on a 32px
+            grid.
           </div>
         </div>
         <div>
           <div style={{ color: "var(--d5-graphite)" }}>INK</div>
-          <div className="mt-2">Graphite #0E0E0F · Cobalt #4A4B8C · Paper #FAFAF7</div>
+          <div className="mt-2">
+            Graphite #0E0E0F · Cobalt #4A4B8C · Paper #FAFAF7
+          </div>
         </div>
         <div>
           <div style={{ color: "var(--d5-graphite)" }}>SHEET</div>

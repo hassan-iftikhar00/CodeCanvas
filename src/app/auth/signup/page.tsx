@@ -79,7 +79,10 @@ export default function SignupPage() {
     [password]
   );
 
-  const passwordStrength = useMemo((): { level: PasswordStrengthLevel; score: number } => {
+  const passwordStrength = useMemo((): {
+    level: PasswordStrengthLevel;
+    score: number;
+  } => {
     if (!password) return { level: "none", score: 0 };
     let score = 0;
     if (password.length >= MIN_PASSWORD_LENGTH) score++;
@@ -202,7 +205,8 @@ export default function SignupPage() {
       confirmPassword: { touched: true, error: confirmPasswordError },
     });
 
-    if (nameError || emailError || passwordError || confirmPasswordError) return;
+    if (nameError || emailError || passwordError || confirmPasswordError)
+      return;
     if (passwordStrength.level === "weak") {
       setError("Please use a stronger password");
       return;

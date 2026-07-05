@@ -25,8 +25,7 @@ export default function ForgotPasswordPage() {
   const validateEmail = useCallback((value: string): string | null => {
     if (!value.trim()) return "Email is required";
     if (!value.includes("@")) return "Email must contain @";
-    if (!EMAIL_REGEX.test(value))
-      return "Please enter a valid email address";
+    if (!EMAIL_REGEX.test(value)) return "Please enter a valid email address";
     return null;
   }, []);
 
@@ -105,8 +104,8 @@ export default function ForgotPasswordPage() {
             message={
               <>
                 Check your inbox at <strong>{email}</strong>. The reset link
-                expires in 1 hour. Didn't receive it? Check your spam folder or
-                wait a minute and{" "}
+                expires in 1 hour. Didn&apos;t receive it? Check your spam
+                folder or wait a minute and{" "}
                 <button
                   type="button"
                   className="d5-link"

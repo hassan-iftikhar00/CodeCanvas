@@ -45,6 +45,15 @@ const STAGES: Stage[] = [
 ];
 
 const EXPECTED_DURATION_S = 30;
+// The real request duration is unknowable up front, so the bar must never
+// claim completion while the request is still in flight. This curve rises
+// fast early, then decelerates toward (never reaching) PROGRESS_CEILING —
+// the remaining gap only closes when the code actually arrives (at which
+// point this component unmounts and the result replaces it).
+const PROGRESS_CEILING = 0.94;
+function progressCurve(elapsedS: number): number {
+  return PROGRESS_CEILING * (1 - Math.exp(-elapsedS / EXPECTED_DURATION_S));
+}
 
 export default function GenerationProgress({
   isGenerating,
@@ -68,7 +77,7 @@ export default function GenerationProgress({
 
   const stage =
     [...STAGES].reverse().find((s) => elapsed >= s.startAt) ?? STAGES[0];
-  const progress = Math.min(elapsed / EXPECTED_DURATION_S, 1);
+  const progress = progressCurve(elapsed);
   const stageIndex = STAGES.findIndex((s) => s === stage);
 
   return (
@@ -86,10 +95,8 @@ export default function GenerationProgress({
           style={{ color: T_DARK.inkMuted }}
         >
           <span style={{ color: T_DARK.inkBright }}>
-            {hasPriorCode ? "REGENERATING" : "GENERATING"} · {stageIndex + 1} / {STAGES.length - 1}
-          </span>
-          <span className="tabular-nums" style={{ color: T_DARK.cobalt }}>
-            T+{elapsed.toString().padStart(2, "0")}s
+            {hasPriorCode ? "REGENERATING" : "GENERATING"} · {stageIndex + 1} /{" "}
+            {STAGES.length - 1}
           </span>
         </div>
 

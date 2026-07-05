@@ -18,10 +18,15 @@ import ShortcutsPanel from "@/components/ShortcutsPanel";
 import { SHORTCUTS_PANEL_EVENT } from "@/components/CommandPalette";
 import { type Layer } from "@/types/canvas";
 import ExportDialog, { type ExportOptions } from "@/components/ExportDialog";
+import ShareDialog from "@/components/ShareDialog";
+import BrandKitModal, {
+  type BrandKit,
+} from "@/components/canvas/BrandKitModal";
 import TemplatesPanel from "@/components/canvas/TemplatesPanel";
 import ZoomPill from "@/components/canvas/ZoomPill";
 import FloatingToolbar from "@/components/canvas/FloatingToolbar";
 import CanvasSurface from "@/components/canvas/CanvasSurface";
+import UploadedSketchPanel from "@/components/canvas/UploadedSketchPanel";
 import StyleRibbon from "@/components/canvas/StyleRibbon";
 import StatusBar from "@/components/canvas/StatusBar";
 import CanvasTopBar from "@/components/canvas/CanvasTopBar";
@@ -36,22 +41,36 @@ import {
 } from "@/hooks/useProjectSave";
 import { recordProjectActivity } from "@/lib/dashboard-projects";
 import { buildExportZip } from "@/lib/export-zip";
+import { openInStackBlitz } from "@/lib/open-in-stackblitz";
 import type { Template } from "@/data/templates";
 
-import MonacoCodeEditor from "@/components/canvas/MonacoCodeEditor";
-import LivePreview from "@/components/canvas/LivePreview";
+import MonacoCodeEditor, {
+  type MonacoCodeEditorHandle,
+} from "@/components/canvas/MonacoCodeEditor";
+import LivePreview, {
+  type AnnotatePayload,
+} from "@/components/canvas/LivePreview";
 import ChatInterface from "@/components/canvas/ChatInterface";
 import ComponentPalette from "@/components/canvas/ComponentPalette";
 import GenerationProgress from "@/components/canvas/GenerationProgress";
 import DraftingToolbox, {
   type ToolboxTabId,
+  type ToolboxTab,
 } from "@/components/canvas/DraftingToolbox";
 import DraftingModal, { ModalButton } from "@/components/canvas/DraftingModal";
 import UploadSketchModal, {
   type UploadDetectionPayload,
 } from "@/components/canvas/UploadSketchModal";
+import DetectionReviewOverlay, {
+  type DetectionCorrection,
+  type ReviewElement,
+} from "@/components/canvas/DetectionReviewOverlay";
 import { T_CANVAS, T_DARK } from "@/components/canvas/canvasTokens";
-import { useVersionHistory } from "@/hooks/useVersionHistory";
+import {
+  useVersionHistory,
+  type ProjectVersion,
+} from "@/hooks/useVersionHistory";
+import VersionCompareModal from "@/components/canvas/VersionCompareModal";
 import { useToast } from "@/components/ui/Toast";
 import { registerCanvasCommands } from "@/components/CommandPalette";
 import type {
@@ -76,6 +95,50 @@ const SketchCanvas = dynamic(
 );
 
 const GENERATE_CODE_ENDPOINT = "/api/generate-code";
+const DETECT_ENDPOINT = "/api/detect";
+const FIDELITY_ENDPOINT = "/api/fidelity";
+const REPAIR_ENDPOINT = "/api/repair";
+// Below this fidelity score, one automatic repair pass runs (single pass per
+// generation — the re-score after repair never triggers another).
+const REPAIR_THRESHOLD = 0.8;
+
+// The detection boxes live in the sketch image's pixel space, so the fidelity
+// render must use the same dimensions. Read them off the image itself.
+function getImageSize(
+  dataUrl: string
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () =>
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error("Could not read sketch image size"));
+    img.src = dataUrl;
+  });
+}
+// Options for the shared generation routine (canvas + upload paths, and the
+// HITL review overlay's corrected re-entry all funnel through this shape).
+type RunGenerationOpts = {
+  canvasData: CanvasData;
+  sketchImage?: string;
+  textAnnotations: TextAnnotation[];
+  sketchSource: "canvas" | "upload-photo" | "upload-clean";
+  framework?: "react" | "html" | "vue";
+  // What gets written to the projects row. The upload path persists the
+  // uploaded image here (so reloads restore it) while keeping the API
+  // payload lean — the image already travels as `sketchImage`.
+  persistCanvasData?: CanvasData;
+  // HITL: user-reviewed detection set. When present the backend skips
+  // Roboflow (and container synthesis) and generates from exactly these.
+  correctedElements?: Array<{
+    type: string;
+    confidence: number;
+    bounds: { x: number; y: number; width: number; height: number };
+    label?: string | null;
+  }>;
+  // HITL: audit log of relabel/delete/add actions from the review overlay.
+  detectionCorrections?: DetectionCorrection[];
+};
+
 const ONBOARDING_STORAGE_PREFIX = "codecanvas:onboarding:seen";
 const ONBOARDING_PENDING_PREFIX = "codecanvas:onboarding:pending";
 const ONBOARDING_LOCAL_PREFIX = "codecanvas:onboarding:local";
@@ -127,7 +190,10 @@ function DraftingToggle({
   return (
     <label
       className="flex items-center justify-between px-3 py-2 cursor-pointer"
-      style={{ background: T_CANVAS.vellum, border: `1px solid ${T_CANVAS.rule}` }}
+      style={{
+        background: T_CANVAS.vellum,
+        border: `1px solid ${T_CANVAS.rule}`,
+      }}
     >
       <span className="text-[12px]" style={{ color: T_CANVAS.graphite }}>
         {label}
@@ -165,6 +231,9 @@ function CanvasPageInner() {
   const [rightPanel, setRightPanel] = useState<RightPanel>("properties");
   const [showCodePanel, setShowCodePanel] = useState(false);
   const [codePanelHeight, setCodePanelHeight] = useState(350);
+  const [selectedFramework, setSelectedFramework] = useState<
+    "react" | "html" | "vue"
+  >("react");
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [codeCopied, setCodeCopied] = useState(false);
   const [gridEnabled, setGridEnabled] = useState(true);
@@ -177,9 +246,89 @@ function CanvasPageInner() {
   // Ã¢â€â‚¬Ã¢â€â‚¬ Panels / modals Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [showVersionCompare, setShowVersionCompare] = useState(false);
+  const [showBrandKit, setShowBrandKit] = useState(false);
+  // Brand kit rides along in a ref so runGeneration reads the latest kit
+  // without adding it to the callback's dependency chain.
+  const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
+  const brandKitRef = useRef<BrandKit | null>(null);
+  const applyBrandKit = (kit: BrandKit | null) => {
+    brandKitRef.current = kit;
+    setBrandKit(kit);
+  };
+
+  // ── Element↔Code Linker (App Uplift feature C) ──
+  // Generated code carries data-cc-id="cc-N" (N = 1-based index into
+  // detectedElements, same order the prompt listed them). The Monaco handle
+  // scrolls/flashes the matching attribute; the preview iframe outlines the
+  // matching element via the cc-highlight message bridge in preview-doc.ts.
+  const monacoEditorRef = useRef<MonacoCodeEditorHandle>(null);
+
+  // ── Incremental regeneration (App Uplift feature D) ──
+  // Mirror of the latest generation (code incl. chat/manual edits + detection
+  // set + framework), sent with the next generation request so the backend
+  // can diff detection sets and PATCH the code instead of regenerating.
+  // A ref (not state): runGeneration clears code state synchronously before
+  // its fetch, but this effect only runs post-render, so at request-build
+  // time the ref still holds the prior generation.
+  const previousGenRef = useRef<{
+    code: string;
+    elements: Array<{ type: string; bounds: unknown }>;
+    framework: string;
+  }>({ code: "", elements: [], framework: "react" });
+  // (Kept in sync by an effect placed after the code/detection state
+  // declarations below.)
+
+  const revealCcInCode = useCallback((ccId: string) => {
+    // The editor may be mid-mount (e.g. we just switched preview → split), so
+    // retry briefly before giving up.
+    const attempt = (triesLeft: number) => {
+      const ok = monacoEditorRef.current?.revealAndFlash(
+        `data-cc-id="${ccId}"`
+      );
+      if (!ok && triesLeft > 0) {
+        setTimeout(() => attempt(triesLeft - 1), 150);
+      }
+    };
+    attempt(10);
+  }, []);
+
+  // Click on a rendered element inside the preview iframe → jump to its code.
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "cc-element-click" && event.data.ccId) {
+        // If only the preview is visible, open split view so the highlighted
+        // code is actually on screen.
+        setCodeViewMode((mode) => (mode === "preview" ? "split" : mode));
+        revealCcInCode(event.data.ccId);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [revealCcInCode]);
+
+  // Element chip in the detection strip → highlight in preview AND code.
+  const handleElementChipClick = useCallback(
+    (ccId: string) => {
+      window.postMessage(
+        { type: "cc-highlight-request", ccId },
+        window.location.origin
+      );
+      revealCcInCode(ccId);
+    },
+    [revealCcInCode]
+  );
   const [showTemplates, setShowTemplates] = useState(false);
   const [showComponents, setShowComponents] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  // Which source feeds the workspace: the drawing canvas, or an uploaded image.
+  // When "upload", the center column swaps CanvasSurface for UploadedSketchPanel
+  // (same slot) and the uploaded image drives generation instead of the canvas.
+  const [inputSource, setInputSource] = useState<"canvas" | "upload">("canvas");
+  const [uploadedPreview, setUploadedPreview] =
+    useState<UploadDetectionPayload | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const exportOpenedByTourRef = useRef(false);
@@ -237,7 +386,43 @@ function CanvasPageInner() {
     Array<{ type: string; bounds: unknown }>
   >([]);
   const [usedFallback, setUsedFallback] = useState(false);
+
+  // Keep the incremental-regen mirror (declared above) current with the
+  // latest code (incl. chat/manual edits), detection set, and framework.
+  useEffect(() => {
+    const code = editedCode || generatedCode;
+    if (code && detectedElements.length > 0) {
+      previousGenRef.current = {
+        code,
+        elements: detectedElements,
+        framework: selectedFramework,
+      };
+    }
+  }, [editedCode, generatedCode, detectedElements, selectedFramework]);
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null);
+  // Fidelity self-check: the backend renders the generated code headless,
+  // re-runs the sketch detector on the render, and scores the boxes against
+  // the original detections. Null = not scored (endpoint off / failed).
+  const [fidelity, setFidelity] = useState<{
+    score: number;
+    missing: number;
+    extra: number;
+    // Pre-repair score, present only after an auto-repair pass ran.
+    before?: number;
+  } | null>(null);
+  const [isScoringFidelity, setIsScoringFidelity] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
+  // HITL detection review (roadmap idea #4): detection runs first (/api/detect),
+  // the boxes open in an overlay for correction, and only the reviewed set goes
+  // to generation. Null = no review in progress.
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [reviewSession, setReviewSession] = useState<{
+    image: string;
+    imageWidth: number;
+    imageHeight: number;
+    elements: ReviewElement[];
+    generationOpts: RunGenerationOpts;
+  } | null>(null);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ History & versions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const history = useHistory({
@@ -274,9 +459,10 @@ function CanvasPageInner() {
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ User Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
-  const [userProfile, setUserProfile] = useState<Record<string, unknown> | null>(
-    null
-  );
+  const [userProfile, setUserProfile] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const lastOnboardingUserIdRef = useRef<string | null>(null);
 
@@ -301,8 +487,7 @@ function CanvasPageInner() {
       {
         id: "export",
         title: "Export Your Code",
-        description:
-          "Preview, copy, or export your generated frontend code.",
+        description: "Preview, copy, or export your generated frontend code.",
         targetSelector: "[data-onboarding='export-dialog']",
         placement: "bottom",
       },
@@ -320,7 +505,13 @@ function CanvasPageInner() {
   // value implicitly expands it. Runs on mount too because the initial tool
   // is "pen".
   useEffect(() => {
-    const DRAWING_TOOLS: Tool[] = ["pen", "line", "rectangle", "arrow", "erase"];
+    const DRAWING_TOOLS: Tool[] = [
+      "pen",
+      "line",
+      "rectangle",
+      "arrow",
+      "erase",
+    ];
     if (DRAWING_TOOLS.includes(currentTool)) {
       setRightPanel("properties");
     }
@@ -380,8 +571,7 @@ function CanvasPageInner() {
     const localSeen = window.localStorage.getItem(localKey);
     const profileCompleted = Boolean(
       userProfile &&
-        (userProfile as { onboarding_completed?: boolean })
-          .onboarding_completed
+      (userProfile as { onboarding_completed?: boolean }).onboarding_completed
     );
 
     if (window.localStorage.getItem(ONBOARDING_DEBUG_KEY) === "true") {
@@ -451,8 +641,31 @@ function CanvasPageInner() {
           setProjectName(project.title);
           setOriginalProjectName(project.title);
           recordProjectActivity(project.id, "opened");
+          {
+            // Restore the project's brand kit so regenerations keep the
+            // user's tokens without reopening the modal.
+            const kit =
+              (project as { brand_kit?: BrandKit | null }).brand_kit ?? null;
+            brandKitRef.current = kit;
+            setBrandKit(kit);
+          }
           if (project.canvas_data) {
             const cd = project.canvas_data as CanvasData;
+            // Upload-based project: the sketch is a stored image, not drawn
+            // strokes. Restore the upload workspace so a reload (or opening
+            // the ?id= URL in a new tab) shows the image again instead of an
+            // empty canvas.
+            if (cd.uploadedSketch?.dataUrl) {
+              setUploadedPreview({
+                dataUrl: cd.uploadedSketch.dataUrl,
+                source: cd.uploadedSketch.source,
+                width: cd.uploadedSketch.width,
+                height: cd.uploadedSketch.height,
+              });
+              setInputSource("upload");
+              // PROPS tab is canvas-only; mirror handleUploadDetection.
+              setRightPanel((p) => (p === "properties" ? null : p));
+            }
             const hasContent =
               (cd.lines?.length ?? 0) > 0 ||
               (cd.shapes?.length ?? 0) > 0 ||
@@ -487,15 +700,41 @@ function CanvasPageInner() {
     }
   }, [currentProject?.id, versionHistory.fetchVersions]);
 
+  // What should be written to the projects row right now. In canvas mode
+  // that's the live Konva state; in upload mode the canvas is unmounted
+  // (canvasRef is null), so build a stub carrying the uploaded image instead —
+  // otherwise Ctrl+S and post-chat persistence silently no-op after an upload.
+  const getPersistableCanvasData = useCallback((): CanvasData | null => {
+    if (inputSource === "upload" && uploadedPreview) {
+      return {
+        lines: [],
+        shapes: [],
+        componentGroups: [],
+        uploadedSketch: {
+          dataUrl: uploadedPreview.dataUrl,
+          source: uploadedPreview.source,
+          width: uploadedPreview.width,
+          height: uploadedPreview.height,
+        },
+      };
+    }
+    return canvasRef.current?.getCanvasData() ?? null;
+  }, [inputSource, uploadedPreview]);
+
   // Save project handler
   const handleSaveProject = useCallback(async () => {
-    const canvasData = canvasRef.current?.getCanvasData();
+    const canvasData = getPersistableCanvasData();
     if (!canvasData) return;
 
     const codeToSave = editedCode || generatedCode || undefined;
 
     if (currentProject?.id && !currentProject.id.startsWith("temp-")) {
-      const success = await updateProject(currentProject.id, canvasData, undefined, codeToSave);
+      const success = await updateProject(
+        currentProject.id,
+        canvasData,
+        undefined,
+        codeToSave
+      );
       if (success) {
         console.log("Project saved successfully");
       }
@@ -515,7 +754,15 @@ function CanvasPageInner() {
         recordProjectActivity(newId, "created");
       }
     }
-  }, [currentProject, projectName, saveProject, updateProject, editedCode, generatedCode]);
+  }, [
+    currentProject,
+    projectName,
+    saveProject,
+    updateProject,
+    editedCode,
+    generatedCode,
+    getPersistableCanvasData,
+  ]);
 
   const ensureGenerationProject = useCallback(
     async (canvasData: CanvasData): Promise<string | null> => {
@@ -690,7 +937,7 @@ function CanvasPageInner() {
           messages: [{ role: "user", content: message }],
           currentCode,
           projectId: currentProject?.id,
-          framework: "react",
+          framework: selectedFramework,
           styling: "tailwind",
         }),
       });
@@ -707,9 +954,14 @@ function CanvasPageInner() {
       setShowCodePanel(true);
       // Persist updated code immediately so it survives a reload.
       if (currentProject?.id && !currentProject.id.startsWith("temp-")) {
-        const currentCanvasData = canvasRef.current?.getCanvasData();
+        const currentCanvasData = getPersistableCanvasData();
         if (currentCanvasData) {
-          void updateProject(currentProject.id, currentCanvasData, undefined, result.code);
+          void updateProject(
+            currentProject.id,
+            currentCanvasData,
+            undefined,
+            result.code
+          );
         }
       }
       return (
@@ -719,6 +971,73 @@ function CanvasPageInner() {
     } catch (err) {
       console.error(err);
       throw err;
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Annotate-on-render refinement (feature B): the user drew markup on the
+  // live preview and wrote an instruction; LivePreview resolved the markup to
+  // data-cc-id targets. One targeted Gemini call applies it.
+  const handleAnnotateRefine = async (
+    payload: AnnotatePayload
+  ): Promise<boolean> => {
+    const currentCode = editedCode || generatedCode;
+    if (!currentCode) return false;
+    if (!currentProject?.id || currentProject.id.startsWith("temp-")) {
+      toast.warning("Save the project first to use annotation refinement.", {
+        title: "Project not saved",
+      });
+      return false;
+    }
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/annotate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: currentProject.id,
+          code: currentCode,
+          framework: selectedFramework,
+          note: payload.note,
+          targets: payload.targets,
+          region: payload.region,
+          width: payload.width,
+          height: payload.height,
+        }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        throw new Error(err?.error || "Annotation refinement failed");
+      }
+      const result = await response.json();
+      setGeneratedCode(result.code);
+      setEditedCode(result.code);
+      setShowCodePanel(true);
+      // Persist so the refined code survives a reload (same as chat).
+      const currentCanvasData = getPersistableCanvasData();
+      if (currentCanvasData) {
+        void updateProject(
+          currentProject.id,
+          currentCanvasData,
+          undefined,
+          result.code
+        );
+      }
+      toast.success(
+        payload.targets.length > 0
+          ? `Applied to ${payload.targets.length} marked element${payload.targets.length === 1 ? "" : "s"}.`
+          : "Applied to the marked region.",
+        { title: "Annotation applied" }
+      );
+      return true;
+    } catch (err) {
+      console.error(err);
+      toast.error(
+        err instanceof Error ? err.message : "Annotation refinement failed",
+        { title: "Annotation failed" }
+      );
+      return false;
     } finally {
       setIsGenerating(false);
     }
@@ -745,15 +1064,77 @@ function CanvasPageInner() {
       toast.success("Checkpoint created.", { title: "Saved" });
     }
   };
-  const handleRestoreVersion = async (versionId: string) => {
-    const canvasData = await versionHistory.restoreVersion(versionId);
-    if (canvasData && canvasRef.current) {
-      canvasRef.current.clearCanvas();
-      canvasRef.current.insertTemplate(canvasData);
+  // Restore a canvas_data snapshot into the workspace. Handles BOTH input
+  // modes: an upload-based snapshot re-opens the upload workspace with the
+  // stored image; a drawn snapshot goes through history.setState (the same
+  // path the ?id= loader uses) so the strokes actually re-render, and flips
+  // back to canvas mode if the user was in the upload view.
+  const restoreCanvasSnapshot = (cd: CanvasData | null | undefined) => {
+    if (!cd) return;
+    if (cd.uploadedSketch?.dataUrl) {
+      setUploadedPreview({
+        dataUrl: cd.uploadedSketch.dataUrl,
+        source: cd.uploadedSketch.source,
+        width: cd.uploadedSketch.width,
+        height: cd.uploadedSketch.height,
+      });
+      setInputSource("upload");
+      setRightPanel((p) => (p === "properties" ? null : p));
+      return;
     }
+    const hasContent =
+      (cd.lines?.length ?? 0) > 0 ||
+      (cd.shapes?.length ?? 0) > 0 ||
+      (cd.componentGroups?.length ?? 0) > 0;
+    if (!hasContent) return;
+    setInputSource("canvas");
+    setUploadedPreview(null);
+    history.setState({
+      lines: cd.lines ?? [],
+      shapes: cd.shapes ?? [],
+      componentGroups: cd.componentGroups ?? [],
+    });
+    setHasUserInteracted(true);
+  };
+
+  const handleRestoreVersion = async (versionId: string) => {
+    const version = await versionHistory.restoreVersion(versionId);
+    if (!version) {
+      toast.error("Could not load that checkpoint.", {
+        title: "Restore failed",
+      });
+      return;
+    }
+    // Same treatment as the compare-modal rollback: restore the code (when
+    // the iteration has one — manual checkpoints store an empty string) and
+    // the canvas snapshot. Previously this restored the canvas only, so a
+    // toolbox click looked like it did nothing to the code panel.
+    if (version.generated_code) {
+      setGeneratedCode(version.generated_code);
+      setEditedCode("");
+      setShowCodePanel(true);
+    }
+    restoreCanvasSnapshot(version.canvas_data as CanvasData | null);
+    toast.success(`Restored version ${version.version_number}.`, {
+      title: "Checkpoint restored",
+    });
   };
   const handleDeleteVersion = async (versionId: string) => {
     await versionHistory.deleteVersion(versionId);
+  };
+  // Rollback from the compare modal: restore the iteration's code into the
+  // editor (clearing manual edits) and its canvas snapshot when it has one.
+  const handleRollbackVersion = (version: ProjectVersion) => {
+    if (version.generated_code) {
+      setGeneratedCode(version.generated_code);
+      setEditedCode("");
+      setShowCodePanel(true);
+    }
+    restoreCanvasSnapshot(version.canvas_data as CanvasData | null);
+    setShowVersionCompare(false);
+    toast.success(`Rolled back to version ${version.version_number}.`, {
+      title: "Version restored",
+    });
   };
   const confirmDeleteCheckpoint = async () => {
     if (!checkpointToDelete || isDeletingCheckpoint) return;
@@ -773,16 +1154,14 @@ function CanvasPageInner() {
   const persistOnboardingCompletion = useCallback(async () => {
     if (!user?.id) return;
     try {
-      await supabase
-        .from("profiles")
-        .upsert(
-          {
-            id: user.id,
-            onboarding_completed: true,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "id" }
-        );
+      await supabase.from("profiles").upsert(
+        {
+          id: user.id,
+          onboarding_completed: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
       setUserProfile({ onboarding_completed: true });
     } catch (error) {
       console.error("Failed to persist onboarding completion:", error);
@@ -818,9 +1197,7 @@ function CanvasPageInner() {
   }, [persistOnboardingCompletion, user?.id]);
 
   const handleOnboardingNext = useCallback(() => {
-    setOnboardingStep((step) =>
-      Math.min(step + 1, onboardingSteps.length - 1)
-    );
+    setOnboardingStep((step) => Math.min(step + 1, onboardingSteps.length - 1));
   }, [onboardingSteps.length]);
 
   const handleOnboardingBack = useCallback(() => {
@@ -869,7 +1246,9 @@ function CanvasPageInner() {
     if (options.format === "png") {
       const result = canvasRef.current?.exportAsPNG();
       if (!result?.dataURL) {
-        toast.error("Could not capture the canvas image.", { title: "Export failed" });
+        toast.error("Could not capture the canvas image.", {
+          title: "Export failed",
+        });
         return;
       }
       const a = document.createElement("a");
@@ -885,16 +1264,23 @@ function CanvasPageInner() {
       // without re-rasterising the wrapper (raster bitmap is still embedded).
       const result = canvasRef.current?.exportAsPNG();
       if (!result?.dataURL) {
-        toast.error("Could not capture the canvas image.", { title: "Export failed" });
+        toast.error("Could not capture the canvas image.", {
+          title: "Export failed",
+        });
         return;
       }
       const img = new Image();
       img.onload = () => {
         const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${img.width}" height="${img.height}" viewBox="0 0 ${img.width} ${img.height}"><image href="${result.dataURL}" width="${img.width}" height="${img.height}"/></svg>`;
-        downloadBlob(new Blob([svg], { type: "image/svg+xml" }), `${baseName}.svg`);
+        downloadBlob(
+          new Blob([svg], { type: "image/svg+xml" }),
+          `${baseName}.svg`
+        );
       };
       img.onerror = () => {
-        toast.error("Could not build the SVG file.", { title: "Export failed" });
+        toast.error("Could not build the SVG file.", {
+          title: "Export failed",
+        });
       };
       img.src = result.dataURL;
       return;
@@ -911,7 +1297,9 @@ function CanvasPageInner() {
         canvas: canvasData,
       };
       downloadBlob(
-        new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
+        new Blob([JSON.stringify(payload, null, 2)], {
+          type: "application/json",
+        }),
         `${baseName}.json`
       );
       return;
@@ -919,7 +1307,9 @@ function CanvasPageInner() {
 
     if (options.format === "zip") {
       if (!code) {
-        toast.warning("Generate code first, then export.", { title: "Nothing to export" });
+        toast.warning("Generate code first, then export.", {
+          title: "Nothing to export",
+        });
         return;
       }
       try {
@@ -932,8 +1322,26 @@ function CanvasPageInner() {
         downloadBlob(blob, `${baseName}.zip`);
       } catch (err) {
         console.error("ZIP export failed:", err);
-        toast.error("Could not build the ZIP file.", { title: "Export failed" });
+        toast.error("Could not build the ZIP file.", {
+          title: "Export failed",
+        });
       }
+      return;
+    }
+
+    if (options.format === "stackblitz") {
+      if (!code) {
+        toast.warning("Generate code first, then export.", {
+          title: "Nothing to export",
+        });
+        return;
+      }
+      openInStackBlitz({
+        code,
+        framework: options.framework ?? "react",
+        styling: options.styling ?? "tailwind",
+        projectName: baseName,
+      });
       return;
     }
   };
@@ -958,23 +1366,122 @@ function CanvasPageInner() {
 
   // Detection / AI
   //
+  // Fidelity self-check, fired after a successful generation. Non-blocking:
+  // the code panel is already usable while this runs, and any failure is
+  // silent (the badge simply does not appear). The backend renders the code
+  // headless, re-detects with the same Roboflow model, and returns an F1-style
+  // score against the original detections.
+  //
+  // When the score lands below REPAIR_THRESHOLD, one auto-repair pass runs:
+  // the mismatch report goes back to Gemini as a surgical fix instruction,
+  // the repaired code replaces the panel content, and a re-score (repair
+  // disabled — exactly one pass per generation) shows before -> after.
+  const scoreFidelity = useCallback(async function scoreRun(opts: {
+    projectId: string;
+    code: string;
+    framework: string;
+    elements: Array<{ type: string; bounds: unknown }>;
+    sketchImage: string;
+    allowRepair: boolean;
+    before?: number;
+  }): Promise<void> {
+    setIsScoringFidelity(true);
+    try {
+      const { width, height } = await getImageSize(opts.sketchImage);
+      const response = await fetch(FIDELITY_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: opts.projectId,
+          code: opts.code,
+          framework: opts.framework,
+          elements: opts.elements,
+          width,
+          height,
+        }),
+      });
+      if (!response.ok) return;
+      const result = await response.json();
+      if (typeof result.score !== "number") return;
+      const missing: Array<Record<string, unknown>> =
+        result.report?.missing ?? [];
+      const extra: Array<Record<string, unknown>> = result.report?.extra ?? [];
+      setFidelity({
+        score: result.score,
+        missing: missing.length,
+        extra: extra.length,
+        before: opts.before,
+      });
+
+      const needsRepair =
+        opts.allowRepair &&
+        result.score < REPAIR_THRESHOLD &&
+        missing.length + extra.length > 0;
+      if (!needsRepair) return;
+
+      setIsRepairing(true);
+      try {
+        const repairResponse = await fetch(REPAIR_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: opts.projectId,
+            code: opts.code,
+            framework: opts.framework,
+            missing,
+            extra,
+            width,
+            height,
+          }),
+        });
+        if (!repairResponse.ok) return;
+        const repaired = await repairResponse.json();
+        if (typeof repaired.code !== "string" || !repaired.code.trim()) return;
+        setGeneratedCode(repaired.code);
+        setEditedCode(repaired.code);
+        await scoreRun({
+          ...opts,
+          code: repaired.code,
+          allowRepair: false,
+          before: result.score,
+        });
+      } finally {
+        setIsRepairing(false);
+      }
+    } catch {
+      // Fidelity is an enhancement, never a blocker — stay quiet on failure.
+    } finally {
+      setIsScoringFidelity(false);
+    }
+  }, []);
+
   // Shared generation routine. Both the canvas "Run detection" path and the
   // image-upload path funnel through here so they hit the SAME detection ->
   // Gemini pipeline. The only difference is the source of `sketchImage` and the
   // `sketchSource` tag (which tells the backend whether to photo-normalize).
   const runGeneration = useCallback(
-    async (opts: {
-      canvasData: CanvasData;
-      sketchImage?: string;
-      textAnnotations: TextAnnotation[];
-      sketchSource: "canvas" | "upload-photo" | "upload-clean";
-    }) => {
+    async (opts: RunGenerationOpts) => {
       setIsGenerating(true);
       setGeneratedCode("");
       setDetectedElements([]);
       setUsedFallback(false);
+      setFidelity(null);
+      // Open the code panel immediately so the generation progress loader is
+      // visible on EVERY path (canvas, HITL confirm, upload) — previously the
+      // canvas path opened it only on success, which read as "nothing is
+      // happening" after confirming the detection review.
+      setShowCodePanel((prev) => {
+        if (!prev) {
+          // Open at the default height, not whatever the user last dragged it
+          // to (e.g. a leftover maximized panel). 350 = double-click reset.
+          setCodePanelHeight(350);
+          codePanelHeightRef.current = 350;
+        }
+        return true;
+      });
+      const persistData = opts.persistCanvasData ?? opts.canvasData;
       try {
-        const projectId = await ensureGenerationProject(opts.canvasData);
+        const projectId = await ensureGenerationProject(persistData);
         if (!projectId) {
           throw new Error("Failed to create a project before generation");
         }
@@ -985,13 +1492,28 @@ function CanvasPageInner() {
           body: JSON.stringify({
             mode: "generate",
             canvasData: opts.canvasData,
-            framework: "react",
+            framework: opts.framework ?? "react",
             styling: "tailwind",
             description: "",
             projectId,
             sketchImage: opts.sketchImage,
             textAnnotations: opts.textAnnotations,
             sketchSource: opts.sketchSource,
+            correctedElements: opts.correctedElements,
+            detectionCorrections: opts.detectionCorrections,
+            brandKit: brandKitRef.current ?? undefined,
+            // Incremental regen (feature D): hand the backend the prior
+            // generation so it can patch instead of regenerate. Only when the
+            // framework matches — patching React code under a Vue request
+            // would corrupt the output.
+            ...(previousGenRef.current.code &&
+            previousGenRef.current.elements.length > 0 &&
+            previousGenRef.current.framework === (opts.framework ?? "react")
+              ? {
+                  previousCode: previousGenRef.current.code,
+                  previousElements: previousGenRef.current.elements,
+                }
+              : {}),
           }),
         });
         if (!response.ok) {
@@ -999,17 +1521,44 @@ function CanvasPageInner() {
           throw new Error(err.error || "Failed to generate code");
         }
         const result = await response.json();
+        const elements = result.detectedElements ?? result.elements ?? [];
         setGeneratedCode(result.code);
         setEditedCode(result.code);
-        setDetectedElements(result.detectedElements ?? result.elements ?? []);
+        setDetectedElements(elements);
         setUsedFallback(Boolean(result.usedFallback));
         setFallbackMessage(result.message ?? null);
         setCurrentMode("preview");
         setShowCodePanel(true);
+        if (result.usedIncremental) {
+          toast.success(
+            "Only the changed elements were updated. Your existing code and refinements were kept.",
+            { title: "Incremental update" }
+          );
+        }
         // Persist generated code immediately so it survives a reload without
         // requiring a manual Ctrl+S.
         if (projectId) {
-          void updateProject(projectId, opts.canvasData, undefined, result.code);
+          void updateProject(projectId, persistData, undefined, result.code);
+          // The backend just persisted a new iteration — refresh the version
+          // list so CHECKPOINTS and COMPARE VERSIONS see it without a reload.
+          void versionHistory.fetchVersions(projectId);
+        }
+        // Kick off the fidelity self-check in the background. Skip fallback
+        // and template outputs — scoring a degraded result is meaningless.
+        if (
+          !result.usedFallback &&
+          result.code &&
+          elements.length > 0 &&
+          opts.sketchImage
+        ) {
+          void scoreFidelity({
+            projectId,
+            code: result.code,
+            framework: opts.framework ?? "react",
+            elements,
+            sketchImage: opts.sketchImage,
+            allowRepair: true,
+          });
         }
       } catch (err) {
         const message =
@@ -1021,7 +1570,118 @@ function CanvasPageInner() {
         setIsGenerating(false);
       }
     },
-    [ensureGenerationProject, updateProject, toast]
+    [
+      ensureGenerationProject,
+      updateProject,
+      toast,
+      scoreFidelity,
+      versionHistory.fetchVersions,
+    ]
+  );
+
+  // HITL review step (roadmap idea #4). Runs detection FIRST (/api/detect,
+  // Roboflow only, no Gemini), then opens the review overlay so the user can
+  // relabel, delete, or add boxes before generation. If detection is
+  // unavailable or finds nothing, falls back to the direct one-shot pipeline
+  // (which has its own contour fallback) so the feature never blocks a user.
+  const runDetectionReview = useCallback(
+    async (opts: RunGenerationOpts) => {
+      if (!opts.sketchImage) {
+        void runGeneration(opts);
+        return;
+      }
+      setIsDetecting(true);
+      try {
+        const projectId = await ensureGenerationProject(
+          opts.persistCanvasData ?? opts.canvasData
+        );
+        if (!projectId) {
+          throw new Error("Failed to create a project before detection");
+        }
+        const response = await fetch(DETECT_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId,
+            sketchImage: opts.sketchImage,
+            sketchSource: opts.sketchSource,
+            // CanvasData only carries width/height on the upload path (the
+            // handler stamps them in); canvas exports fall back to defaults —
+            // the backend uses these purely as an image-size fallback.
+            width: (opts.canvasData as { width?: number }).width ?? 1000,
+            height: (opts.canvasData as { height?: number }).height ?? 600,
+          }),
+        });
+        if (!response.ok) throw new Error("Detection request failed");
+        const result = await response.json();
+        const detected: Array<{
+          type: string;
+          confidence: number;
+          bounds: { x: number; y: number; width: number; height: number };
+          label?: string | null;
+        }> = result.elements ?? [];
+        if (detected.length === 0) {
+          // Nothing to review; let the normal pipeline (and its fallbacks) run.
+          void runGeneration(opts);
+          return;
+        }
+        // Uploads: boxes live in post-preprocessing pixel space, so both the
+        // overlay AND the later generation call must use the processed preview.
+        const reviewImage: string = result.previewImage || opts.sketchImage;
+        let imageWidth: number = result.imageWidth ?? 0;
+        let imageHeight: number = result.imageHeight ?? 0;
+        if (!imageWidth || !imageHeight) {
+          const size = await getImageSize(reviewImage);
+          imageWidth = size.width;
+          imageHeight = size.height;
+        }
+        setReviewSession({
+          image: reviewImage,
+          imageWidth,
+          imageHeight,
+          elements: detected.map((el, i) => ({
+            id: `detected-${i}`,
+            type: (el.type || "card").toLowerCase(),
+            confidence: el.confidence ?? 0,
+            bounds: el.bounds,
+            label: el.label,
+          })),
+          generationOpts: { ...opts, sketchImage: reviewImage },
+        });
+      } catch (err) {
+        // Review is an enhancement on top of the pipeline, not a gate: any
+        // detect failure routes back through the direct one-shot path.
+        console.error(
+          "Detection review unavailable, generating directly:",
+          err
+        );
+        void runGeneration(opts);
+      } finally {
+        setIsDetecting(false);
+      }
+    },
+    [ensureGenerationProject, runGeneration]
+  );
+
+  // The user confirmed (or corrected) the detections: generate from exactly
+  // that set. The backend skips Roboflow and container synthesis.
+  const handleReviewGenerate = useCallback(
+    (elements: ReviewElement[], corrections: DetectionCorrection[]) => {
+      const session = reviewSession;
+      if (!session) return;
+      setReviewSession(null);
+      void runGeneration({
+        ...session.generationOpts,
+        correctedElements: elements.map((el) => ({
+          type: el.type,
+          confidence: el.confidence,
+          bounds: el.bounds,
+          label: el.label ?? undefined,
+        })),
+        detectionCorrections: corrections.length > 0 ? corrections : undefined,
+      });
+    },
+    [reviewSession, runGeneration]
   );
 
   // Upload path: the uploaded image IS the sketch. Send it straight through
@@ -1031,6 +1691,12 @@ function CanvasPageInner() {
   const handleUploadDetection = useCallback(
     (payload: UploadDetectionPayload) => {
       setShowUpload(false);
+      // Swap the center column to show the uploaded image in place of the canvas.
+      setUploadedPreview(payload);
+      setInputSource("upload");
+      // PROPS tab is canvas-only; close it so DraftingToolbox doesn't show a
+      // mismatched active tab with no content.
+      setRightPanel((p) => (p === "properties" ? null : p));
       const emptyCanvas: CanvasData = {
         lines: [],
         shapes: [],
@@ -1038,15 +1704,34 @@ function CanvasPageInner() {
         width: payload.width,
         height: payload.height,
       } as CanvasData;
-      void runGeneration({
+      void runDetectionReview({
         canvasData: emptyCanvas,
         sketchImage: payload.dataUrl,
         textAnnotations: [],
         sketchSource: payload.source,
+        framework: selectedFramework,
+        // Persist the image in canvas_data so /canvas?id=... restores the
+        // upload view after a reload or when opened in a new tab.
+        persistCanvasData: {
+          ...emptyCanvas,
+          uploadedSketch: {
+            dataUrl: payload.dataUrl,
+            source: payload.source,
+            width: payload.width,
+            height: payload.height,
+          },
+        },
       });
     },
-    [runGeneration]
+    [runDetectionReview, selectedFramework]
   );
+
+  // Return the workspace to the drawing canvas after an upload, discarding the
+  // uploaded image. Generated code in the panel is left untouched.
+  const handleBackToCanvas = useCallback(() => {
+    setInputSource("canvas");
+    setUploadedPreview(null);
+  }, []);
 
   const handleRunDetection = async () => {
     if (!canvasRef.current) return;
@@ -1126,11 +1811,12 @@ function CanvasPageInner() {
         }
       }
 
-      void runGeneration({
+      void runDetectionReview({
         canvasData,
         sketchImage,
         textAnnotations,
         sketchSource: "canvas",
+        framework: selectedFramework,
       });
     }
   };
@@ -1345,10 +2031,7 @@ function CanvasPageInner() {
 
   // Map expanded tool Ã¢â€ â€™ what SketchCanvas understands
   const toolForCanvas = (): string => {
-    if (
-      ["rectangle", "arrow"].includes(currentTool)
-    )
-      return currentTool;
+    if (["rectangle", "arrow"].includes(currentTool)) return currentTool;
     if (currentTool === "hand") return "hand";
     return currentTool;
   };
@@ -1358,7 +2041,10 @@ function CanvasPageInner() {
   // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden select-none" style={{ background: "#FAFAF7", color: "#0E0E0F" }}>
+    <div
+      className="flex h-screen flex-col overflow-hidden select-none"
+      style={{ background: "#FAFAF7", color: "#0E0E0F" }}
+    >
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Top Navbar Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <CanvasTopBar
         projectName={projectName}
@@ -1371,9 +2057,21 @@ function CanvasPageInner() {
         lastSaved={lastSaved}
         saveError={error}
         onSave={handleSaveProject}
-        onRunDetection={handleRunDetection}
-        isGenerating={isGenerating}
+        onRunDetection={
+          inputSource === "upload" ? undefined : handleRunDetection
+        }
+        isGenerating={isGenerating || isDetecting}
+        framework={selectedFramework}
+        onFrameworkChange={setSelectedFramework}
         onExport={() => setShowExport(true)}
+        onOpenStackBlitz={() =>
+          handleExport({
+            format: "stackblitz",
+            framework: selectedFramework,
+            styling: "tailwind",
+          })
+        }
+        onShare={() => setShowShare(true)}
         onUploadSketch={() => setShowUpload(true)}
         onTemplatesToggle={() => setShowTemplates(true)}
         onChatToggle={() =>
@@ -1398,62 +2096,76 @@ function CanvasPageInner() {
             className="relative flex-1 min-h-0 overflow-hidden"
             style={{ background: "#FAFAF7" }}
           >
-            <CanvasSurface
-              isEmpty={
-                !hasUserInteracted &&
-                (() => {
-                  const s = history.state as
-                    | {
-                        lines?: unknown[];
-                        shapes?: unknown[];
-                        componentGroups?: unknown[];
-                      }
-                    | undefined;
-                  if (!s) return true;
-                  return (
-                    (s.lines?.length ?? 0) === 0 &&
-                    (s.shapes?.length ?? 0) === 0 &&
-                    (s.componentGroups?.length ?? 0) === 0
-                  );
-                })()
-              }
-              onUserInteract={() => setHasUserInteracted(true)}
-            >
-              <div className="flex h-full items-center justify-center p-2 sm:p-4 md:p-6">
-                <ErrorBoundary
-                  variant="panel"
-                  title="Canvas surface failed"
-                  message="The drawing area could not be loaded."
-                >
-                  <SketchCanvas
-                    ref={canvasRef}
-                    tool={toolForCanvas()}
-                    mode={currentMode}
-                    gridEnabled={gridEnabled}
-                    snapEnabled={snapEnabled}
-                    importedDesign={importedDesign}
-                    strokeColor={strokeColor}
-                    fillColor={fillColor}
-                    strokeWidth={strokeWidth}
-                    zoom={zoom}
-                    canvasState={history.state}
-                    onStateChange={history.setState}
-                  />
-                </ErrorBoundary>
-              </div>
-            </CanvasSurface>
-
-            {/* Floating left toolbar - drawing tools */}
-            <ErrorBoundary
-              variant="panel"
-              title="Toolbar unavailable"
-              message="We could not load the drawing tools."
-            >
-              <FloatingToolbar
-                currentTool={currentTool}
-                onSelectTool={setCurrentTool}
+            {inputSource === "upload" && uploadedPreview ? (
+              <UploadedSketchPanel
+                src={uploadedPreview.dataUrl}
+                source={uploadedPreview.source}
+                fileName={uploadedPreview.fileName}
+                zoom={zoom}
+                onBackToCanvas={handleBackToCanvas}
+                onReplace={() => setShowUpload(true)}
+                isGenerating={isGenerating || isDetecting}
               />
-            </ErrorBoundary>
+            ) : (
+              <CanvasSurface
+                isEmpty={
+                  !hasUserInteracted &&
+                  (() => {
+                    const s = history.state as
+                      | {
+                          lines?: unknown[];
+                          shapes?: unknown[];
+                          componentGroups?: unknown[];
+                        }
+                      | undefined;
+                    if (!s) return true;
+                    return (
+                      (s.lines?.length ?? 0) === 0 &&
+                      (s.shapes?.length ?? 0) === 0 &&
+                      (s.componentGroups?.length ?? 0) === 0
+                    );
+                  })()
+                }
+                onUserInteract={() => setHasUserInteracted(true)}
+              >
+                <div className="flex h-full items-center justify-center p-2 sm:p-4 md:p-6">
+                  <ErrorBoundary
+                    variant="panel"
+                    title="Canvas surface failed"
+                    message="The drawing area could not be loaded."
+                  >
+                    <SketchCanvas
+                      ref={canvasRef}
+                      tool={toolForCanvas()}
+                      mode={currentMode}
+                      gridEnabled={gridEnabled}
+                      snapEnabled={snapEnabled}
+                      importedDesign={importedDesign}
+                      strokeColor={strokeColor}
+                      fillColor={fillColor}
+                      strokeWidth={strokeWidth}
+                      zoom={zoom}
+                      canvasState={history.state}
+                      onStateChange={history.setState}
+                    />
+                  </ErrorBoundary>
+                </div>
+              </CanvasSurface>
+            )}
+
+            {/* Floating left toolbar - drawing tools (canvas mode only) */}
+            {inputSource === "canvas" && (
+              <ErrorBoundary
+                variant="panel"
+                title="Toolbar unavailable"
+                message="We could not load the drawing tools."
+              >
+                <FloatingToolbar
+                  currentTool={currentTool}
+                  onSelectTool={setCurrentTool}
+                />
+              </ErrorBoundary>
+            )}
 
             {/* StyleRibbon used to float here at bottom-left. It now lives
                 in the DraftingToolbox PROPS tab so it never blocks the
@@ -1481,7 +2193,8 @@ function CanvasPageInner() {
                   background: T_CANVAS.paper,
                   border: `1px solid ${T_CANVAS.rule}`,
                   color: T_CANVAS.muted,
-                  fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                  fontFamily:
+                    "var(--font-jetbrains-mono, ui-monospace, monospace)",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = T_CANVAS.graphite;
@@ -1549,8 +2262,12 @@ function CanvasPageInner() {
                 title="Drag to resize · double-click to reset"
                 className="group relative flex h-2.5 shrink-0 cursor-row-resize items-center justify-center transition-colors"
                 style={{ background: T_DARK.bgRaised }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = T_DARK.cobaltWash)}
-                onMouseLeave={(e) => (e.currentTarget.style.background = T_DARK.bgRaised)}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = T_DARK.cobaltWash)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = T_DARK.bgRaised)
+                }
               >
                 <div
                   className="h-[2px] w-10 transition-all duration-150 group-hover:w-16"
@@ -1566,7 +2283,8 @@ function CanvasPageInner() {
                   style={{
                     borderColor: T_DARK.ruleSoft,
                     background: T_DARK.bg,
-                    fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                    fontFamily:
+                      "var(--font-jetbrains-mono, ui-monospace, monospace)",
                   }}
                 >
                   <div
@@ -1581,15 +2299,20 @@ function CanvasPageInner() {
                           onClick={() => setCodeViewMode(mode)}
                           className="px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
                           style={{
-                            background: active ? T_DARK.surfaceHover : "transparent",
+                            background: active
+                              ? T_DARK.surfaceHover
+                              : "transparent",
                             color: active ? T_DARK.inkBright : T_DARK.inkMuted,
-                            borderLeft: i > 0 ? `1px solid ${T_DARK.rule}` : undefined,
+                            borderLeft:
+                              i > 0 ? `1px solid ${T_DARK.rule}` : undefined,
                           }}
                           onMouseEnter={(e) => {
-                            if (!active) e.currentTarget.style.color = T_DARK.inkBright;
+                            if (!active)
+                              e.currentTarget.style.color = T_DARK.inkBright;
                           }}
                           onMouseLeave={(e) => {
-                            if (!active) e.currentTarget.style.color = T_DARK.inkMuted;
+                            if (!active)
+                              e.currentTarget.style.color = T_DARK.inkMuted;
                           }}
                         >
                           {mode}
@@ -1603,17 +2326,21 @@ function CanvasPageInner() {
                       disabled={!generatedCode && !editedCode}
                       className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                       style={{
-                        background: codeCopied ? T_DARK.cobaltWash : T_DARK.surfaceSoft,
+                        background: codeCopied
+                          ? T_DARK.cobaltWash
+                          : T_DARK.surfaceSoft,
                         border: `1px solid ${codeCopied ? T_DARK.cobalt : T_DARK.rule}`,
                         color: codeCopied ? T_DARK.cobaltInk : T_DARK.inkMuted,
-                        fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                        fontFamily:
+                          "var(--font-jetbrains-mono, ui-monospace, monospace)",
                       }}
                       onMouseEnter={(e) => {
                         if (!codeCopied && (generatedCode || editedCode))
                           e.currentTarget.style.color = T_DARK.inkBright;
                       }}
                       onMouseLeave={(e) => {
-                        if (!codeCopied) e.currentTarget.style.color = T_DARK.inkMuted;
+                        if (!codeCopied)
+                          e.currentTarget.style.color = T_DARK.inkMuted;
                       }}
                       title="Copy code to clipboard"
                     >
@@ -1721,15 +2448,22 @@ function CanvasPageInner() {
                       className="flex items-center gap-2 border-b px-3 py-1.5 text-[10px] tracking-[0.14em] uppercase"
                       style={{
                         borderColor: T_DARK.ruleSoft,
-                        background: usedFallback ? T_DARK.warningWash : T_DARK.bgRaised,
+                        background: usedFallback
+                          ? T_DARK.warningWash
+                          : T_DARK.bgRaised,
                         color: usedFallback ? T_DARK.warning : T_DARK.inkMuted,
-                        fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                        fontFamily:
+                          "var(--font-jetbrains-mono, ui-monospace, monospace)",
                       }}
                     >
                       {usedFallback ? (
                         <>
-                          <span className="font-bold" aria-hidden="true">[!]</span>
-                          <span style={{ textTransform: "none", letterSpacing: 0 }}>
+                          <span className="font-bold" aria-hidden="true">
+                            [!]
+                          </span>
+                          <span
+                            style={{ textTransform: "none", letterSpacing: 0 }}
+                          >
                             {fallbackMessage ??
                               "No UI elements detected. Showing a default template. Try drawing larger, clearer boxes."}
                           </span>
@@ -1741,26 +2475,107 @@ function CanvasPageInner() {
                             style={{ background: T_DARK.cobalt }}
                             aria-hidden="true"
                           />
-                          <span style={{ color: T_DARK.inkBright }}>DETECTED ·</span>
-                          <span>
-                            {Object.entries(
-                              detectedElements.reduce<Record<string, number>>(
-                                (acc, el) => {
-                                  const t = (
-                                    el.type || "element"
-                                  ).toLowerCase();
-                                  acc[t] = (acc[t] || 0) + 1;
-                                  return acc;
-                                },
-                                {}
-                              )
-                            )
-                              .map(
-                                ([type, count]) =>
-                                  `${count} ${type}${count > 1 ? "s" : ""}`
-                              )
-                              .join(" · ")}
+                          <span style={{ color: T_DARK.inkBright }}>
+                            DETECTED ·
                           </span>
+                          {/* Element↔Code Linker chips: one per detected
+                              element, in prompt order (cc-N = index+1).
+                              Click → outline in preview + flash in code. */}
+                          <span className="flex min-w-0 items-center gap-1 overflow-x-auto">
+                            {detectedElements.map((el, i) => {
+                              const ccId = `cc-${i + 1}`;
+                              return (
+                                <button
+                                  key={ccId}
+                                  type="button"
+                                  onClick={() => handleElementChipClick(ccId)}
+                                  title={`Highlight this ${(el.type || "element").toLowerCase()} in the code and preview`}
+                                  className="shrink-0 px-1.5 py-0.5 text-[9px] tracking-[0.12em] uppercase transition-colors"
+                                  style={{
+                                    background: T_DARK.surfaceSoft,
+                                    border: `1px solid ${T_DARK.rule}`,
+                                    color: T_DARK.inkMuted,
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.color =
+                                      T_DARK.inkBright;
+                                    e.currentTarget.style.borderColor =
+                                      T_DARK.cobalt;
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.color =
+                                      T_DARK.inkMuted;
+                                    e.currentTarget.style.borderColor =
+                                      T_DARK.rule;
+                                  }}
+                                >
+                                  {i + 1}·{(el.type || "element").toUpperCase()}
+                                </button>
+                              );
+                            })}
+                          </span>
+                          {(isScoringFidelity || isRepairing || fidelity) && (
+                            <span
+                              className="ml-auto flex items-center gap-1.5"
+                              title={
+                                isRepairing
+                                  ? "Low score: sending the mismatch report back to the AI for one corrective pass"
+                                  : fidelity
+                                    ? `Self-check: the generated code was rendered and re-detected with the same model. ${fidelity.missing} missing, ${fidelity.extra} extra vs your sketch.${fidelity.before !== undefined ? " Auto-repaired once." : ""}`
+                                    : "Checking how faithfully the code matches your sketch"
+                              }
+                            >
+                              {isRepairing ? (
+                                <span style={{ color: T_DARK.warning }}>
+                                  FIDELITY ·{" "}
+                                  {fidelity
+                                    ? `${Math.round(fidelity.score * 100)}% · `
+                                    : ""}
+                                  REPAIRING
+                                </span>
+                              ) : isScoringFidelity ? (
+                                <span style={{ color: T_DARK.inkMuted }}>
+                                  FIDELITY · CHECKING
+                                </span>
+                              ) : fidelity ? (
+                                <>
+                                  <span
+                                    className="inline-block h-1.5 w-1.5"
+                                    style={{
+                                      background:
+                                        fidelity.score >= 0.8
+                                          ? T_DARK.success
+                                          : fidelity.score >= 0.5
+                                            ? T_DARK.warning
+                                            : T_DARK.error,
+                                    }}
+                                    aria-hidden="true"
+                                  />
+                                  <span
+                                    style={{
+                                      color:
+                                        fidelity.score >= 0.8
+                                          ? T_DARK.success
+                                          : fidelity.score >= 0.5
+                                            ? T_DARK.warning
+                                            : T_DARK.error,
+                                    }}
+                                  >
+                                    FIDELITY ·{" "}
+                                    {fidelity.before !== undefined && (
+                                      <>
+                                        <s style={{ opacity: 0.6 }}>
+                                          {Math.round(fidelity.before * 100)}%
+                                        </s>
+                                        <span aria-hidden="true"> → </span>
+                                      </>
+                                    )}
+                                    {Math.round(fidelity.score * 100)}%
+                                  </span>
+                                </>
+                              ) : null}
+                            </span>
+                          )}
                         </>
                       )}
                     </div>
@@ -1778,6 +2593,7 @@ function CanvasPageInner() {
                           resetKeys={[codeLanguage, editedCode, generatedCode]}
                         >
                           <MonacoCodeEditor
+                            ref={monacoEditorRef}
                             value={editedCode || generatedCode}
                             language={codeLanguage}
                             onChange={(v) => setEditedCode(v || "")}
@@ -1794,7 +2610,8 @@ function CanvasPageInner() {
                         >
                           <LivePreview
                             code={editedCode || generatedCode}
-                            language="react"
+                            language={selectedFramework}
+                            onAnnotate={handleAnnotateRefine}
                           />
                         </ErrorBoundary>
                       )}
@@ -1811,9 +2628,14 @@ function CanvasPageInner() {
                               variant="panel"
                               title="Editor failed to load"
                               message="We could not render the code editor."
-                              resetKeys={[codeLanguage, editedCode, generatedCode]}
+                              resetKeys={[
+                                codeLanguage,
+                                editedCode,
+                                generatedCode,
+                              ]}
                             >
                               <MonacoCodeEditor
+                                ref={monacoEditorRef}
                                 value={editedCode || generatedCode}
                                 language={codeLanguage}
                                 onChange={(v) => setEditedCode(v || "")}
@@ -1835,8 +2657,13 @@ function CanvasPageInner() {
                             <div
                               aria-hidden="true"
                               className="absolute inset-y-0 -left-1 -right-1 transition-colors"
-                              onMouseEnter={(e) => (e.currentTarget.style.background = `${T_DARK.cobalt}33`)}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.background = `${T_DARK.cobalt}33`)
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.background =
+                                  "transparent")
+                              }
                             />
                           </div>
                           <div className="h-full flex-1 overflow-hidden">
@@ -1849,6 +2676,7 @@ function CanvasPageInner() {
                               <LivePreview
                                 code={editedCode || generatedCode}
                                 language="react"
+                                onAnnotate={handleAnnotateRefine}
                               />
                             </ErrorBoundary>
                           </div>
@@ -1888,7 +2716,8 @@ function CanvasPageInner() {
                           className="text-[11px] tracking-[0.16em] uppercase"
                           style={{
                             color: T_DARK.inkBright,
-                            fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                            fontFamily:
+                              "var(--font-jetbrains-mono, ui-monospace, monospace)",
                           }}
                         >
                           AWAITING SKETCH
@@ -1897,7 +2726,8 @@ function CanvasPageInner() {
                           className="mt-1 text-[10px] tracking-[0.14em] uppercase"
                           style={{
                             color: T_DARK.inkFaint,
-                            fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                            fontFamily:
+                              "var(--font-jetbrains-mono, ui-monospace, monospace)",
                           }}
                         >
                           DRAW + RUN DETECTION TO GENERATE CODE
@@ -1926,133 +2756,280 @@ function CanvasPageInner() {
           activeTab={(rightPanel ?? "chat") as ToolboxTabId}
           onTabChange={(id) => setRightPanel(id as typeof rightPanel)}
           collapsed={rightPanel === null}
-          onCollapsedChange={(c) => setRightPanel(c ? null : (rightPanel ?? "chat"))}
-          tabs={[
-            {
-              id: "chat",
-              label: "CHAT",
-              shortcut: "Ctrl+/",
-              icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                </svg>
-              ),
-              content: (
-                <ChatInterface
-                  key={currentProject?.id ?? "no-project"}
-                  onSendMessage={handleChatMessage}
-                  isProcessing={isGenerating}
-                  hasCode={!!(editedCode || generatedCode)}
-                  projectId={currentProject?.id}
-                />
-              ),
-            },
-            {
-              id: "properties",
-              label: "PROPS",
-              icon: (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-                </svg>
-              ),
-              content: (
-                <div className="h-full overflow-y-auto p-4 space-y-5" style={{ background: T_CANVAS.paper, fontFamily: "var(--font-inter, ui-sans-serif, system-ui)" }}>
-                  {/* STYLE — color / width / fill / opacity for the current drawing tool */}
-                  <StyleRibbon
-                    currentTool={currentTool}
-                    strokeColor={strokeColor}
-                    fillColor={fillColor}
-                    strokeWidth={strokeWidth}
-                    onStrokeColorChange={setStrokeColor}
-                    onFillColorChange={setFillColor}
-                    onStrokeWidthChange={setStrokeWidth}
+          onCollapsedChange={(c) =>
+            setRightPanel(c ? null : (rightPanel ?? "chat"))
+          }
+          tabs={
+            [
+              {
+                id: "chat",
+                label: "CHAT",
+                shortcut: "Ctrl+/",
+                icon: (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3.5 w-3.5"
+                  >
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                  </svg>
+                ),
+                content: (
+                  <ChatInterface
+                    key={currentProject?.id ?? "no-project"}
+                    onSendMessage={handleChatMessage}
+                    isProcessing={isGenerating}
+                    hasCode={!!(editedCode || generatedCode)}
+                    projectId={currentProject?.id}
                   />
+                ),
+              },
+              {
+                id: "properties",
+                label: "PROPS",
+                icon: (
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3.5 w-3.5"
+                  >
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                  </svg>
+                ),
+                content: (
+                  <div
+                    className="h-full overflow-y-auto p-4 space-y-5"
+                    style={{
+                      background: T_CANVAS.paper,
+                      fontFamily: "var(--font-inter, ui-sans-serif, system-ui)",
+                    }}
+                  >
+                    {/* STYLE — color / width / fill / opacity for the current drawing tool */}
+                    <StyleRibbon
+                      currentTool={currentTool}
+                      strokeColor={strokeColor}
+                      fillColor={fillColor}
+                      strokeWidth={strokeWidth}
+                      onStrokeColorChange={setStrokeColor}
+                      onFillColorChange={setFillColor}
+                      onStrokeWidthChange={setStrokeWidth}
+                    />
 
-                  <div>
-                    <div
-                      className="mb-2 text-[10px] tracking-[0.18em] uppercase"
-                      style={{ color: T_CANVAS.muted, fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)" }}
-                    >
-                      CANVAS
-                    </div>
-                    <div className="space-y-2">
-                      <DraftingToggle label="Show grid" enabled={gridEnabled} onToggle={() => setGridEnabled(!gridEnabled)} />
-                      <DraftingToggle label="Snap to grid" enabled={snapEnabled} onToggle={() => setSnapEnabled(!snapEnabled)} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div
-                      className="mb-2 text-[10px] tracking-[0.18em] uppercase"
-                      style={{ color: T_CANVAS.muted, fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)" }}
-                    >
-                      CHECKPOINTS
-                    </div>
-                    <button
-                      onClick={handleCreateCheckpoint}
-                      className="w-full px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
-                      style={{
-                        background: T_CANVAS.paper,
-                        border: `1px dashed ${T_CANVAS.rule}`,
-                        color: T_CANVAS.muted,
-                        fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = T_CANVAS.cobalt;
-                        e.currentTarget.style.borderColor = T_CANVAS.cobalt;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = T_CANVAS.muted;
-                        e.currentTarget.style.borderColor = T_CANVAS.rule;
-                      }}
-                    >
-                      + CREATE CHECKPOINT
-                    </button>
-                    {versionHistory.versions.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        {versionHistory.versions.slice(0, 5).map((v) => (
-                          <div
-                            key={v.id}
-                            className="flex items-center justify-between px-3 py-1.5 text-[11px]"
-                            style={{ background: T_CANVAS.vellum, border: `1px solid ${T_CANVAS.rule}`, color: T_CANVAS.graphite }}
-                          >
-                            <span className="truncate">{v.description || "Checkpoint"}</span>
-                            <div className="ml-2 flex flex-shrink-0 items-center gap-2">
-                              <button
-                                onClick={() => handleRestoreVersion(v.id)}
-                                className="text-[10px] tracking-[0.14em] uppercase"
-                                style={{ color: T_CANVAS.cobalt, fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)" }}
-                              >
-                                RESTORE
-                              </button>
-                              <span aria-hidden="true" style={{ color: T_CANVAS.rule }}>
-                                ·
-                              </span>
-                              <button
-                                onClick={() =>
-                                  setCheckpointToDelete({
-                                    id: v.id,
-                                    label: v.description || "Checkpoint",
-                                  })
-                                }
-                                className="text-[10px] tracking-[0.14em] uppercase"
-                                style={{ color: T_CANVAS.error, fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)" }}
-                              >
-                                DELETE
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                    <div>
+                      <div
+                        className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+                        style={{
+                          color: T_CANVAS.muted,
+                          fontFamily:
+                            "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                        }}
+                      >
+                        CANVAS
                       </div>
-                    )}
-                  </div>
-                </div>
-              ),
-            },
-          ]}
-        />
+                      <div className="space-y-2">
+                        <DraftingToggle
+                          label="Show grid"
+                          enabled={gridEnabled}
+                          onToggle={() => setGridEnabled(!gridEnabled)}
+                        />
+                        <DraftingToggle
+                          label="Snap to grid"
+                          enabled={snapEnabled}
+                          onToggle={() => setSnapEnabled(!snapEnabled)}
+                        />
+                      </div>
+                    </div>
 
+                    <div>
+                      <div
+                        className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+                        style={{
+                          color: T_CANVAS.muted,
+                          fontFamily:
+                            "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                        }}
+                      >
+                        CHECKPOINTS
+                      </div>
+                      <button
+                        onClick={handleCreateCheckpoint}
+                        className="w-full px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                        style={{
+                          background: T_CANVAS.paper,
+                          border: `1px dashed ${T_CANVAS.rule}`,
+                          color: T_CANVAS.muted,
+                          fontFamily:
+                            "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = T_CANVAS.cobalt;
+                          e.currentTarget.style.borderColor = T_CANVAS.cobalt;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = T_CANVAS.muted;
+                          e.currentTarget.style.borderColor = T_CANVAS.rule;
+                        }}
+                      >
+                        + CREATE CHECKPOINT
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Refresh from the DB so iterations created since
+                          // page load (every generation makes one) show up.
+                          if (currentProject?.id) {
+                            void versionHistory.fetchVersions(
+                              currentProject.id
+                            );
+                          }
+                          setShowVersionCompare(true);
+                        }}
+                        className="mt-2 w-full px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                        style={{
+                          background: T_CANVAS.paper,
+                          border: `1px solid ${T_CANVAS.rule}`,
+                          color: T_CANVAS.muted,
+                          fontFamily:
+                            "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = T_CANVAS.cobalt;
+                          e.currentTarget.style.borderColor = T_CANVAS.cobalt;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = T_CANVAS.muted;
+                          e.currentTarget.style.borderColor = T_CANVAS.rule;
+                        }}
+                      >
+                        COMPARE VERSIONS
+                      </button>
+                      {versionHistory.versions.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {versionHistory.versions.slice(0, 5).map((v) => (
+                            <div
+                              key={v.id}
+                              className="flex items-center justify-between px-3 py-1.5 text-[11px]"
+                              style={{
+                                background: T_CANVAS.vellum,
+                                border: `1px solid ${T_CANVAS.rule}`,
+                                color: T_CANVAS.graphite,
+                              }}
+                            >
+                              <span className="truncate">
+                                {v.description || "Checkpoint"}
+                              </span>
+                              <div className="ml-2 flex flex-shrink-0 items-center gap-2">
+                                <button
+                                  onClick={() => handleRestoreVersion(v.id)}
+                                  className="text-[10px] tracking-[0.14em] uppercase"
+                                  style={{
+                                    color: T_CANVAS.cobalt,
+                                    fontFamily:
+                                      "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                                  }}
+                                >
+                                  RESTORE
+                                </button>
+                                <span
+                                  aria-hidden="true"
+                                  style={{ color: T_CANVAS.rule }}
+                                >
+                                  ·
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setCheckpointToDelete({
+                                      id: v.id,
+                                      label: v.description || "Checkpoint",
+                                    })
+                                  }
+                                  className="text-[10px] tracking-[0.14em] uppercase"
+                                  style={{
+                                    color: T_CANVAS.error,
+                                    fontFamily:
+                                      "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                                  }}
+                                >
+                                  DELETE
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <div
+                        className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+                        style={{
+                          color: T_CANVAS.muted,
+                          fontFamily:
+                            "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                        }}
+                      >
+                        BRAND KIT
+                      </div>
+                      <button
+                        onClick={() => setShowBrandKit(true)}
+                        className="flex w-full items-center justify-between px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                        style={{
+                          background: T_CANVAS.paper,
+                          border: `1px solid ${T_CANVAS.rule}`,
+                          color: T_CANVAS.muted,
+                          fontFamily:
+                            "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = T_CANVAS.cobalt;
+                          e.currentTarget.style.borderColor = T_CANVAS.cobalt;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = T_CANVAS.muted;
+                          e.currentTarget.style.borderColor = T_CANVAS.rule;
+                        }}
+                      >
+                        <span>
+                          {brandKit ? "EDIT BRAND KIT" : "SET BRAND KIT"}
+                        </span>
+                        {brandKit ? (
+                          <span className="flex items-center gap-1">
+                            {[
+                              brandKit.primaryColor,
+                              brandKit.secondaryColor,
+                              brandKit.accentColor,
+                            ]
+                              .filter(Boolean)
+                              .map((c, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-block h-3 w-3"
+                                  style={{
+                                    background: c,
+                                    border: `1px solid ${T_CANVAS.rule}`,
+                                  }}
+                                />
+                              ))}
+                          </span>
+                        ) : null}
+                      </button>
+                    </div>
+                  </div>
+                ),
+              },
+            ].filter(
+              (t) => inputSource !== "upload" || t.id !== "properties"
+            ) as ToolboxTab[]
+          }
+        />
       </div>
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Code panel toggle (when hidden) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
@@ -2115,8 +3092,7 @@ function CanvasPageInner() {
             className="text-[10px] tracking-[0.16em] uppercase"
             style={{
               color: T_CANVAS.muted,
-              fontFamily:
-                "var(--font-jetbrains-mono, ui-monospace, monospace)",
+              fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
             }}
           >
             Checkpoint
@@ -2197,7 +3173,8 @@ function CanvasPageInner() {
               className="text-[11px] tracking-[0.12em] uppercase"
               style={{
                 color: T_CANVAS.muted,
-                fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                fontFamily:
+                  "var(--font-jetbrains-mono, ui-monospace, monospace)",
               }}
             >
               Mini canvas sketch ready
@@ -2228,6 +3205,25 @@ function CanvasPageInner() {
         canvasData={canvasRef.current?.getCanvasData()}
         generatedCode={editedCode || generatedCode}
       />
+      <VersionCompareModal
+        isOpen={showVersionCompare}
+        onClose={() => setShowVersionCompare(false)}
+        versions={versionHistory.versions}
+        framework={selectedFramework}
+        onRollback={handleRollbackVersion}
+      />
+      <ShareDialog
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        projectId={currentProject?.id ?? null}
+      />
+      <BrandKitModal
+        isOpen={showBrandKit}
+        onClose={() => setShowBrandKit(false)}
+        projectId={currentProject?.id ?? null}
+        value={brandKit}
+        onApply={applyBrandKit}
+      />
       <TemplatesPanel
         isOpen={showTemplates}
         onClose={() => setShowTemplates(false)}
@@ -2242,8 +3238,67 @@ function CanvasPageInner() {
         open={showUpload}
         onClose={() => setShowUpload(false)}
         onDetect={handleUploadDetection}
-        isGenerating={isGenerating}
+        isGenerating={isGenerating || isDetecting}
       />
+      {/* Detection-in-flight loader: /api/detect has no other visible
+          progress surface (GenerationProgress is gated on isGenerating),
+          so without this the upload path shows nothing until the review
+          overlay pops. Hidden once the review session opens. */}
+      {isDetecting && !reviewSession && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center"
+          style={{ background: "rgba(14, 14, 15, 0.62)" }}
+        >
+          <div
+            className="flex flex-col items-center gap-4 px-12 py-9"
+            style={{
+              background: T_CANVAS.paper,
+              border: `1px solid ${T_CANVAS.rule}`,
+              boxShadow: "6px 6px 0 rgba(14, 14, 15, 0.18)",
+            }}
+          >
+            <span
+              className="h-8 w-8 animate-spin rounded-full border-2"
+              style={{
+                borderColor: T_CANVAS.rule,
+                borderTopColor: T_CANVAS.cobalt,
+              }}
+            />
+            <div className="text-center">
+              <p
+                className="text-[11px] uppercase tracking-[0.18em]"
+                style={{
+                  color: T_CANVAS.graphite,
+                  fontFamily:
+                    "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                }}
+              >
+                DETECTING ELEMENTS
+              </p>
+              <p
+                className="mt-1.5 text-[10px] uppercase tracking-[0.14em]"
+                style={{
+                  color: T_CANVAS.muted,
+                  fontFamily:
+                    "var(--font-jetbrains-mono, ui-monospace, monospace)",
+                }}
+              >
+                READING SKETCH · BOXES OPEN FOR REVIEW NEXT
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {reviewSession && (
+        <DetectionReviewOverlay
+          image={reviewSession.image}
+          imageWidth={reviewSession.imageWidth}
+          imageHeight={reviewSession.imageHeight}
+          initialElements={reviewSession.elements}
+          onGenerate={handleReviewGenerate}
+          onCancel={() => setReviewSession(null)}
+        />
+      )}
       {/* Duplicate floating save indicator removed (BUG 3) - the header's
           single save-dot in <Navbar /> is now the only save-status surface. */}
     </div>

@@ -65,14 +65,18 @@ export default function StatusBar({
             className="inline-block h-1.5 w-1.5"
             style={{ background: T_CANVAS.cobalt }}
           />
-          <span style={{ color: T_CANVAS.graphite }}>{TOOL_LABEL[tool] ?? tool.toUpperCase()}</span>
+          <span style={{ color: T_CANVAS.graphite }}>
+            {TOOL_LABEL[tool] ?? tool.toUpperCase()}
+          </span>
         </span>
         <Sep />
         <span className="tabular-nums">
           {Math.round(width)} × {Math.round(height)}
         </span>
         <Sep />
-        <span style={{ color: gridEnabled ? T_CANVAS.graphite : T_CANVAS.muted }}>
+        <span
+          style={{ color: gridEnabled ? T_CANVAS.graphite : T_CANVAS.muted }}
+        >
           GRID {gridEnabled ? "ON" : "OFF"}
         </span>
         {snapEnabled && gridEnabled ? (
@@ -102,8 +106,12 @@ export default function StatusBar({
           aria-label="Reset zoom"
           className="flex h-5 min-w-[44px] items-center justify-center px-1.5 text-[10px] tabular-nums transition-colors"
           style={{ color: T_CANVAS.graphite }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = T_CANVAS.vellum)}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.background = T_CANVAS.vellum)
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.background = "transparent")
+          }
         >
           {zoom}%
         </button>

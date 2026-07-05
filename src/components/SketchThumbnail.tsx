@@ -19,7 +19,12 @@ function shapeBounds(s: CanvasShapeData): Bounds | null {
   switch (s.type) {
     case "rectangle":
     case "image": {
-      return { minX: x, minY: y, maxX: x + (s.width ?? 0), maxY: y + (s.height ?? 0) };
+      return {
+        minX: x,
+        minY: y,
+        maxX: x + (s.width ?? 0),
+        maxY: y + (s.height ?? 0),
+      };
     }
     case "circle": {
       const r = s.radius ?? 0;
@@ -42,9 +47,13 @@ function shapeBounds(s: CanvasShapeData): Bounds | null {
 
 function linePoints(pts: number[] | undefined): Bounds | null {
   if (!pts || pts.length < 4) return null;
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   for (let i = 0; i + 1 < pts.length; i += 2) {
-    const x = pts[i], y = pts[i + 1];
+    const x = pts[i],
+      y = pts[i + 1];
     if (typeof x !== "number" || typeof y !== "number") continue;
     if (x < minX) minX = x;
     if (y < minY) minY = y;
@@ -70,15 +79,23 @@ export function hasSketchContent(data: CanvasData | null | undefined): boolean {
   if (!data) return false;
   if ((data.shapes?.length ?? 0) > 0) return true;
   if ((data.lines?.length ?? 0) > 0) return true;
-  if ((data.componentGroups ?? []).some((g) => (g.shapes?.length ?? 0) > 0)) return true;
+  if ((data.componentGroups ?? []).some((g) => (g.shapes?.length ?? 0) > 0))
+    return true;
   return false;
 }
 
-export default function SketchThumbnail({ canvasData }: { canvasData: CanvasData }) {
+export default function SketchThumbnail({
+  canvasData,
+}: {
+  canvasData: CanvasData;
+}) {
   const shapes = flattenShapes(canvasData);
   const lines = canvasData.lines ?? [];
 
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   const merge = (b: Bounds | null) => {
     if (!b) return;
     if (b.minX < minX) minX = b.minX;
@@ -142,7 +159,8 @@ export default function SketchThumbnail({ canvasData }: { canvasData: CanvasData
           return (
             <rect
               key={`s${i}`}
-              x={tx(x)} y={ty(y)}
+              x={tx(x)}
+              y={ty(y)}
               width={Math.max((s.width ?? 0) * scale, 0)}
               height={Math.max((s.height ?? 0) * scale, 0)}
               fill="none"
@@ -156,7 +174,8 @@ export default function SketchThumbnail({ canvasData }: { canvasData: CanvasData
           return (
             <circle
               key={`s${i}`}
-              cx={tx(x)} cy={ty(y)}
+              cx={tx(x)}
+              cy={ty(y)}
               r={Math.max((s.radius ?? 0) * scale, 0)}
               fill="none"
               stroke={T.cobalt}
@@ -169,7 +188,8 @@ export default function SketchThumbnail({ canvasData }: { canvasData: CanvasData
           return (
             <ellipse
               key={`s${i}`}
-              cx={tx(x)} cy={ty(y)}
+              cx={tx(x)}
+              cy={ty(y)}
               rx={Math.max((s.radiusX ?? 0) * scale, 0)}
               ry={Math.max((s.radiusY ?? 0) * scale, 0)}
               fill="none"
@@ -185,7 +205,8 @@ export default function SketchThumbnail({ canvasData }: { canvasData: CanvasData
           return (
             <rect
               key={`s${i}`}
-              x={tx(x)} y={ty(y) - 1.75}
+              x={tx(x)}
+              y={ty(y) - 1.75}
               width={Math.max(w, 6)}
               height={2.5}
               fill={T.muted}

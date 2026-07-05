@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, {
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  type ForwardedRef,
+} from "react";
 import Editor from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { T_DARK } from "./canvasTokens";
@@ -13,20 +18,74 @@ interface MonacoCodeEditorProps {
   height?: string;
 }
 
+/** Imperative surface for the Element↔Code Linker (App Uplift feature C). */
+export interface MonacoCodeEditorHandle {
+  /**
+   * Find `searchText` in the current model, scroll it into view and flash a
+   * line highlight. Returns true when a match was found.
+   */
+  revealAndFlash: (searchText: string) => boolean;
+}
+
 /**
  * Monaco code editor — Drafting Room "dark inset" theme. Reads as a graphite
  * slab dropped into the otherwise paper-light canvas page (mirrors the
  * design-preview-v2 CodeWell). Ink is paper-tinted at graded opacity, the
  * one accent is the brighter cobalt that survives on dark.
  */
-export default function MonacoCodeEditor({
-  value,
-  language = "html",
-  onChange,
-  readOnly = false,
-  height = "100%",
-}: MonacoCodeEditorProps) {
+export default forwardRef(function MonacoCodeEditor(
+  {
+    value,
+    language = "html",
+    onChange,
+    readOnly = false,
+    height = "100%",
+  }: MonacoCodeEditorProps,
+  ref: ForwardedRef<MonacoCodeEditorHandle>
+) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const flashDecorationsRef =
+    useRef<editor.IEditorDecorationsCollection | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    revealAndFlash: (searchText: string): boolean => {
+      const ed = editorRef.current;
+      const model = ed?.getModel();
+      if (!ed || !model) return false;
+      const match = model.findMatches(
+        searchText,
+        false, // searchOnlyEditableRange
+        false, // isRegex
+        false, // matchCase
+        null,
+        false
+      )[0];
+      if (!match) return false;
+
+      const line = match.range.startLineNumber;
+      ed.revealLineInCenter(line, 0 /* ScrollType.Smooth */);
+      ed.setPosition({ lineNumber: line, column: match.range.startColumn });
+
+      // Flash: replace any previous highlight, auto-clear after 1.6s.
+      flashDecorationsRef.current?.clear();
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      flashDecorationsRef.current = ed.createDecorationsCollection([
+        {
+          range: match.range,
+          options: {
+            isWholeLine: true,
+            className: "cc-link-flash-line",
+            inlineClassName: "cc-link-flash-inline",
+          },
+        },
+      ]);
+      flashTimerRef.current = setTimeout(() => {
+        flashDecorationsRef.current?.clear();
+      }, 1600);
+      return true;
+    },
+  }));
 
   const handleBeforeMount = (monaco: typeof import("monaco-editor")) => {
     // Silence language-service diagnostics entirely so no red squiggles or
@@ -152,6 +211,13 @@ export default function MonacoCodeEditor({
           timing can flash a red bar before our options apply. CSS removes
           the element entirely. */}
       <style jsx global>{`
+        /* Element↔Code Linker flash highlight (cleared after 1.6s). */
+        .monaco-editor .cc-link-flash-line {
+          background: rgba(140, 141, 212, 0.22) !important;
+        }
+        .monaco-editor .cc-link-flash-inline {
+          background: rgba(140, 141, 212, 0.35) !important;
+        }
         .monaco-editor .overflow-guard .decorationsOverviewRuler,
         .monaco-editor .overflow-guard .decorationsOverviewRuler > canvas,
         .monaco-editor .overflow-guard .decorationsOverviewRuler > svg,
@@ -313,4 +379,4 @@ export default function MonacoCodeEditor({
       </div>
     </div>
   );
-}
+});

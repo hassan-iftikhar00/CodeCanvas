@@ -75,7 +75,10 @@ export default function ResetPasswordPage() {
     []
   );
 
-  const passwordStrength = useMemo((): { level: PasswordStrengthLevel; score: number } => {
+  const passwordStrength = useMemo((): {
+    level: PasswordStrengthLevel;
+    score: number;
+  } => {
     if (!password) return { level: "none", score: 0 };
     let score = 0;
     if (password.length >= MIN_PASSWORD_LENGTH) score++;
@@ -142,7 +145,10 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const passwordError = validatePassword(password);
-    const confirmPasswordError = validateConfirmPassword(confirmPassword, password);
+    const confirmPasswordError = validateConfirmPassword(
+      confirmPassword,
+      password
+    );
 
     setV({
       password: { touched: true, error: passwordError },
@@ -233,8 +239,8 @@ export default function ResetPasswordPage() {
           title="ALL SET"
           message={
             <>
-              Your password has been updated. You'll be redirected to the login
-              page in a few seconds, or you can{" "}
+              Your password has been updated. You&apos;ll be redirected to the
+              login page in a few seconds, or you can{" "}
               <Link href="/auth/login" className="d5-link">
                 go now
               </Link>
@@ -318,7 +324,10 @@ export default function ResetPasswordPage() {
           loadingLabel="UPDATING..."
           loading={loading}
           disabled={
-            !!(v.password.touched && (v.password.error || v.confirmPassword.error))
+            !!(
+              v.password.touched &&
+              (v.password.error || v.confirmPassword.error)
+            )
           }
         />
       </form>
