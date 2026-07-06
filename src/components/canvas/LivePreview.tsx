@@ -47,6 +47,9 @@ interface LivePreviewProps {
   /** Annotate-on-render (feature B): resolve markup + note into a targeted
    *  refinement. Return true on success so the overlay clears itself. */
   onAnnotate?: (payload: AnnotatePayload) => Promise<boolean>;
+  /** Multi-screen flows (feature A): generated code called
+   *  window.ccNavigate("Screen Name") inside the preview. */
+  onNavigateScreen?: (screenName: string) => void;
 }
 
 type DeviceType = "fit" | "desktop" | "tablet" | "mobile";
@@ -73,6 +76,7 @@ export default function LivePreview({
   code,
   language = "html",
   onAnnotate,
+  onNavigateScreen,
 }: LivePreviewProps) {
   const [device, setDevice] = useState<DeviceType>("fit");
   const [orientation, setOrientation] = useState<Orientation>("portrait");
@@ -102,6 +106,10 @@ export default function LivePreview({
   } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // The message listener below mounts once (deps []); route navigation through
+  // a ref so it always calls the latest handler without re-binding.
+  const onNavigateScreenRef = useRef(onNavigateScreen);
+  onNavigateScreenRef.current = onNavigateScreen;
 
   const sendInspectMode = (enabled: boolean) => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -395,6 +403,13 @@ export default function LivePreview({
           { type: "cc-highlight", ccId: event.data.ccId },
           window.location.origin
         );
+        return;
+      }
+      // Multi-screen flows: generated code invoked window.ccNavigate(...)
+      // inside the iframe; hand the target screen name up to the canvas page.
+      if (event.data.type === "cc-navigate") {
+        const name = String(event.data.screen ?? "").trim();
+        if (name) onNavigateScreenRef.current?.(name);
         return;
       }
       // Annotate-on-render: reply to a pending cc-get-rects request.

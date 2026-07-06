@@ -18,6 +18,7 @@ function shapeBounds(s: CanvasShapeData): Bounds | null {
   const y = s.y ?? 0;
   switch (s.type) {
     case "rectangle":
+    case "button":
     case "image": {
       return {
         minX: x,
@@ -167,6 +168,22 @@ export default function SketchThumbnail({
               stroke={T.cobalt}
               strokeWidth={0.9}
               opacity={0.55}
+            />
+          );
+        }
+        if (s.type === "button") {
+          return (
+            <rect
+              key={`s${i}`}
+              x={tx(x)}
+              y={ty(y)}
+              width={Math.max((s.width ?? 0) * scale, 0)}
+              height={Math.max((s.height ?? 0) * scale, 0)}
+              rx={1.5}
+              fill={T.cobalt}
+              stroke={T.cobalt}
+              strokeWidth={0.9}
+              opacity={0.35}
             />
           );
         }

@@ -22,6 +22,18 @@ export type PreviewLanguage = "html" | "react" | "vue";
 function linkerScript(parentOrigin: string): string {
   return `<script>
   (function () {
+    // Multi-screen flows (feature A): generated code calls window.ccNavigate
+    // ("Screen Name") from nav elements whose label names another screen. The
+    // parent (LivePreview -> canvas page) switches the active screen tab.
+    // Defined unconditionally so single-screen code that never calls it is
+    // unaffected and multi-screen code never hits a ReferenceError.
+    window.ccNavigate = function (screenName) {
+      window.parent.postMessage(
+        { type: 'cc-navigate', screen: String(screenName || '') },
+        '${parentOrigin}'
+      );
+    };
+
     // INSPECT mode gate: clicks only map to code while the user has toggled
     // INSPECT on in the preview toolbar. Otherwise the preview behaves like a
     // normal page (typing in inputs, pressing buttons never jumps to code).

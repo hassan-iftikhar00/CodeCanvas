@@ -29,6 +29,7 @@ import CanvasSurface from "@/components/canvas/CanvasSurface";
 import UploadedSketchPanel from "@/components/canvas/UploadedSketchPanel";
 import StyleRibbon from "@/components/canvas/StyleRibbon";
 import StatusBar from "@/components/canvas/StatusBar";
+import TipsTicker from "@/components/canvas/TipsTicker";
 import CanvasTopBar from "@/components/canvas/CanvasTopBar";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import OnboardingTour, {
@@ -38,7 +39,9 @@ import {
   useProjectSave,
   useAutoSave,
   type CanvasData,
+  type ScreenSnapshot,
 } from "@/hooks/useProjectSave";
+import ScreenTabs, { type ScreenTabInfo } from "@/components/canvas/ScreenTabs";
 import { recordProjectActivity } from "@/lib/dashboard-projects";
 import { buildExportZip } from "@/lib/export-zip";
 import { openInStackBlitz } from "@/lib/open-in-stackblitz";
@@ -239,6 +242,9 @@ function CanvasPageInner() {
   const [gridEnabled, setGridEnabled] = useState(true);
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(false);
+  const [screenToDelete, setScreenToDelete] = useState<ScreenTabInfo | null>(
+    null
+  );
   const [importedDesign, setImportedDesign] = useState<
     { x: number; y: number }[][] | null
   >(null);
@@ -329,6 +335,23 @@ function CanvasPageInner() {
   const [inputSource, setInputSource] = useState<"canvas" | "upload">("canvas");
   const [uploadedPreview, setUploadedPreview] =
     useState<UploadDetectionPayload | null>(null);
+
+  // ── Multi-screen flows (App Uplift feature A) ──
+  // The ACTIVE screen lives in the page's existing live state (canvas history,
+  // generatedCode/editedCode, detectedElements); entries in `screens` are
+  // snapshots that get refreshed on tab switch and on persist. Single-screen
+  // projects never touch any of this — the tab strip renders one tab and the
+  // request/persist payloads stay byte-identical to the pre-A shape.
+  const [screens, setScreens] = useState<ScreenSnapshot[]>([
+    { id: "screen-1", name: "Home", canvasData: null, generatedCode: "" },
+  ]);
+  const [activeScreenId, setActiveScreenId] = useState("screen-1");
+  // runGeneration reads screens through this ref so adding/renaming screens
+  // does not recreate the (heavy) generation callback.
+  const screensRef = useRef({ screens, activeScreenId });
+  useEffect(() => {
+    screensRef.current = { screens, activeScreenId };
+  }, [screens, activeScreenId]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const exportOpenedByTourRef = useRef(false);
@@ -509,7 +532,7 @@ function CanvasPageInner() {
       "pen",
       "line",
       "rectangle",
-      "arrow",
+      "button",
       "erase",
     ];
     if (DRAWING_TOOLS.includes(currentTool)) {
@@ -651,6 +674,19 @@ function CanvasPageInner() {
           }
           if (project.canvas_data) {
             const cd = project.canvas_data as CanvasData;
+            // Multi-screen project: restore the whole tab set. The top-level
+            // canvas_data mirrors the screen that was ACTIVE at save time, so
+            // the upload/canvas restore below still loads the right workspace.
+            if (cd.screens && cd.screens.length > 0) {
+              setScreens(cd.screens);
+              const active =
+                cd.screens.find((s) => s.id === cd.activeScreenId) ??
+                cd.screens[0];
+              setActiveScreenId(active.id);
+              if (active.detectedElements) {
+                setDetectedElements(active.detectedElements);
+              }
+            }
             // Upload-based project: the sketch is a stored image, not drawn
             // strokes. Restore the upload workspace so a reload (or opening
             // the ?id= URL in a new tab) shows the image again instead of an
@@ -704,7 +740,7 @@ function CanvasPageInner() {
   // that's the live Konva state; in upload mode the canvas is unmounted
   // (canvasRef is null), so build a stub carrying the uploaded image instead —
   // otherwise Ctrl+S and post-chat persistence silently no-op after an upload.
-  const getPersistableCanvasData = useCallback((): CanvasData | null => {
+  const getRawCanvasData = useCallback((): CanvasData | null => {
     if (inputSource === "upload" && uploadedPreview) {
       return {
         lines: [],
@@ -720,6 +756,188 @@ function CanvasPageInner() {
     }
     return canvasRef.current?.getCanvasData() ?? null;
   }, [inputSource, uploadedPreview]);
+
+  // Multi-screen: what handleSaveProject / chat / annotate persist. With one
+  // screen this is the raw data (unchanged legacy shape). With 2+ screens the
+  // ACTIVE screen's snapshot is refreshed from live state, the whole tab set
+  // rides in `screens`, and the top-level fields still mirror the active
+  // screen so thumbnails/share/older restores keep working.
+  const getPersistableCanvasData = useCallback((): CanvasData | null => {
+    const raw = getRawCanvasData();
+    if (screens.length <= 1) return raw;
+    const updatedScreens = screens.map((s) =>
+      s.id === activeScreenId
+        ? {
+            ...s,
+            canvasData: raw,
+            generatedCode: editedCode || generatedCode,
+            detectedElements:
+              detectedElements as ScreenSnapshot["detectedElements"],
+          }
+        : s
+    );
+    return {
+      ...(raw ?? { lines: [], shapes: [], componentGroups: [] }),
+      screens: updatedScreens,
+      activeScreenId,
+    };
+  }, [
+    getRawCanvasData,
+    screens,
+    activeScreenId,
+    editedCode,
+    generatedCode,
+    detectedElements,
+  ]);
+
+  // ── Multi-screen tab handlers ──
+  const activeScreenName =
+    screens.find((s) => s.id === activeScreenId)?.name ?? "Home";
+
+  /** Snapshot the active screen's live state into the screens array. */
+  const captureActiveScreen = useCallback(
+    (list: ScreenSnapshot[]): ScreenSnapshot[] =>
+      list.map((s) =>
+        s.id === activeScreenId
+          ? {
+              ...s,
+              canvasData: getRawCanvasData(),
+              generatedCode: editedCode || generatedCode,
+              detectedElements:
+                detectedElements as ScreenSnapshot["detectedElements"],
+            }
+          : s
+      ),
+    [
+      activeScreenId,
+      getRawCanvasData,
+      editedCode,
+      generatedCode,
+      detectedElements,
+    ]
+  );
+
+  /** Load a screen snapshot into the live workspace (canvas or upload view). */
+  const loadScreenIntoWorkspace = useCallback(
+    (screen: ScreenSnapshot) => {
+      const cd = screen.canvasData;
+      if (cd?.uploadedSketch?.dataUrl) {
+        setUploadedPreview({
+          dataUrl: cd.uploadedSketch.dataUrl,
+          source: cd.uploadedSketch.source,
+          width: cd.uploadedSketch.width,
+          height: cd.uploadedSketch.height,
+        });
+        setInputSource("upload");
+        setRightPanel((p) => (p === "properties" ? null : p));
+      } else {
+        setInputSource("canvas");
+        setUploadedPreview(null);
+        // Unlike restoreCanvasSnapshot this DELIBERATELY clears on an empty
+        // snapshot — switching to a fresh screen must show a blank canvas,
+        // not the previous screen's strokes.
+        history.setState({
+          lines: cd?.lines ?? [],
+          shapes: cd?.shapes ?? [],
+          componentGroups: cd?.componentGroups ?? [],
+        });
+        const hasContent =
+          (cd?.lines?.length ?? 0) > 0 ||
+          (cd?.shapes?.length ?? 0) > 0 ||
+          (cd?.componentGroups?.length ?? 0) > 0;
+        setHasUserInteracted(hasContent);
+      }
+      const code = screen.generatedCode || "";
+      setGeneratedCode(code);
+      setEditedCode(code);
+      setDetectedElements(screen.detectedElements ?? []);
+      setFidelity(null);
+      // Reset the incremental-regen mirror to THIS screen's last generation,
+      // otherwise the next generation diffs against another screen's elements.
+      previousGenRef.current = {
+        code,
+        elements: screen.detectedElements ?? [],
+        framework: selectedFramework,
+      };
+    },
+    // history.setState is stable (useHistory memoizes it).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [history.setState, selectedFramework]
+  );
+
+  const handleSelectScreen = useCallback(
+    (id: string) => {
+      if (id === activeScreenId) return;
+      const target = screens.find((s) => s.id === id);
+      if (!target) return;
+      setScreens((prev) => captureActiveScreen(prev));
+      loadScreenIntoWorkspace(target);
+      setActiveScreenId(id);
+    },
+    [activeScreenId, screens, captureActiveScreen, loadScreenIntoWorkspace]
+  );
+
+  const handleAddScreen = useCallback(() => {
+    const fresh: ScreenSnapshot = {
+      id: `screen-${Date.now()}`,
+      name: `Screen ${screens.length + 1}`,
+      canvasData: null,
+      generatedCode: "",
+    };
+    setScreens((prev) => [...captureActiveScreen(prev), fresh]);
+    loadScreenIntoWorkspace(fresh);
+    setActiveScreenId(fresh.id);
+    toast.info(
+      `Buttons labeled with a screen's name (like "${activeScreenName}") become navigation links between screens.`,
+      { title: "Screen added" }
+    );
+  }, [
+    screens.length,
+    captureActiveScreen,
+    loadScreenIntoWorkspace,
+    toast,
+    activeScreenName,
+  ]);
+
+  const handleRenameScreen = useCallback((id: string, name: string) => {
+    setScreens((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+  }, []);
+
+  const handleDeleteScreen = useCallback(
+    (id: string) => {
+      if (screens.length <= 1) return;
+      const doomed = screens.find((s) => s.id === id);
+      if (!doomed) return;
+      setScreenToDelete({ id: doomed.id, name: doomed.name });
+    },
+    [screens]
+  );
+
+  const confirmDeleteScreen = useCallback(() => {
+    if (!screenToDelete) return;
+    const id = screenToDelete.id;
+    setScreenToDelete(null);
+    if (screens.length <= 1) return;
+    const remaining = screens.filter((s) => s.id !== id);
+    if (remaining.length === screens.length) return;
+    setScreens(remaining);
+    if (id === activeScreenId) {
+      loadScreenIntoWorkspace(remaining[0]);
+      setActiveScreenId(remaining[0].id);
+    }
+  }, [screenToDelete, screens, activeScreenId, loadScreenIntoWorkspace]);
+
+  // Generated code called window.ccNavigate("Name") inside the preview.
+  const handlePreviewNavigate = useCallback(
+    (screenName: string) => {
+      const wanted = screenName.trim().toLowerCase();
+      const target = screens.find(
+        (s) => s.name.trim().toLowerCase() === wanted
+      );
+      if (target) handleSelectScreen(target.id);
+    },
+    [screens, handleSelectScreen]
+  );
 
   // Save project handler
   const handleSaveProject = useCallback(async () => {
@@ -813,7 +1031,7 @@ function CanvasPageInner() {
           p: "pen",
           n: "line",
           r: "rectangle",
-          a: "arrow",
+          b: "button",
           t: "text",
           e: "erase",
           x: "bin",
@@ -1071,6 +1289,15 @@ function CanvasPageInner() {
   // back to canvas mode if the user was in the upload view.
   const restoreCanvasSnapshot = (cd: CanvasData | null | undefined) => {
     if (!cd) return;
+    // Multi-screen snapshot: bring back the whole tab set as of that save.
+    if (cd.screens && cd.screens.length > 0) {
+      setScreens(cd.screens);
+      const active =
+        cd.screens.find((s) => s.id === cd.activeScreenId) ?? cd.screens[0];
+      setActiveScreenId(active.id);
+      // Top-level fields mirror the active screen; fall through to the
+      // regular restore below so its workspace loads too.
+    }
     if (cd.uploadedSketch?.dataUrl) {
       setUploadedPreview({
         dataUrl: cd.uploadedSketch.dataUrl,
@@ -1233,6 +1460,17 @@ function CanvasPageInner() {
   const handleExport = async (options: ExportOptions) => {
     const baseName = projectName?.trim() || "canvas";
     const code = editedCode || generatedCode || "";
+    // Multi-screen export: the active screen's code is the LIVE one (its
+    // snapshot may be stale); the rest come from their snapshots. Only screens
+    // with code count — buildReactScaffoldFiles falls back to single-App when
+    // fewer than two carry code.
+    const exportScreens =
+      screens.length > 1
+        ? screens.map((s) => ({
+            name: s.name,
+            code: s.id === activeScreenId ? code : s.generatedCode,
+          }))
+        : undefined;
 
     const downloadBlob = (blob: Blob, filename: string) => {
       const url = URL.createObjectURL(blob);
@@ -1318,6 +1556,7 @@ function CanvasPageInner() {
           framework: options.framework ?? "react",
           styling: options.styling ?? "tailwind",
           projectName: baseName,
+          screens: exportScreens,
         });
         downloadBlob(blob, `${baseName}.zip`);
       } catch (err) {
@@ -1341,6 +1580,7 @@ function CanvasPageInner() {
         framework: options.framework ?? "react",
         styling: options.styling ?? "tailwind",
         projectName: baseName,
+        screens: exportScreens,
       });
       return;
     }
@@ -1502,6 +1742,19 @@ function CanvasPageInner() {
             correctedElements: opts.correctedElements,
             detectionCorrections: opts.detectionCorrections,
             brandKit: brandKitRef.current ?? undefined,
+            // Multi-screen flows (feature A): tell the backend which screens
+            // exist and which one this generation targets, so the prompt can
+            // wire label-matched nav elements to window.ccNavigate. Omitted
+            // entirely for single-screen projects (legacy payload + cache key).
+            ...(screensRef.current.screens.length > 1
+              ? {
+                  screens: screensRef.current.screens.map((s) => s.name),
+                  currentScreen:
+                    screensRef.current.screens.find(
+                      (s) => s.id === screensRef.current.activeScreenId
+                    )?.name ?? screensRef.current.screens[0].name,
+                }
+              : {}),
             // Incremental regen (feature D): hand the backend the prior
             // generation so it can patch instead of regenerate. Only when the
             // framework matches — patching React code under a Vue request
@@ -1538,7 +1791,40 @@ function CanvasPageInner() {
         // Persist generated code immediately so it survives a reload without
         // requiring a manual Ctrl+S.
         if (projectId) {
-          void updateProject(projectId, persistData, undefined, result.code);
+          // Multi-screen heal: callers hand in a screen-less canvasData (the
+          // API payload stays lean); writing that raw would WIPE the other
+          // screens from projects.canvas_data. Re-attach the full tab set
+          // with the active screen's snapshot refreshed to this generation.
+          const { screens: screenList, activeScreenId: activeId } =
+            screensRef.current;
+          const persistWithScreens: CanvasData =
+            screenList.length > 1
+              ? {
+                  ...persistData,
+                  screens: screenList.map((s) =>
+                    s.id === activeId
+                      ? {
+                          ...s,
+                          canvasData: {
+                            ...persistData,
+                            screens: undefined,
+                            activeScreenId: undefined,
+                          },
+                          generatedCode: result.code,
+                          detectedElements:
+                            elements as ScreenSnapshot["detectedElements"],
+                        }
+                      : s
+                  ),
+                  activeScreenId: activeId,
+                }
+              : persistData;
+          void updateProject(
+            projectId,
+            persistWithScreens,
+            undefined,
+            result.code
+          );
           // The backend just persisted a new iteration — refresh the version
           // list so CHECKPOINTS and COMPARE VERSIONS see it without a reload.
           void versionHistory.fetchVersions(projectId);
@@ -2031,7 +2317,7 @@ function CanvasPageInner() {
 
   // Map expanded tool Ã¢â€ â€™ what SketchCanvas understands
   const toolForCanvas = (): string => {
-    if (["rectangle", "arrow"].includes(currentTool)) return currentTool;
+    if (currentTool === "rectangle") return currentTool;
     if (currentTool === "hand") return "hand";
     return currentTool;
   };
@@ -2096,6 +2382,19 @@ function CanvasPageInner() {
             className="relative flex-1 min-h-0 overflow-hidden"
             style={{ background: "#FAFAF7" }}
           >
+            {/* Multi-screen tab strip (feature A): floats top-center over the
+                canvas / upload workspace. */}
+            <div className="absolute left-1/2 top-3 z-30 -translate-x-1/2">
+              <ScreenTabs
+                screens={screens.map((s) => ({ id: s.id, name: s.name }))}
+                activeScreenId={activeScreenId}
+                onSelect={handleSelectScreen}
+                onAdd={handleAddScreen}
+                onRename={handleRenameScreen}
+                onDelete={handleDeleteScreen}
+              />
+            </div>
+
             {inputSource === "upload" && uploadedPreview ? (
               <UploadedSketchPanel
                 src={uploadedPreview.dataUrl}
@@ -2223,6 +2522,13 @@ function CanvasPageInner() {
                 CODE ↑
               </button>
             )}
+
+            {/* Rotating workflow tips - bottom-center keeps clear of the
+                ZoomPill (bottom-left) and code pill (bottom-right). Hidden on
+                small screens where the chrome already crowds the canvas. */}
+            <div className="pointer-events-none absolute bottom-3 left-1/2 z-20 hidden -translate-x-1/2 md:block">
+              <TipsTicker />
+            </div>
           </main>
 
           {/* Persistent status bar - owns dimensions / mode / grid / zoom.
@@ -2612,6 +2918,7 @@ function CanvasPageInner() {
                             code={editedCode || generatedCode}
                             language={selectedFramework}
                             onAnnotate={handleAnnotateRefine}
+                            onNavigateScreen={handlePreviewNavigate}
                           />
                         </ErrorBoundary>
                       )}
@@ -2677,6 +2984,7 @@ function CanvasPageInner() {
                                 code={editedCode || generatedCode}
                                 language="react"
                                 onAnnotate={handleAnnotateRefine}
+                                onNavigateScreen={handlePreviewNavigate}
                               />
                             </ErrorBoundary>
                           </div>
@@ -3181,6 +3489,34 @@ function CanvasPageInner() {
             </span>
           </div>
         </div>
+      </DraftingModal>
+
+      <DraftingModal
+        open={screenToDelete !== null}
+        onClose={() => setScreenToDelete(null)}
+        slug="CANVAS · DELETE SCREEN"
+        title="Delete this screen?"
+        subtitle={
+          screenToDelete
+            ? `"${screenToDelete.name}" and its sketch plus generated code are removed from this project. This cannot be undone.`
+            : undefined
+        }
+        maxWidth={420}
+        footer={
+          <div className="flex justify-end gap-2">
+            <ModalButton
+              variant="ghost"
+              onClick={() => setScreenToDelete(null)}
+            >
+              Cancel
+            </ModalButton>
+            <ModalButton variant="danger" onClick={confirmDeleteScreen}>
+              Delete screen
+            </ModalButton>
+          </div>
+        }
+      >
+        <div className="pt-1 pb-1" />
       </DraftingModal>
 
       <OnboardingTour

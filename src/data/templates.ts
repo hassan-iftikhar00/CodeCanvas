@@ -11,12 +11,11 @@ export interface Template {
       points: number[];
     }>;
     shapes?: Array<{
-      type: "rectangle" | "circle" | "text";
+      type: "rectangle" | "text";
       x: number;
       y: number;
       width?: number;
       height?: number;
-      radius?: number;
       text?: string;
     }>;
   };
@@ -102,6 +101,37 @@ export const templates: Template[] = [
       lines: [],
     },
     tags: ["navigation", "navbar", "menu", "header"],
+  },
+  {
+    id: "dashboard-sidebar",
+    name: "Dashboard Sidebar",
+    category: "navigation",
+    description: "Left sidebar navigation with a main content area",
+    preview: "Narrow left nav column beside a wide content section",
+    canvasData: {
+      shapes: [
+        // Sidebar section (narrow, tall, left) — detected as a `section`
+        { type: "rectangle", x: 50, y: 60, width: 200, height: 460 },
+        // Stacked nav items inside the sidebar
+        { type: "rectangle", x: 70, y: 90, width: 160, height: 34 },
+        { type: "text", x: 85, y: 108, text: "Dashboard" },
+        { type: "rectangle", x: 70, y: 140, width: 160, height: 34 },
+        { type: "text", x: 85, y: 158, text: "Analytics" },
+        { type: "rectangle", x: 70, y: 190, width: 160, height: 34 },
+        { type: "text", x: 85, y: 208, text: "Projects" },
+        { type: "rectangle", x: 70, y: 240, width: 160, height: 34 },
+        { type: "text", x: 85, y: 258, text: "Settings" },
+        // Main content section (wide, beside the sidebar)
+        { type: "rectangle", x: 270, y: 60, width: 680, height: 460 },
+        { type: "text", x: 300, y: 100, text: "Overview" },
+        { type: "rectangle", x: 300, y: 130, width: 300, height: 150 },
+        { type: "text", x: 400, y: 205, text: "Chart" },
+        { type: "rectangle", x: 620, y: 130, width: 300, height: 150 },
+        { type: "text", x: 720, y: 205, text: "Stats" },
+      ],
+      lines: [],
+    },
+    tags: ["navigation", "sidebar", "dashboard", "layout"],
   },
   {
     id: "hero-section",

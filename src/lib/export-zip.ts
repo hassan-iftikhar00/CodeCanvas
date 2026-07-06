@@ -6,6 +6,11 @@ export interface BuildOptions {
   framework: CodeFramework;
   styling: StylingOption;
   projectName: string;
+  /** Multi-screen flows (App Uplift feature A): when 2+ screens carry code,
+   *  the React scaffold becomes a multi-page app — one component per screen
+   *  under src/screens/ plus an App.tsx shell with a tiny state router that
+   *  also provides window.ccNavigate for generated nav elements. */
+  screens?: Array<{ name: string; code: string }>;
 }
 
 export async function buildExportZip(opts: BuildOptions): Promise<Blob> {
@@ -45,8 +50,14 @@ export function buildReactScaffoldFiles(
   const useStyledComponents = opts.styling === "styled-components";
   const projectName = sanitizeNpmName(opts.projectName);
 
+  // Multi-screen: only kicks in when 2+ screens actually carry code; a single
+  // non-empty screen (or none) falls back to the classic single-App layout.
+  const codedScreens = (opts.screens ?? []).filter((s) => s.code.trim());
+  const multiScreen =
+    codedScreens.length > 1 ? buildMultiScreenFiles(codedScreens) : null;
+
   return {
-    "src/App.tsx": opts.code.trim() + "\n",
+    ...(multiScreen ?? { "src/App.tsx": opts.code.trim() + "\n" }),
     "src/main.tsx": mainTsx(useTailwind),
     "src/index.css": indexCss(opts.styling),
     "index.html": viteIndexHtml(opts.projectName),
@@ -61,6 +72,92 @@ export function buildReactScaffoldFiles(
     ".gitignore": gitignore(),
     "README.md": reactReadme(opts),
   };
+}
+
+/**
+ * Turn a user-facing screen name into a safe PascalCase component/file name.
+ * Word tails are lowercased so "HOME" and "Home" collide in `taken` — screen
+ * files land on case-insensitive filesystems (Windows/macOS), where Home.tsx
+ * and HOME.tsx are the same file. Dedupe appends 2, 3, ...
+ */
+export function screenComponentName(name: string, taken?: Set<string>): string {
+  let base = name
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join("");
+  if (!base) base = "Screen";
+  if (/^\d/.test(base)) base = "Screen" + base;
+  if (!taken) return base;
+  let candidate = base;
+  let n = 2;
+  while (taken.has(candidate)) {
+    candidate = `${base}${n}`;
+    n += 1;
+  }
+  taken.add(candidate);
+  return candidate;
+}
+
+/**
+ * Multi-page scaffold: src/screens/<Component>.tsx per screen + an App.tsx
+ * shell holding the active screen in state. The shell defines
+ * window.ccNavigate(name) — the same hook the preview iframe provides — so
+ * generated nav elements keep working in the exported app, matched against
+ * screen names case-insensitively.
+ */
+function buildMultiScreenFiles(
+  screens: Array<{ name: string; code: string }>
+): Record<string, string> {
+  const taken = new Set<string>();
+  const entries = screens.map((s) => ({
+    displayName: s.name,
+    component: screenComponentName(s.name, taken),
+    code: s.code.trim() + "\n",
+  }));
+
+  const files: Record<string, string> = {};
+  for (const e of entries) {
+    files[`src/screens/${e.component}.tsx`] = e.code;
+  }
+
+  const imports = entries
+    .map((e) => `import ${e.component} from "./screens/${e.component}";`)
+    .join("\n");
+  const registry = entries
+    .map((e) => `  ${JSON.stringify(e.displayName)}: ${e.component},`)
+    .join("\n");
+
+  files["src/App.tsx"] = `import { useState, useEffect } from "react";
+${imports}
+
+const SCREENS: Record<string, () => JSX.Element> = {
+${registry}
+};
+
+const FIRST_SCREEN = ${JSON.stringify(entries[0].displayName)};
+
+export default function App() {
+  const [screen, setScreen] = useState(FIRST_SCREEN);
+
+  useEffect(() => {
+    // Generated nav elements call window.ccNavigate("Screen Name").
+    (window as unknown as { ccNavigate?: (name: string) => void }).ccNavigate =
+      (name) => {
+        const wanted = String(name).trim().toLowerCase();
+        const match = Object.keys(SCREENS).find(
+          (k) => k.trim().toLowerCase() === wanted
+        );
+        if (match) setScreen(match);
+      };
+  }, []);
+
+  const Active = SCREENS[screen] ?? SCREENS[FIRST_SCREEN];
+  return <Active />;
+}
+`;
+
+  return files;
 }
 
 function mainTsx(_useTailwind: boolean): string {

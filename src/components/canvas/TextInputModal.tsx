@@ -8,6 +8,7 @@ interface TextInputModalProps {
   open: boolean;
   value: string;
   isEditing: boolean;
+  kind?: "text" | "button";
   onChange: (value: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
@@ -17,11 +18,13 @@ export default function TextInputModal({
   open,
   value,
   isEditing,
+  kind = "text",
   onChange,
   onSubmit,
   onCancel,
 }: TextInputModalProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isButton = kind === "button";
 
   useEffect(() => {
     if (!open) return;
@@ -36,8 +39,16 @@ export default function TextInputModal({
     <DraftingModal
       open={open}
       onClose={onCancel}
-      slug="TEXT TOOL"
-      title={isEditing ? "Edit text" : "Add text"}
+      slug={isButton ? "BUTTON TOOL" : "TEXT TOOL"}
+      title={
+        isButton
+          ? isEditing
+            ? "Edit button label"
+            : "Add button"
+          : isEditing
+            ? "Edit text"
+            : "Add text"
+      }
       subtitle="Press Enter to add, Shift+Enter for a new line, or Escape to cancel."
       maxWidth={520}
     >
@@ -50,7 +61,7 @@ export default function TextInputModal({
               fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
             }}
           >
-            Text
+            {isButton ? "Button label" : "Text"}
           </label>
           <textarea
             ref={textareaRef}

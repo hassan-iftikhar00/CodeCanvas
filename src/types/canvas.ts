@@ -4,10 +4,7 @@ export type Tool =
   | "pen"
   | "line"
   | "rectangle"
-  | "circle"
-  | "ellipse"
-  | "triangle"
-  | "arrow"
+  | "button"
   | "text"
   | "erase"
   | "bin";
@@ -49,7 +46,7 @@ export const TOOL_KEY_MAP: Record<string, Tool> = {
   p: "pen",
   n: "line",
   r: "rectangle",
-  a: "arrow",
+  b: "button",
   t: "text",
   e: "erase",
   x: "bin",

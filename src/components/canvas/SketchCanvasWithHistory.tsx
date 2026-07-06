@@ -13,6 +13,7 @@ interface CanvasShapeData {
   type?:
     | "text"
     | "rectangle"
+    | "button"
     | "circle"
     | "image"
     | "ellipse"

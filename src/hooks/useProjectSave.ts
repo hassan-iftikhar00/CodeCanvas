@@ -6,6 +6,7 @@ export interface CanvasShapeData {
   type?:
     | "text"
     | "rectangle"
+    | "button"
     | "circle"
     | "image"
     | "ellipse"
@@ -61,6 +62,32 @@ export interface CanvasData {
     width: number;
     height: number;
   };
+  // Multi-screen flows (App Uplift feature A): every screen's snapshot plus
+  // which one was active at save time. Present only when the project has 2+
+  // screens; the TOP-LEVEL canvas_data fields above always mirror the ACTIVE
+  // screen so thumbnails, share links and older restore paths keep working.
+  // Backend main.py's CanvasData model must declare these too or model_dump()
+  // strips them from persisted iterations.
+  screens?: ScreenSnapshot[];
+  activeScreenId?: string;
+}
+
+/**
+ * One screen (tab) of a multi-screen project. The active screen lives in the
+ * page's live state; inactive ones are held as these snapshots and swapped in
+ * on tab switch. `canvasData` here must NOT recurse (no nested `screens`).
+ */
+export interface ScreenSnapshot {
+  id: string;
+  name: string;
+  canvasData: CanvasData | null;
+  generatedCode: string;
+  detectedElements?: Array<{
+    type: string;
+    confidence: number;
+    bounds: { x: number; y: number; width: number; height: number };
+    label?: string;
+  }>;
 }
 
 interface Project {

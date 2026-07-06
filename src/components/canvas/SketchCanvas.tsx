@@ -48,6 +48,7 @@ interface ShapeData {
   id: string;
   type:
     | "rectangle"
+    | "button"
     | "circle"
     | "text"
     | "image"
@@ -265,6 +266,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const transformerRef = useRef<Konva.Transformer>(null);
     const selectedShapeRef = useRef<Konva.Shape | Konva.Group | null>(null);
     const gridGroupRef = useRef<Konva.Group>(null);
+    const templatesGroupRef = useRef<Konva.Group>(null);
 
     // Text input modal state
     const [showTextInput, setShowTextInput] = useState(false);
@@ -275,6 +277,10 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     });
     // When set, the modal edits this existing text shape instead of adding one
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
+    // Whether the label modal is placing a plain "text" shape or a "button"
+    const [pendingShapeKind, setPendingShapeKind] = useState<"text" | "button">(
+      "text"
+    );
 
     // Track which text element is being hovered for delete button.
     // Hiding is delayed so the cursor can travel from the text to the delete
@@ -533,6 +539,15 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       }
     }, [importedDesign]);
 
+    // Keep the templates/component-groups container pinned just above the grid
+    // (z-index 1) so it renders as a background layer. Standalone shapes and
+    // lines drawn on top of a template then win Konva hit-testing and stay
+    // selectable. react-konva rewrites z-index by JSX order when the child set
+    // changes, so re-pin whenever the drawable counts (or grid state) change.
+    useEffect(() => {
+      templatesGroupRef.current?.setZIndex(1);
+    }, [componentGroups, shapes, lines, gridEnabled]);
+
     // Spacebar pan controls and keyboard shortcuts
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -636,7 +651,16 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         window.removeEventListener("keydown", handleKeyDown);
         window.removeEventListener("keyup", handleKeyUp);
       };
-    }, [spacePressed, selectedShapeId, showTextInput, zoom]);
+    }, [
+      spacePressed,
+      selectedShapeId,
+      selectedLineIndex,
+      selectedGroupId,
+      selectedGroupShapeId,
+      editingGroupId,
+      showTextInput,
+      zoom,
+    ]);
 
     // Helper function to get mouse position adjusted for zoom and pan
     const getTransformedPointerPosition = (stage: Konva.Stage | null) => {
@@ -696,6 +720,23 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
               shape.id === editingTextId ? { ...shape, text: value } : shape
             )
           );
+        } else if (pendingShapeKind === "button") {
+          const bw = 140;
+          const bh = 44;
+          const newButton: ShapeData = {
+            id: `button-${Date.now()}`,
+            type: "button",
+            // Center the button on the click point.
+            x: pendingTextPosition.x - bw / 2,
+            y: pendingTextPosition.y - bh / 2,
+            width: bw,
+            height: bh,
+            text: value,
+            stroke: strokeColorRef.current,
+            strokeWidth: strokeWidthRef.current,
+            fill: fillColorRef.current,
+          };
+          setShapes((prev) => [...prev, newButton]);
         } else {
           const newText: ShapeData = {
             id: `text-${Date.now()}`,
@@ -712,6 +753,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       setShowTextInput(false);
       setTextInputValue("");
       setEditingTextId(null);
+      setPendingShapeKind("text");
     };
 
     // Handle text cancellation
@@ -719,11 +761,13 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       setShowTextInput(false);
       setTextInputValue("");
       setEditingTextId(null);
+      setPendingShapeKind("text");
     };
 
     // Open the text modal pre-filled to edit an existing text shape
     const handleTextEditStart = (shape: ShapeData) => {
       setEditingTextId(shape.id);
+      setPendingShapeKind(shape.type === "button" ? "button" : "text");
       setTextInputValue(shape.text || "");
       setShowTextInput(true);
     };
@@ -770,6 +814,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           if (shape.id === id) {
             if (
               shape.type === "rectangle" ||
+              shape.type === "button" ||
               shape.type === "triangle" ||
               shape.type === "arrow"
             ) {
@@ -864,6 +909,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           }
           if (
             shape.type === "rectangle" ||
+            shape.type === "button" ||
             shape.type === "triangle" ||
             shape.type === "arrow"
           ) {
@@ -1000,6 +1046,15 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         setCurrentShape(newShape);
       } else if (toolRef.current === "text") {
         // Show the drafting text panel and place the eventual text at the click.
+        setPendingShapeKind("text");
+        setPendingTextPosition({ x: pos.x, y: pos.y });
+        setTextInputValue("");
+        setEditingTextId(null);
+        setShowTextInput(true);
+      } else if (toolRef.current === "button") {
+        // Same label modal, but the submit builds a button (rect + centered
+        // label) instead of a bare text shape. Center the button on the click.
+        setPendingShapeKind("button");
         setPendingTextPosition({ x: pos.x, y: pos.y });
         setTextInputValue("");
         setEditingTextId(null);
@@ -1035,6 +1090,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           }
           if (
             shape.type === "rectangle" ||
+            shape.type === "button" ||
             shape.type === "triangle" ||
             shape.type === "arrow"
           ) {
@@ -1570,6 +1626,53 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                     }
                   />
                 );
+              } else if (shape.type === "button") {
+                const bw = shape.width || 140;
+                const bh = shape.height || 44;
+                return (
+                  <Group
+                    key={shape.id || i}
+                    ref={(node) => {
+                      if (isSelected && node) {
+                        selectedShapeRef.current = node;
+                      }
+                    }}
+                    x={shape.x}
+                    y={shape.y}
+                    draggable={tool === "select"}
+                    rotation={shape.rotation || 0}
+                    onClick={() => {
+                      if (tool === "select") {
+                        setSelectedShapeId(shape.id);
+                      }
+                    }}
+                    onDblClick={() => handleTextEditStart(shape)}
+                    onDragEnd={(e) => handleShapeDragEnd(shape.id, e)}
+                    onTransformEnd={(e) =>
+                      handleShapeTransformEnd(shape.id, e.target)
+                    }
+                  >
+                    <Rect
+                      width={bw}
+                      height={bh}
+                      stroke={shape.stroke || "#000000"}
+                      strokeWidth={shape.strokeWidth || 2}
+                      fill={shape.fill || "transparent"}
+                      cornerRadius={6}
+                    />
+                    <KonvaText
+                      width={bw}
+                      height={bh}
+                      text={shape.text || "Button"}
+                      align="center"
+                      verticalAlign="middle"
+                      fontSize={shape.fontSize || 16}
+                      fontFamily={shape.fontFamily || "Inter, sans-serif"}
+                      fill={shape.stroke || "#000000"}
+                      listening={false}
+                    />
+                  </Group>
+                );
               } else if (shape.type === "circle") {
                 return (
                   <Circle
@@ -1811,7 +1914,10 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
               return null;
             })}
 
-            {/* Component Groups (Templates/Components) */}
+            {/* Component Groups (Templates/Components) — kept at the bottom of
+                the layer (see the z-index effect) so standalone shapes/lines
+                drawn on top of a template stay selectable. */}
+            <Group ref={templatesGroupRef}>
             {componentGroups.map((group) => {
               const isGroupSelected =
                 selectedGroupId === group.id && tool === "select";
@@ -2057,6 +2163,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                 </Group>
               );
             })}
+            </Group>
 
             {/* Transformer for selected shapes */}
             {tool === "select" && selectedShapeId && (
@@ -2184,6 +2291,7 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
           open={showTextInput}
           value={textInputValue}
           isEditing={Boolean(editingTextId)}
+          kind={pendingShapeKind}
           onChange={setTextInputValue}
           onSubmit={handleTextSubmit}
           onCancel={handleTextCancel}

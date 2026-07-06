@@ -36,7 +36,7 @@ const WIDTHS: {
   { id: "thick", label: "THICK", value: 8, thickness: 4 },
 ];
 
-const VISIBLE_TOOLS: Tool[] = ["pen", "line", "rectangle", "arrow", "erase"];
+const VISIBLE_TOOLS: Tool[] = ["pen", "line", "rectangle", "button", "erase"];
 
 /**
  * Drafting Room style controls. Renders as a vertical sidebar block (used

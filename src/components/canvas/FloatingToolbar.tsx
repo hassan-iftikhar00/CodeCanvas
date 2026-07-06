@@ -49,11 +49,11 @@ const TOOLS: ToolItem[] = [
     icon: <RectIcon />,
   },
   {
-    id: "arrow",
-    label: "Arrow",
-    shortcut: "A",
+    id: "button",
+    label: "Button",
+    shortcut: "B",
     group: "shape",
-    icon: <ArrowIcon />,
+    icon: <ButtonIcon />,
   },
   {
     id: "text",
@@ -247,7 +247,6 @@ function PenIcon() {
 function LineIcon() {
   return (
     <svg {..._icon}>
-      {/* Point-to-point straight line with end dots - Excalidraw style */}
       <circle cx="5" cy="19" r="1.6" fill="currentColor" stroke="none" />
       <circle cx="19" cy="5" r="1.6" fill="currentColor" stroke="none" />
       <line x1="5" y1="19" x2="19" y2="5" />
@@ -261,11 +260,11 @@ function RectIcon() {
     </svg>
   );
 }
-function ArrowIcon() {
+function ButtonIcon() {
   return (
     <svg {..._icon}>
-      <line x1="5" y1="12" x2="19" y2="12" />
-      <polyline points="12 5 19 12 12 19" />
+      <rect x="2" y="7" width="20" height="10" rx="3" />
+      <line x1="7" y1="12" x2="17" y2="12" />
     </svg>
   );
 }
