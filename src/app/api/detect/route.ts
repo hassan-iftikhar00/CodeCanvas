@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// Vercel caps serverless functions at 10s by default (60s hard max on Hobby).
+// Without this the platform 504s before our own AbortController fires.
+export const maxDuration = 60;
+
 // Detection-only proxy for the HITL review step. Same FastAPI server as the
 // generate-code proxy; FASTAPI_DETECT_URL overrides if the backend splits.
 const FASTAPI_BASE =
@@ -33,10 +37,10 @@ export async function POST(request: Request) {
 
     const requestBody = await request.json();
 
-    // Detection alone stays under the backend's 60s Roboflow ceiling; 75s
-    // gives the proxy headroom above it.
+    // Must stay under the Vercel 60s function cap so we return a clean 504
+    // instead of an opaque platform timeout. 55s leaves render headroom.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 75_000);
+    const timeoutId = setTimeout(() => controller.abort(), 55_000);
 
     let response: Response;
     try {

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// Vercel caps serverless functions at 10s by default (60s hard max on Hobby).
+// Without this the platform 504s before our own AbortController fires.
+export const maxDuration = 60;
+
 // Reuse the FASTAPI_URL base the generate-code proxy is configured with; the
 // fidelity endpoint lives on the same FastAPI server. FASTAPI_FIDELITY_URL
 // overrides it if the backend is ever split.
@@ -34,9 +38,10 @@ export async function POST(request: Request) {
 
     const requestBody = await request.json();
 
-    // Render + re-detect is much cheaper than generation; 90s is generous.
+    // Must stay under the Vercel 60s function cap so we return a clean 504
+    // instead of an opaque platform timeout.
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90_000);
+    const timeoutId = setTimeout(() => controller.abort(), 55_000);
 
     let response: Response;
     try {
