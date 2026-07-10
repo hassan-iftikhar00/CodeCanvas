@@ -185,18 +185,40 @@ def test_squarish_card_without_parent_gets_no_hint():
     assert hint(els[0]) is None
 
 
-def test_card_wrapping_other_cards_is_not_an_image():
-    # Form container mis-detected as `card`: squarish, unlabelled, large — the
-    # shape guess would say image placeholder, but it WRAPS real cards.
+def test_card_wrapping_other_cards_is_a_container():
+    # Form container mis-detected as `card`: unlabelled, wraps 2+ real cards →
+    # firm group-box hint so Gemini renders a wrapper, not a literal stub.
     section = make("section", 0, 0, 800, 900)
     wrapper = make("card", 100, 50, 600, 640)
     inner_a = make("card", 140, 100, 500, 80, text="Email")
     inner_b = make("card", 140, 220, 500, 80, text="Password")
     els = [section, wrapper, inner_a, inner_b]
     annotate_role_hints(els)
-    assert hint(wrapper) is None
+    assert hint(wrapper) == "container (group box)"
+    assert wrapper.attributes["role_hint_firm"] is True
     assert hint(inner_a) == "input"
     assert hint(inner_b) == "input"
+
+
+def test_wrapper_with_single_child_is_not_a_container():
+    # A pricing card holding one button is a content card, not a group box —
+    # the container hint needs 2+ wrapped cards.
+    section = make("section", 0, 0, 1200, 900)
+    pricing = make("card", 100, 100, 300, 400)
+    button = make("card", 140, 400, 220, 60, text="Get Started")
+    els = [section, pricing, button]
+    annotate_role_hints(els)
+    assert hint(pricing) != "container (group box)"
+
+
+def test_labelled_wrapper_keeps_its_text_classification():
+    # A label always wins over the wrapper heuristic.
+    wrapper = make("card", 100, 50, 600, 640, text="[ image ]")
+    inner_a = make("card", 140, 100, 500, 80)
+    inner_b = make("card", 140, 220, 500, 80)
+    els = [wrapper, inner_a, inner_b]
+    annotate_role_hints(els)
+    assert hint(wrapper) == "image placeholder"
 
 
 def test_marker_label_beats_wrapper_veto():

@@ -1038,6 +1038,38 @@ def _attach_text_annotations(
     return unmatched
 
 
+_CC_ID_RE = re.compile(r'data-cc-id="cc-(\d+)"')
+
+# Minimum fraction of the previous element set that must carry a data-cc-id
+# in the previous code for incremental patching to trust it as a base.
+_INCREMENTAL_MIN_ID_COVERAGE = 0.6
+
+
+def _previous_code_is_degenerate(previous_code: str, n_previous_elements: int) -> bool:
+    """True when previousCode is not a trustworthy base for incremental regen.
+
+    Faithful generations stamp EVERY element with data-cc-id (Decision #28),
+    so distinct-id coverage ~= 100%. Degenerate code — a repair-destroyed stub,
+    or pre-linker output with no ids at all — has far fewer. Patching such a
+    base recycles the damage forever (live case: a 'Card Card Card' stub with
+    3 ids for 9 elements kept being returned/patched across runs); the REMOVE
+    instructions also key off cc-ids, so an id-less base cannot be patched
+    correctly anyway. Force a full regeneration instead.
+    """
+    if n_previous_elements <= 0:
+        return True
+    distinct_ids = set(_CC_ID_RE.findall(previous_code))
+    coverage = len(distinct_ids) / n_previous_elements
+    if coverage < _INCREMENTAL_MIN_ID_COVERAGE:
+        print(
+            f"[incremental] previous code fails id-coverage check "
+            f"({len(distinct_ids)} distinct cc-ids for {n_previous_elements} "
+            f"elements) — full regeneration"
+        )
+        return True
+    return False
+
+
 def _corrected_elements_to_output(
     corrected: List[DetectedElement],
 ) -> "ExternalModelOutput":
@@ -1287,7 +1319,14 @@ async def _generate_from_output(
     incremental_enabled = os.getenv("INCREMENTAL_ENABLED", "true").lower() not in (
         "false", "0", "off", "no",
     )
-    if request.previousCode and request.previousElements and incremental_enabled:
+    if (
+        request.previousCode
+        and request.previousElements
+        and incremental_enabled
+        and not _previous_code_is_degenerate(
+            request.previousCode, len(request.previousElements)
+        )
+    ):
         diff = diff_detection_sets(
             [e.model_dump() for e in request.previousElements],
             roboflow_output.elements,

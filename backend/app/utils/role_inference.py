@@ -213,6 +213,24 @@ def annotate_role_hints(elements: List[Any]) -> None:
     ]
     for element in cards:
         parent = _find_parent(element, containers)
+        inner_count = sum(
+            1 for c in cards if c is not element and _center_inside(c, element)
+        )
+        # A card WRAPPING 2+ other cards is a group box (e.g. a form container
+        # the detector labelled `card` instead of `section`). Without a hint
+        # Gemini treats it as a content unit and renders a literal stub. A
+        # label (like an image marker) still wins below, so only unlabelled
+        # wrappers take this branch.
+        attrs = element.attributes or {}
+        if inner_count >= 2 and not (attrs.get("label_text") or "").strip():
+            if element.attributes is None:
+                element.attributes = {}
+            element.attributes["role_hint"] = "container (group box)"
+            element.attributes["role_hint_reason"] = (
+                f"wraps {inner_count} other detected cards"
+            )
+            element.attributes["role_hint_firm"] = True
+            continue
         classified = _classify_card(element, parent)
         if classified is None:
             continue
@@ -220,11 +238,7 @@ def annotate_role_hints(elements: List[Any]) -> None:
         # A squarish card WRAPPING other cards is a group box (e.g. a form
         # container the detector labelled `card`), not a media slot. Only the
         # shape-only guess is vetoed — a firm marker label still wins.
-        if (
-            role == "image placeholder"
-            and not firm
-            and any(c is not element and _center_inside(c, element) for c in cards)
-        ):
+        if role == "image placeholder" and not firm and inner_count >= 1:
             continue
         if element.attributes is None:
             element.attributes = {}
