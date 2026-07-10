@@ -1,0 +1,16 @@
+# Keep the image small and the build reproducible.
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+env/
+tests/
+debug/
+*.log
+.env
+.env.*
+requirements-dev.txt

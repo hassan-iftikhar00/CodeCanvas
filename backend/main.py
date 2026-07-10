@@ -1047,7 +1047,11 @@ def _corrected_elements_to_output(
     a row) like the Roboflow path so the Gemini prompt reads in document order. Each element is tagged user_verified so
     the prompt (and any debugging) can tell it came through human review.
     """
-    from app.models.inference import ExternalModelElement, sort_reading_order
+    from app.models.inference import (
+        ExternalModelElement,
+        snap_positional_bars,
+        sort_reading_order,
+    )
 
     elements = [
         ExternalModelElement(
@@ -1060,6 +1064,11 @@ def _corrected_elements_to_output(
         )
         for i, el in enumerate(corrected, 1)
     ]
+    # Positional snap runs even on the human-reviewed set: navbar/footer are
+    # positional classes by definition, and the review UI makes it easy to
+    # keep the detector's wrong class for a bottom bar. Snapping fixes the
+    # class, never adds/removes elements — reviewer authority holds.
+    snap_positional_bars(elements)
     sort_reading_order(elements)
     return ExternalModelOutput(
         source="user-corrected",
@@ -1275,7 +1284,10 @@ async def _generate_from_output(
     # generation, diff old vs new detection sets and patch instead of
     # regenerating — unchanged code (incl. chat refinements) stays intact.
     incremental_prompt: Optional[str] = None
-    if request.previousCode and request.previousElements:
+    incremental_enabled = os.getenv("INCREMENTAL_ENABLED", "true").lower() not in (
+        "false", "0", "off", "no",
+    )
+    if request.previousCode and request.previousElements and incremental_enabled:
         diff = diff_detection_sets(
             [e.model_dump() for e in request.previousElements],
             roboflow_output.elements,
@@ -1312,18 +1324,24 @@ async def _generate_from_output(
             )
 
     if debug:
-        prompt_preview = _build_gemini_prompt(
-            roboflow_output.elements,
-            request.framework,
-            request.styling,
-            request.description,
-            extra_text=extra_text or None,
-            has_image=gemini_image_bytes is not None,
-            brand_kit=request.brandKit.as_prompt_dict() if request.brandKit else None,
-            screens=request.screens,
-            current_screen=request.currentScreen,
-        )
-        print("[debug] Gemini prompt:")
+        # Print what Gemini will ACTUALLY receive: the incremental patch
+        # prompt when the delta path fired, the full prompt otherwise.
+        if incremental_prompt is not None:
+            prompt_preview = incremental_prompt
+            print("[debug] Gemini prompt (INCREMENTAL PATCH — previous code + delta):")
+        else:
+            prompt_preview = _build_gemini_prompt(
+                roboflow_output.elements,
+                request.framework,
+                request.styling,
+                request.description,
+                extra_text=extra_text or None,
+                has_image=gemini_image_bytes is not None,
+                brand_kit=request.brandKit.as_prompt_dict() if request.brandKit else None,
+                screens=request.screens,
+                current_screen=request.currentScreen,
+            )
+            print("[debug] Gemini prompt:")
         print("-" * 70)
         print(prompt_preview)
         print("-" * 70)
@@ -1915,6 +1933,15 @@ async def fidelity(request: FidelityRequest, http_request: Request):
         score_fidelity,
     )
 
+    # Kill switch (deploy safety): on 512MB hosts a per-request Chromium launch
+    # can OOM-kill the whole process. Set FIDELITY_ENABLED=false to hard-disable
+    # this endpoint without a code redeploy — the UI badge just stops appearing.
+    if os.getenv("FIDELITY_ENABLED", "true").lower() in ("0", "false", "no", "off"):
+        raise HTTPException(
+            status_code=503,
+            detail="Fidelity scoring is disabled on this deployment (FIDELITY_ENABLED=false).",
+        )
+
     if not request.elements:
         raise HTTPException(status_code=400, detail="No detected elements to score against")
     if not request.code.strip():
@@ -1986,7 +2013,10 @@ async def fidelity(request: FidelityRequest, http_request: Request):
         ]
     )
     report = score_fidelity(
-        original_boxes, rendered_boxes, canvas_height=float(request.height)
+        original_boxes,
+        rendered_boxes,
+        canvas_height=float(request.height),
+        canvas_width=float(request.width),
     )
 
     _total_ms = (time.perf_counter() - _t_start) * 1000
@@ -1995,6 +2025,20 @@ async def fidelity(request: FidelityRequest, http_request: Request):
         f"(tp={report['counts']['tp']} fp={report['counts']['fp']} "
         f"fn={report['counts']['fn']}) total={_total_ms:.0f}ms"
     )
+    if _debug_ai_enabled():
+        # Box-level dump — without this a 0.00 score is undiagnosable (no way
+        # to tell coordinate mismatch from render failure from detector miss).
+        for b in original_boxes:
+            print(
+                f"[fidelity]   orig {b.cls:8s} ({b.x:.0f},{b.y:.0f},{b.w:.0f},{b.h:.0f}) "
+                f"{'matched' if b.matched else 'MISSING'}"
+            )
+        for b in rendered_boxes:
+            print(
+                f"[fidelity]   rend {b.cls:8s} conf={b.confidence:.2f} "
+                f"({b.x:.0f},{b.y:.0f},{b.w:.0f},{b.h:.0f}) "
+                f"{'matched' if b.matched else 'EXTRA'}"
+            )
 
     return FidelityResponse(
         success=True,
@@ -2075,6 +2119,23 @@ async def repair(request: RepairRequest, http_request: Request):
 
     if not repaired_code or not repaired_code.strip():
         raise HTTPException(status_code=502, detail="Repair returned empty code")
+
+    # Sanity guard: repair is a SURGICAL patch (add missing, remove extras,
+    # byte-identical elsewhere). Output dramatically smaller than the input
+    # means Gemini rewrote the page as a stub (live case: a correct 4679-char
+    # login screen came back as 901 chars of literal "Card"/"Navbar"
+    # placeholders). Reject — the user keeps their code, the badge just shows
+    # the unrepaired score. Legitimate extra-removal never halves the file.
+    if len(repaired_code) < 0.5 * len(request.code):
+        print(
+            f"[repair] REJECTED: output {len(repaired_code)} chars vs input "
+            f"{len(request.code)} — shrank below 50%, looks like a rewrite, "
+            "not a patch"
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="Repair output failed sanity check (code shrank drastically)",
+        )
 
     # Version history stays truthful: the repaired code is a new iteration.
     iteration_id = persist_generation_result(

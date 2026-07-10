@@ -3,18 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 
 const FASTAPI_URL = process.env.FASTAPI_URL;
 
-if (!FASTAPI_URL) {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "[CodeCanvas] FASTAPI_URL environment variable is not set. " +
-        "Set it to your FastAPI backend URL (e.g. http://your-server:8000/api/predict)."
-    );
-  } else {
-    console.warn(
-      "[CodeCanvas] FASTAPI_URL is not set - falling back to http://localhost:8000/api/predict. " +
-        "Set FASTAPI_URL in .env.local to suppress this warning."
-    );
-  }
+if (!FASTAPI_URL && process.env.NODE_ENV !== "production") {
+  console.warn(
+    "[CodeCanvas] FASTAPI_URL is not set - falling back to http://localhost:8000/api/predict. " +
+      "Set FASTAPI_URL in .env.local to suppress this warning."
+  );
 }
 
 const FASTAPI_ENDPOINT = FASTAPI_URL || "http://localhost:8000/api/predict";
@@ -43,6 +36,16 @@ export async function POST(request: Request) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!FASTAPI_URL && process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        {
+          error:
+            "Backend not configured: FASTAPI_URL environment variable is not set.",
+        },
+        { status: 503 }
+      );
     }
 
     const requestBody = await request.json();
