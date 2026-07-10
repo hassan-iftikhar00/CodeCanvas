@@ -281,8 +281,15 @@ function CanvasPageInner() {
   const previousGenRef = useRef<{
     code: string;
     elements: Array<{ type: string; bounds: unknown }>;
+    // Generation CONTEXT, stamped only when a generation completes (or a
+    // screen switch restores one) — never live-synced. The code was produced
+    // under this framework/brand kit; if either differs at the next request,
+    // incremental patching would keep code that ignores the change (e.g. a
+    // brand kit added with an unchanged sketch → zero delta → old unstyled
+    // code returned verbatim), so the payload gate below forces a full regen.
     framework: string;
-  }>({ code: "", elements: [], framework: "react" });
+    brandKitKey: string;
+  }>({ code: "", elements: [], framework: "react", brandKitKey: "null" });
   // (Kept in sync by an effect placed after the code/detection state
   // declarations below.)
 
@@ -411,17 +418,21 @@ function CanvasPageInner() {
   const [usedFallback, setUsedFallback] = useState(false);
 
   // Keep the incremental-regen mirror (declared above) current with the
-  // latest code (incl. chat/manual edits), detection set, and framework.
+  // latest code (incl. chat/manual edits) and detection set. The generation
+  // CONTEXT fields (framework, brandKitKey) are deliberately NOT synced here:
+  // flipping the framework pill or editing the brand kit does not change what
+  // the existing code was generated with — updating them live would defeat
+  // the payload gate that forces a full regen on context change.
   useEffect(() => {
     const code = editedCode || generatedCode;
     if (code && detectedElements.length > 0) {
       previousGenRef.current = {
+        ...previousGenRef.current,
         code,
         elements: detectedElements,
-        framework: selectedFramework,
       };
     }
-  }, [editedCode, generatedCode, detectedElements, selectedFramework]);
+  }, [editedCode, generatedCode, detectedElements]);
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null);
   // Fidelity self-check: the backend renders the generated code headless,
   // re-runs the sketch detector on the render, and scores the boxes against
@@ -870,6 +881,7 @@ function CanvasPageInner() {
         code,
         elements: screen.detectedElements ?? [],
         framework: selectedFramework,
+        brandKitKey: JSON.stringify(brandKitRef.current ?? null),
       };
     },
     // history.setState is stable (useHistory memoizes it).
@@ -1778,11 +1790,15 @@ function CanvasPageInner() {
               : {}),
             // Incremental regen (feature D): hand the backend the prior
             // generation so it can patch instead of regenerate. Only when the
-            // framework matches — patching React code under a Vue request
-            // would corrupt the output.
+            // generation CONTEXT matches: patching React code under a Vue
+            // request corrupts the output, and an unchanged sketch with a
+            // changed brand kit would zero-delta back the old (wrongly
+            // styled) code — both must force a full regeneration.
             ...(previousGenRef.current.code &&
             previousGenRef.current.elements.length > 0 &&
-            previousGenRef.current.framework === (opts.framework ?? "react")
+            previousGenRef.current.framework === (opts.framework ?? "react") &&
+            previousGenRef.current.brandKitKey ===
+              JSON.stringify(brandKitRef.current ?? null)
               ? {
                   previousCode: previousGenRef.current.code,
                   previousElements: previousGenRef.current.elements,
@@ -1796,6 +1812,15 @@ function CanvasPageInner() {
         }
         const result = await response.json();
         const elements = result.detectedElements ?? result.elements ?? [];
+        // Stamp the incremental-regen mirror with this generation's full
+        // context; the live-sync effect only refreshes code/elements after
+        // edits and leaves these context fields alone.
+        previousGenRef.current = {
+          code: result.code,
+          elements,
+          framework: opts.framework ?? "react",
+          brandKitKey: JSON.stringify(brandKitRef.current ?? null),
+        };
         setGeneratedCode(result.code);
         setEditedCode(result.code);
         setDetectedElements(elements);
