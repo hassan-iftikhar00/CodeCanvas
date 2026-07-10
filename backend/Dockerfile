@@ -7,7 +7,10 @@
 # self-check. If the host is memory-starved, set FIDELITY_ENABLED=false at runtime —
 # the endpoint 503s cleanly and nothing else is affected.
 
-FROM python:3.11-slim
+# Pinned to bookworm: playwright 1.49.1's `install --with-deps` references apt
+# packages (ttf-unifont, ttf-ubuntu-font-family) that were renamed on Debian
+# trixie, so the default `slim` (trixie) fails the browser-deps step.
+FROM python:3.11-slim-bookworm
 
 # Keep Python lean and unbuffered so Render's log stream is live.
 ENV PYTHONUNBUFFERED=1 \
