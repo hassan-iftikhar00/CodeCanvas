@@ -46,6 +46,7 @@ _BUTTON_VERBS = {
     "send", "save", "cancel", "ok", "continue", "next", "back", "get",
     "learn", "subscribe", "download", "order", "checkout", "apply", "book",
     "join", "start", "try", "watch", "add", "shop", "explore", "browse",
+    "create", "delete", "update", "upload", "view", "go",
 }
 _BUTTON_PHRASES = {
     "log in", "sign in", "sign up", "get started", "learn more", "learn now",
@@ -139,18 +140,39 @@ def _classify_card(
         role, reason = by_text
         return role, reason, True
 
+    # Sidebar menu: a tall side panel (section much taller than wide) holding
+    # short-labelled rows is navigation, not a form. Without this, "Home" /
+    # "Projects" rows in a dashboard sidebar fall through to the wide-thin
+    # rule and render as text inputs. Field-style labels ("Password") never
+    # reach here — _classify_text above already claimed them.
+    if (
+        parent is not None
+        and (parent.type or "").lower() == "section"
+        and text
+        and len(_normalize(text).split()) <= 3
+    ):
+        _, _, pw, ph = _bounds(parent)
+        if pw > 0 and ph >= 1.5 * pw:
+            return (
+                "nav item (sidebar menu link)",
+                "short label inside a tall sidebar section",
+                True,
+            )
+
     _, _, w, h = _bounds(element)
     if w <= 0 or h <= 0:
         return None
     aspect = w / h
 
-    # Wide, thin row with a short label → form field (the label is the
-    # placeholder). Long sentences are headings/paragraphs, not fields.
+    # Wide, thin row with a short label → probably a form field (the label as
+    # placeholder). SOFT: the label is not field-style (those were claimed by
+    # _classify_text above), so shape alone must not force an <input> — a
+    # short heading drawn wide-thin would be destroyed by a firm hint.
     if text and len(_normalize(text).split()) <= 3 and aspect >= 4.0:
         return (
             "input",
             f'wide-thin row (aspect {aspect:.1f}) with label "{text.strip()}"',
-            True,
+            False,
         )
 
     if not text:
@@ -186,14 +208,24 @@ def annotate_role_hints(elements: List[Any]) -> None:
     containers = [
         el for el in elements if (el.type or "").lower() in CONTAINER_TYPES
     ]
-    for element in elements:
-        if (element.type or "").lower() in CONTAINER_TYPES:
-            continue
+    cards = [
+        el for el in elements if (el.type or "").lower() not in CONTAINER_TYPES
+    ]
+    for element in cards:
         parent = _find_parent(element, containers)
         classified = _classify_card(element, parent)
         if classified is None:
             continue
         role, reason, firm = classified
+        # A squarish card WRAPPING other cards is a group box (e.g. a form
+        # container the detector labelled `card`), not a media slot. Only the
+        # shape-only guess is vetoed — a firm marker label still wins.
+        if (
+            role == "image placeholder"
+            and not firm
+            and any(c is not element and _center_inside(c, element) for c in cards)
+        ):
+            continue
         if element.attributes is None:
             element.attributes = {}
         element.attributes["role_hint"] = role

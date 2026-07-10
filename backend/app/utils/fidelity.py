@@ -157,18 +157,54 @@ def _reclassify_bars_by_position(
             b.cls = "footer"
 
 
+# Stage-2 flow-drift tolerance: rendered layouts FLOW (content stacks from the
+# top) instead of reproducing absolute sketch geometry, so a faithfully
+# rendered element can sit a few hundred px from its drawn position with zero
+# IoU. Unmatched same-class pairs whose centers are within this fraction of
+# the canvas diagonal still count as the same element.
+_CENTER_DIST_FRAC = 0.06
+
+# Stage-3 containment fallback: rendered navbars/footers/wrappers have no
+# drawn OUTLINE, so the detector often misses the container box while finding
+# its children. An unmatched original box covering at least this fraction of
+# the canvas, with at least this many re-detected boxes centered inside it,
+# is evidently present in the render.
+_CONTAINMENT_MIN_AREA_FRAC = 0.04
+_CONTAINMENT_MIN_CHILDREN = 2
+
+
+def _center_inside_box(inner: FidelityBox, outer: FidelityBox) -> bool:
+    cx, cy = inner.x + inner.w / 2, inner.y + inner.h / 2
+    return outer.x <= cx <= outer.x + outer.w and outer.y <= cy <= outer.y + outer.h
+
+
 def score_fidelity(
     original: List[FidelityBox],
     rendered: List[FidelityBox],
     iou_threshold: Optional[float] = None,
     canvas_height: Optional[float] = None,
+    canvas_width: Optional[float] = None,
 ) -> Dict[str, Any]:
-    """Match rendered boxes against the original sketch boxes, per class.
+    """Match rendered boxes against the original sketch boxes.
 
-    Greedy: within each class, highest-confidence rendered boxes claim their
-    best-IoU unmatched original first. Score is the F1 over matches —
+    Four matching stages, strictest first. Score is the F1 over matches —
     2*TP / (2*TP + FP + FN) — so both missing elements (FN) and invented
     elements (FP) pull it down symmetrically.
+
+    1. Greedy per-class IoU (highest-confidence rendered claims first).
+    2. Center-distance fallback for flow drift (same class, centers within
+       _CENTER_DIST_FRAC of the canvas diagonal).
+    3. Containment fallback for outline-less containers: a large unmatched
+       original with >= 2 re-detected boxes centered inside it is present in
+       the render even though its own box was never re-detected (rendered
+       navbars/footers/form wrappers have no drawn border, so the detector
+       finds their children instead).
+    4. Extras suppression: an unmatched re-detected `card` inside an original
+       navbar/footer y-band is that bar's TEXT child (nav links render as
+       visible text and re-detect as cards — the sketch never boxed them), and
+       a re-detected `section` when the sketch has none is just the page's
+       middle band, which every real render has. Neither is an invented
+       element.
 
     ``canvas_height`` (when known) lets navbar/footer detections be snapped to
     their positional definition before matching — see
@@ -185,9 +221,9 @@ def score_fidelity(
     for b in rendered:
         b.matched = False
 
-    per_class: Dict[str, Dict[str, int]] = {}
     matched_pairs: List[Dict[str, Any]] = []
 
+    # Stage 1: greedy per-class IoU.
     for cls in sorted({b.cls for b in original} | {b.cls for b in rendered}):
         cls_orig = [b for b in original if b.cls == cls]
         cls_rend = sorted(
@@ -195,7 +231,6 @@ def score_fidelity(
             key=lambda b: b.confidence,
             reverse=True,
         )
-        stats = {"tp": 0, "fp": 0, "fn": 0}
         for r in cls_rend:
             best, best_iou = None, 0.0
             for o in cls_orig:
@@ -207,14 +242,90 @@ def score_fidelity(
             if best is not None and best_iou >= threshold:
                 best.matched = True
                 r.matched = True
-                stats["tp"] += 1
                 matched_pairs.append(
                     {"original": _box_summary(best), "rendered": _box_summary(r), "iou": round(best_iou, 3)}
                 )
-            else:
-                stats["fp"] += 1
-        stats["fn"] = sum(1 for o in cls_orig if not o.matched)
-        per_class[cls] = stats
+
+    # Canvas extents for the drift / containment stages (fall back to the
+    # boxes' envelope when the caller didn't supply dimensions).
+    all_boxes = original + rendered
+    width = float(canvas_width or 0) or max((b.x + b.w for b in all_boxes), default=0.0)
+    height = float(canvas_height or 0) or max((b.y + b.h for b in all_boxes), default=0.0)
+    diagonal = (width**2 + height**2) ** 0.5
+    canvas_area = width * height
+
+    # Stage 2: center-distance fallback (flow drift).
+    if diagonal > 0:
+        for o in original:
+            if o.matched:
+                continue
+            best, best_dist = None, _CENTER_DIST_FRAC * diagonal
+            ocx, ocy = o.x + o.w / 2, o.y + o.h / 2
+            for r in rendered:
+                if r.matched or r.cls != o.cls:
+                    continue
+                rcx, rcy = r.x + r.w / 2, r.y + r.h / 2
+                d = ((ocx - rcx) ** 2 + (ocy - rcy) ** 2) ** 0.5
+                if d <= best_dist:
+                    best, best_dist = r, d
+            if best is not None:
+                o.matched = True
+                best.matched = True
+                matched_pairs.append(
+                    {
+                        "original": _box_summary(o),
+                        "rendered": _box_summary(best),
+                        "method": "center-distance",
+                    }
+                )
+
+    # Stage 3: containment fallback (outline-less containers).
+    if canvas_area > 0:
+        for o in original:
+            if o.matched:
+                continue
+            if o.w * o.h < _CONTAINMENT_MIN_AREA_FRAC * canvas_area:
+                continue
+            inside = [r for r in rendered if _center_inside_box(r, o)]
+            if len(inside) >= _CONTAINMENT_MIN_CHILDREN:
+                o.matched = True
+                for r in inside:
+                    r.matched = True  # consumed as this container's children
+                matched_pairs.append(
+                    {
+                        "original": _box_summary(o),
+                        "method": "containment",
+                        "children": len(inside),
+                    }
+                )
+
+    # Stage 4: extras suppression (bar text children + implicit section).
+    bar_bands = [
+        (o.y, o.y + o.h) for o in original if o.cls in ("navbar", "footer")
+    ]
+    orig_has_section = any(o.cls == "section" for o in original)
+    suppressed_ids = set()
+    for r in rendered:
+        if r.matched:
+            continue
+        cy = r.y + r.h / 2
+        if r.cls == "card" and any(y1 <= cy <= y2 for y1, y2 in bar_bands):
+            suppressed_ids.add(id(r))
+        elif r.cls == "section" and not orig_has_section:
+            suppressed_ids.add(id(r))
+
+    # Counts from the final flags.
+    per_class: Dict[str, Dict[str, int]] = {}
+    for cls in sorted({b.cls for b in original} | {b.cls for b in rendered}):
+        per_class[cls] = {
+            "tp": sum(1 for o in original if o.cls == cls and o.matched),
+            "fn": sum(1 for o in original if o.cls == cls and not o.matched),
+            "fp": sum(
+                1
+                for r in rendered
+                if r.cls == cls and not r.matched and id(r) not in suppressed_ids
+            ),
+        }
 
     tp = sum(s["tp"] for s in per_class.values())
     fp = sum(s["fp"] for s in per_class.values())
@@ -228,7 +339,11 @@ def score_fidelity(
         "per_class": per_class,
         "matched": matched_pairs,
         "missing": [_box_summary(o) for o in original if not o.matched],
-        "extra": [_box_summary(r) for r in rendered if not r.matched],
+        "extra": [
+            _box_summary(r)
+            for r in rendered
+            if not r.matched and id(r) not in suppressed_ids
+        ],
     }
 
 
@@ -421,9 +536,15 @@ async def render_code_to_png(
     vertically to the sketch height. That keeps every element in frame and
     maps relative layout positions into the coordinate space the original
     detection boxes live in.
+
+    The Playwright work runs in a worker thread with its OWN event loop:
+    uvicorn on Windows installs WindowsSelectorEventLoopPolicy, and a selector
+    loop cannot spawn subprocesses (asyncio raises NotImplementedError when
+    Playwright launches Chromium). The worker thread builds a Proactor loop
+    directly, bypassing the policy.
     """
     try:
-        from playwright.async_api import async_playwright
+        from playwright.async_api import async_playwright  # noqa: F401
     except ImportError as error:
         raise FidelityUnavailableError(
             "Playwright is not installed — fidelity scoring is disabled. "
@@ -433,22 +554,59 @@ async def render_code_to_png(
     html = build_render_html(code, framework)
     settle_ms = int(os.getenv("FIDELITY_RENDER_SETTLE_MS", "1200"))
 
+    # Render at a NORMAL desktop width, never at the sketch's raw pixel size.
+    # Sketch exports run 2000+px wide; at that viewport, realistic UI sizing
+    # (max-w-md forms, text-sized nav links) makes every element proportionally
+    # TINY vs the chunky hand-drawn boxes the detector trained on, and
+    # re-detection confidence collapses (measured: navbar 0.07, inputs 0.17 at
+    # 2329px vs inputs 0.92 at 1440px on the same code). The screenshot is
+    # scaled up to the sketch dimensions afterwards, so box coordinates stay
+    # in the original detection space.
+    max_view_w = int(os.getenv("FIDELITY_VIEWPORT_WIDTH", "1440"))
+    view_w = min(int(width), max_view_w)
+    view_h = max(1, round(int(height) * view_w / int(width))) if int(width) else int(height)
+
+    import asyncio
+
+    png = await asyncio.to_thread(
+        _render_html_in_own_loop, html, view_w, view_h, settle_ms
+    )
+    return _resize_png(png, int(width), int(height))
+
+
+def _render_html_in_own_loop(html: str, width: int, height: int, settle_ms: int) -> bytes:
+    import asyncio
+    import sys
+
+    if sys.platform == "win32":
+        # Direct construction, NOT new_event_loop(): the process-wide policy
+        # (set by uvicorn) would hand back another subprocess-less selector loop.
+        loop: "asyncio.AbstractEventLoop" = asyncio.ProactorEventLoop()
+    else:
+        loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_render_html_async(html, width, height, settle_ms))
+    finally:
+        loop.close()
+
+
+async def _render_html_async(html: str, width: int, height: int, settle_ms: int) -> bytes:
+    from playwright.async_api import async_playwright
+
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             try:
                 page = await browser.new_page(
-                    viewport={"width": int(width), "height": int(height)}
+                    viewport={"width": width, "height": height}
                 )
                 await page.set_content(html, wait_until="networkidle", timeout=30_000)
                 # Babel compiles + Tailwind CDN JIT-generates styles after load;
                 # without this settle the screenshot catches an unstyled flash.
                 await page.wait_for_timeout(settle_ms)
-                png = await page.screenshot(full_page=True, type="png")
+                return await page.screenshot(full_page=True, type="png")
             finally:
                 await browser.close()
-    except FidelityUnavailableError:
-        raise
     except Exception as error:
         # Chromium binary missing is the common first-run failure.
         message = str(error)
@@ -457,8 +615,6 @@ async def render_code_to_png(
                 "Playwright Chromium is not installed — run: python -m playwright install chromium"
             ) from error
         raise
-
-    return _resize_png(png, int(width), int(height))
 
 
 def _resize_png(png: bytes, width: int, height: int) -> bytes:

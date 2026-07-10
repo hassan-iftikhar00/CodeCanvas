@@ -56,12 +56,15 @@ class TestScoreFidelity:
         assert report["extra"][0]["type"] == "card"
 
     def test_class_mismatch_is_not_a_match(self):
-        # Same geometry, different class: FP for the rendered class, FN for the original.
+        # Same geometry, different class: the original footer stays missing.
+        # The rendered card is suppressed as a bar-band child (stage 4), not
+        # counted as an invented extra — the footer itself is still FN.
         original = [box("footer", 0, 500, 1000, 100)]
         rendered = [box("card", 0, 500, 1000, 100)]
         report = score_fidelity(original, rendered, iou_threshold=0.25)
         assert report["score"] == 0.0
-        assert report["counts"] == {"tp": 0, "fp": 1, "fn": 1}
+        assert report["counts"] == {"tp": 0, "fp": 0, "fn": 1}
+        assert report["missing"][0]["type"] == "footer"
 
     def test_shifted_box_matches_above_threshold(self):
         # Rendered layout rarely reproduces sketch geometry exactly; a modest
@@ -154,6 +157,194 @@ class TestScoreFidelity:
         original = [box("card", 0, 0, 100, 40, label="Confirm")]
         report = score_fidelity(original, [], iou_threshold=0.25)
         assert report["missing"][0]["label"] == "Confirm"
+
+
+class TestFlowTolerantStages:
+    """Stages 2-4: flow drift, outline-less containers, bar text children."""
+
+    def test_flow_drift_matches_by_center_distance(self):
+        # Faithfully rendered element pushed by content flow: zero IoU but
+        # centers ~130px apart on a 2329x1300 canvas (diag tolerance 160px).
+        original = [box("card", 45, 81, 287, 93)]
+        rendered = [box("card", 157, 196, 252, 42)]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=2329, canvas_height=1300,
+        )
+        assert report["score"] == 1.0
+        assert report["matched"][0]["method"] == "center-distance"
+
+    def test_far_drift_does_not_match(self):
+        original = [box("card", 45, 81, 287, 93)]
+        rendered = [box("card", 45, 900, 287, 93)]  # other end of the page
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=2329, canvas_height=1300,
+        )
+        assert report["counts"]["tp"] == 0
+
+    def test_center_distance_requires_same_class(self):
+        original = [box("card", 45, 81, 287, 93)]
+        rendered = [box("section", 50, 90, 287, 93)]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=2329, canvas_height=1300,
+        )
+        assert report["counts"]["tp"] == 0
+
+    def test_outline_less_navbar_matched_via_children(self):
+        # Rendered navbar has no drawn border → never re-detected as navbar,
+        # but its nav links come back as cards centered inside its region.
+        original = [box("navbar", 477, 48, 1810, 143)]
+        rendered = [
+            box("card", 886, 40, 93, 35),
+            box("card", 1011, 40, 84, 35),
+            box("card", 1132, 39, 108, 37),
+        ]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=2329, canvas_height=1300,
+        )
+        assert report["counts"]["tp"] == 1
+        assert report["counts"]["fp"] == 0  # children consumed, not extras
+        assert report["matched"][0]["method"] == "containment"
+
+    def test_containment_needs_two_children(self):
+        original = [box("navbar", 477, 48, 1810, 143)]
+        rendered = [box("card", 886, 40, 93, 35)]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=2329, canvas_height=1300,
+        )
+        assert report["counts"]["tp"] == 0
+
+    def test_small_original_gets_no_containment_fallback(self):
+        # A small card containing two tiny detections is not a container.
+        original = [box("card", 100, 100, 120, 60)]
+        rendered = [box("card", 110, 110, 30, 20), box("card", 150, 110, 30, 20)]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=2329, canvas_height=1300,
+        )
+        assert not any(p.get("method") == "containment" for p in report["matched"])
+
+    def test_bar_band_text_children_not_counted_as_extras(self):
+        # Footer link texts re-detect as cards inside the footer's y-band —
+        # the sketch never boxed them (they were text annotations).
+        original = [box("footer", 477, 948, 1799, 304)]
+        rendered = [
+            box("footer", 6, 1039, 2322, 109),
+            box("card", 140, 1070, 479, 37),
+            box("card", 1811, 1066, 368, 41),
+        ]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=2329, canvas_height=1300,
+        )
+        assert report["counts"] == {"tp": 1, "fp": 0, "fn": 0}
+
+    def test_mid_page_extra_still_counts(self):
+        original = [box("navbar", 0, 0, 1000, 80), box("footer", 0, 520, 1000, 80)]
+        rendered = [
+            box("navbar", 0, 0, 1000, 80),
+            box("footer", 0, 520, 1000, 80),
+            box("card", 400, 280, 200, 100),  # invented, middle of the page
+        ]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=1000, canvas_height=600,
+        )
+        assert report["counts"]["fp"] == 1
+
+    def test_implicit_section_not_an_extra(self):
+        # Every real render has a middle band; when the sketch drew no section
+        # the re-detected one is not an invented element.
+        original = [box("navbar", 0, 0, 1000, 80)]
+        rendered = [box("navbar", 0, 0, 1000, 80), box("section", 0, 100, 1000, 400)]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=1000, canvas_height=600,
+        )
+        assert report["score"] == 1.0
+
+    def test_section_extra_counts_when_sketch_has_sections(self):
+        original = [box("section", 0, 100, 1000, 200)]
+        rendered = [
+            box("section", 0, 100, 1000, 200),
+            box("section", 0, 350, 1000, 200),
+        ]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=1000, canvas_height=700,
+        )
+        assert report["counts"]["fp"] == 1
+
+    def test_live_login_regression_scores_high(self):
+        # The 2026-07-09 live run: element-perfect login render scored 0.00
+        # and auto-repair destroyed the code. These are the REAL boxes (sketch
+        # detections + re-detections of the render at the 1440 viewport).
+        original = [
+            box("navbar", 477, 48, 1810, 143),
+            box("card", 45, 81, 287, 93),
+            box("card", 2018, 78, 200, 84),
+            box("card", 970, 346, 595, 508),
+            box("card", 997, 419, 536, 89),
+            box("card", 1012, 544, 511, 86),
+            box("card", 1007, 685, 519, 94),
+            box("footer", 477, 948, 1799, 304),
+        ]
+        rendered = [
+            box("card", 166, 32, 124, 52, conf=0.73),
+            box("card", 886, 40, 93, 35, conf=0.55),
+            box("card", 1011, 40, 84, 35, conf=0.70),
+            box("card", 1132, 39, 108, 37, conf=0.71),
+            box("card", 1274, 35, 108, 44, conf=0.67),
+            box("card", 1990, 22, 169, 71, conf=0.70),
+            box("section", 1, 79, 2313, 942, conf=0.23),
+            box("card", 157, 196, 252, 42, conf=0.73),
+            box("card", 882, 407, 563, 82, conf=0.92),
+            box("card", 881, 572, 566, 81, conf=0.92),
+            box("card", 881, 692, 568, 89, conf=0.91),
+            box("footer", 6, 1039, 2322, 109, conf=0.33),
+            box("card", 140, 1070, 479, 37, conf=0.70),
+            box("card", 1811, 1066, 368, 41, conf=0.69),
+            box("card", 1012, 1213, 304, 39, conf=0.32),
+        ]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=2329, canvas_height=1300,
+        )
+        assert report["counts"]["fn"] == 0  # every drawn element found
+        assert report["score"] >= 0.85
+
+    def test_degraded_render_still_scores_low(self):
+        # Same sketch, but the render dropped the form entirely: inputs,
+        # button, and wrapper all missing. The score must stay below the 0.8
+        # repair threshold — tolerance stages must not hide real omissions.
+        original = [
+            box("navbar", 477, 48, 1810, 143),
+            box("card", 45, 81, 287, 93),
+            box("card", 2018, 78, 200, 84),
+            box("card", 970, 346, 595, 508),
+            box("card", 997, 419, 536, 89),
+            box("card", 1012, 544, 511, 86),
+            box("card", 1007, 685, 519, 94),
+            box("footer", 477, 948, 1799, 304),
+        ]
+        rendered = [
+            box("card", 166, 32, 124, 52, conf=0.73),
+            box("card", 886, 40, 93, 35, conf=0.55),
+            box("card", 1011, 40, 84, 35, conf=0.70),
+            box("card", 157, 196, 252, 42, conf=0.73),
+            box("footer", 6, 1039, 2322, 109, conf=0.33),
+        ]
+        report = score_fidelity(
+            original, rendered, iou_threshold=0.25,
+            canvas_width=2329, canvas_height=1300,
+        )
+        assert report["score"] < 0.8
+        missing_types = [m["type"] for m in report["missing"]]
+        assert missing_types.count("card") >= 3
 
 
 class TestElementsToFidelityBoxes:

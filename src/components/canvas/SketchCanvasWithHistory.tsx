@@ -72,8 +72,13 @@ interface SketchCanvasWithHistoryProps {
   onStateChange: (newState: CanvasTemplateData) => void;
 }
 
-// Alias for now; widen into an interface if history-specific methods appear.
-export type SketchCanvasWithHistoryRef = SketchCanvasRef;
+// The wrapper adds loadState on top of the inner canvas methods: a
+// synchronous, guarded canvas replace used for programmatic loads (screen
+// switch, project/version restore) so the 500ms canvas->history poll cannot
+// race the load and write the OUTGOING content back over it.
+export type SketchCanvasWithHistoryRef = SketchCanvasRef & {
+  loadState: (data: CanvasTemplateData) => void;
+};
 
 /**
  * Wrapper around SketchCanvas that integrates with the useHistory hook
@@ -101,6 +106,10 @@ const SketchCanvasWithHistory = forwardRef<
     ref
   ) => {
     const canvasRef = useRef<SketchCanvasRef>(null);
+
+    // Track if we're applying history state to prevent circular updates.
+    // Declared before the imperative handle so loadState can set it.
+    const isApplyingHistoryRef = useRef(false);
 
     // Expose methods to parent
     useImperativeHandle(ref, () => ({
@@ -163,10 +172,29 @@ const SketchCanvasWithHistory = forwardRef<
             []) as CanvasComponentGroup[],
         });
       },
+      // Programmatic load used by screen switching / restore. Sets the poll
+      // guard SYNCHRONOUSLY so a 500ms canvas->history tick landing mid-swap
+      // cannot copy the outgoing screen's strokes back over the incoming ones,
+      // then replaces the canvas and syncs history in one shot. The guard is
+      // held long enough for the inner setState to render so the next poll tick
+      // reads the new content and stays quiet.
+      loadState: (data: CanvasTemplateData) => {
+        isApplyingHistoryRef.current = true;
+        if (canvasRef.current) {
+          canvasRef.current.replaceCanvasState(
+            data as Parameters<SketchCanvasRef["replaceCanvasState"]>[0]
+          );
+        }
+        onStateChange({
+          lines: data.lines ?? [],
+          shapes: data.shapes ?? [],
+          componentGroups: data.componentGroups ?? [],
+        });
+        setTimeout(() => {
+          isApplyingHistoryRef.current = false;
+        }, 150);
+      },
     }));
-
-    // Track if we're applying history state to prevent circular updates
-    const isApplyingHistoryRef = useRef(false);
 
     // Apply history state to canvas (for undo/redo + project load).
     // Uses replaceCanvasState so componentGroups (templates) survive the round-trip;

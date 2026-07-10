@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import type { SketchCanvasRef } from "@/components/canvas/SketchCanvas";
+import type { SketchCanvasWithHistoryRef } from "@/components/canvas/SketchCanvasWithHistory";
 import { createClient } from "@/lib/supabase/client";
 
 import { useHistory } from "@/hooks/useHistory";
@@ -470,7 +470,7 @@ function CanvasPageInner() {
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
   // Ã¢â€â‚¬Ã¢â€â‚¬ Refs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-  const canvasRef = useRef<SketchCanvasRef>(null);
+  const canvasRef = useRef<SketchCanvasWithHistoryRef>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -836,11 +836,23 @@ function CanvasPageInner() {
         // Unlike restoreCanvasSnapshot this DELIBERATELY clears on an empty
         // snapshot — switching to a fresh screen must show a blank canvas,
         // not the previous screen's strokes.
-        history.setState({
+        //
+        // Load imperatively (loadState) rather than via history.setState: the
+        // latter only updates history and waits for the wrapper's apply-effect
+        // to push it into the canvas after paint, leaving a window where the
+        // 500ms canvas->history poll copies the OUTGOING screen's strokes back
+        // over the load (cross-screen sketch bleed). loadState sets the poll
+        // guard synchronously and replaces the canvas in one shot.
+        const nextState = {
           lines: cd?.lines ?? [],
           shapes: cd?.shapes ?? [],
           componentGroups: cd?.componentGroups ?? [],
-        });
+        };
+        if (canvasRef.current?.loadState) {
+          canvasRef.current.loadState(nextState);
+        } else {
+          history.setState(nextState);
+        }
         const hasContent =
           (cd?.lines?.length ?? 0) > 0 ||
           (cd?.shapes?.length ?? 0) > 0 ||
@@ -1596,7 +1608,9 @@ function CanvasPageInner() {
   const handleInsertComponent = (component: { canvasData: unknown }) => {
     if (canvasRef.current) {
       canvasRef.current.insertTemplate(
-        component.canvasData as Parameters<SketchCanvasRef["insertTemplate"]>[0]
+        component.canvasData as Parameters<
+          SketchCanvasWithHistoryRef["insertTemplate"]
+        >[0]
       );
       setHasUserInteracted(true);
     }
@@ -1653,8 +1667,15 @@ function CanvasPageInner() {
         before: opts.before,
       });
 
+      // score === 0 means NOTHING matched — that is a systemic failure of the
+      // scoring loop (render broke, coordinate mismatch, detector confused by
+      // the line-art), not a partially-wrong generation. A repair prompt built
+      // from a total mismatch tells Gemini to remove everything and re-add
+      // everything, which rewrites the page into a stub. Only repair partial
+      // mismatches.
       const needsRepair =
         opts.allowRepair &&
+        result.score > 0 &&
         result.score < REPAIR_THRESHOLD &&
         missing.length + extra.length > 0;
       if (!needsRepair) return;

@@ -322,6 +322,67 @@ def _class_aware_nms(
     return kept
 
 
+# A container box (section/navbar/footer) is often ALSO detected as a `card`
+# on nearly the same pixels — a cross-class duplicate, not hierarchy. Class-aware
+# NMS keeps it (different classes), and downstream the phantom card becomes a
+# real rendered element (an unlabelled squarish card reads as an image
+# placeholder). Same 0.8 threshold fidelity scoring already uses to suppress
+# this exact double-detection pattern. True containment (small card inside a
+# big section) has low IoU, so the hierarchy is untouched.
+_CROSS_CLASS_DUPE_IOU = 0.8
+
+_CONTAINER_CLASS_NAMES = {"navbar", "footer", "section"}
+
+
+def _drop_container_shadow_cards(
+    elements: List["ExternalModelElement"],
+) -> List["ExternalModelElement"]:
+    """Drop `card` detections that duplicate a container's box (IoU >= 0.8)."""
+    containers = [
+        el for el in elements if (el.type or "").lower() in _CONTAINER_CLASS_NAMES
+    ]
+    if not containers:
+        return elements
+    return [
+        el
+        for el in elements
+        if (el.type or "").lower() != "card"
+        or all(_iou(el, c) < _CROSS_CLASS_DUPE_IOU for c in containers)
+    ]
+
+
+def snap_positional_bars(elements: List["ExternalModelElement"]) -> None:
+    """Snap navbar/footer classes to what their POSITION says they are.
+
+    The class semantics are positional — navbar is the top horizontal bar,
+    footer the bottom one (CLAUDE.md class table) — but the detector sometimes
+    returns a bottom bar as `navbar` (live case: footer with links + copyright
+    detected as navbar 0.70, which the prompt then forces to render at the TOP
+    of the page). Same rule fidelity scoring already applies before matching
+    (_reclassify_bars_by_position in fidelity.py). Bars whose center sits in
+    the middle third keep their detected class.
+    """
+    if not elements:
+        return
+    canvas_height = max(
+        float((el.bounds or {}).get("y", 0.0))
+        + float((el.bounds or {}).get("height", 0.0))
+        for el in elements
+    )
+    if canvas_height <= 0:
+        return
+    for el in elements:
+        cls = (el.type or "").lower()
+        if cls not in ("navbar", "footer"):
+            continue
+        b = el.bounds or {}
+        cy = (float(b.get("y", 0.0)) + float(b.get("height", 0.0)) / 2.0) / canvas_height
+        if cy < 1 / 3:
+            el.type = "navbar"
+        elif cy > 2 / 3:
+            el.type = "footer"
+
+
 def _roboflow_to_element(prediction: Dict[str, Any]) -> Optional[ExternalModelElement]:
     try:
         cx = float(prediction["x"])
@@ -579,9 +640,14 @@ def detect_with_roboflow(
 
     # Pass 2: class-aware NMS to collapse duplicate same-class detections.
     elements = _class_aware_nms(pre_nms, nms_iou)
+    nms_kept = len(elements)
+
+    # Pass 3: drop cards that shadow a container box (cross-class duplicates).
+    elements = _drop_container_shadow_cards(elements)
 
     if debug:
-        nms_dropped = len(pre_nms) - len(elements)
+        nms_dropped = len(pre_nms) - nms_kept
+        shadow_dropped = nms_kept - len(elements)
         print(
             f"[debug] After per-class threshold: kept={len(pre_nms)} "
             f"low-conf-rejected={rejected_low_conf} "
@@ -589,15 +655,21 @@ def detect_with_roboflow(
             f"parse-errors={parse_errors}"
         )
         print(
-            f"[debug] After class-aware NMS (iou>{nms_iou}): kept={len(elements)} "
+            f"[debug] After class-aware NMS (iou>{nms_iou}): kept={nms_kept} "
             f"(dropped {nms_dropped} same-class duplicates)"
         )
+        if shadow_dropped:
+            print(
+                f"[debug] Dropped {shadow_dropped} card(s) shadowing a container "
+                f"box (cross-class IoU >= {_CROSS_CLASS_DUPE_IOU})"
+            )
 
     if not elements:
         if debug:
             print("[debug] All predictions filtered out → returning None")
         return None
 
+    snap_positional_bars(elements)
     sort_reading_order(elements)
 
     metadata: Dict[str, Any] = {
@@ -712,8 +784,13 @@ def build_repair_prompt(
         "- Fix ONLY the discrepancies listed above. Do not restyle, rename,",
         "  reorder, or rewrite anything else — unchanged parts of the code must",
         "  remain byte-identical.",
+        "- The type names are detector classes, not copy: `card` means ANY",
+        "  single content unit (button, input, text, image — infer the real",
+        "  element from its label, shape and position phrase); `navbar` is the",
+        "  top bar container; `footer` the bottom bar. NEVER render the words",
+        '  "card", "navbar", "section" or "footer" as visible text.',
         "- Do not invent content: added elements get minimal placeholder text",
-        "  consistent with their type (or the label given above).",
+        "  consistent with their inferred role (or the label given above).",
         f"- Keep the output a complete, valid {framework} file in the same",
         "  structure as the current code (same component name, same export).",
         "- Return ONLY the complete updated code. No explanations, no markdown",

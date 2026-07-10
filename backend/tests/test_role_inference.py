@@ -66,6 +66,15 @@ def test_action_verb_is_button():
         assert hint(els[0]) == "button", label
 
 
+def test_create_account_is_button_even_when_wide_thin():
+    # Live case: "Create Account" drawn as a wide bar fell through to the
+    # wide-thin rule and rendered as an <input>.
+    els = [make("card", 1095, 753, 515, 92, text="Create Account")]
+    annotate_role_hints(els)
+    assert hint(els[0]) == "button"
+    assert els[0].attributes["role_hint_firm"] is True
+
+
 def test_image_marker_labels_are_image_placeholders():
     # Mirrors the synthetic dataset's IMAGE_LABELS: an image card drawn as a
     # box holding a marker word, not as an X-cross.
@@ -101,6 +110,43 @@ def test_wide_thin_labelled_row_is_input():
     els = [make("card", 50, 100, 500, 50, text="Whatever Label")]
     annotate_role_hints(els)
     assert hint(els[0]) == "input"
+    # Non-field label: shape-only guess, must stay soft so the drawn text
+    # (e.g. a short heading) can override it.
+    assert els[0].attributes["role_hint_firm"] is False
+
+
+def test_sidebar_menu_rows_are_nav_items_not_inputs():
+    # Live case: dashboard sidebar (tall section) with Home/Projects/
+    # Analytics/Settings rows — the wide-thin rule made them text inputs.
+    sidebar = make("section", 5, 4, 495, 1001, text="Dashboard")
+    labels = ("Home", "Projects", "Analytics", "Settings")
+    rows = [
+        make("card", 46, 204 + i * 100, 409, 80, text=lbl)
+        for i, lbl in enumerate(labels)
+    ]
+    els = [sidebar] + rows
+    annotate_role_hints(els)
+    for row, lbl in zip(rows, labels):
+        assert hint(row) == "nav item (sidebar menu link)", lbl
+        assert row.attributes["role_hint_firm"] is True, lbl
+
+
+def test_field_label_in_tall_section_stays_input():
+    # A tall form column: field-style labels beat the sidebar rule.
+    column = make("section", 0, 0, 400, 900)
+    row = make("card", 40, 100, 320, 60, text="Password")
+    els = [column, row]
+    annotate_role_hints(els)
+    assert hint(row) == "input"
+
+
+def test_wide_section_rows_do_not_get_sidebar_hint():
+    # Normal (wide) section: short-labelled rows keep the wide-thin input path.
+    section = make("section", 0, 0, 1200, 700)
+    row = make("card", 100, 100, 500, 50, text="Whatever Label")
+    els = [section, row]
+    annotate_role_hints(els)
+    assert hint(row) == "input"
 
 
 def test_wide_thin_unlabelled_row_is_input():
@@ -137,6 +183,30 @@ def test_squarish_card_without_parent_gets_no_hint():
     els = [make("card", 100, 50, 300, 250)]
     annotate_role_hints(els)
     assert hint(els[0]) is None
+
+
+def test_card_wrapping_other_cards_is_not_an_image():
+    # Form container mis-detected as `card`: squarish, unlabelled, large — the
+    # shape guess would say image placeholder, but it WRAPS real cards.
+    section = make("section", 0, 0, 800, 900)
+    wrapper = make("card", 100, 50, 600, 640)
+    inner_a = make("card", 140, 100, 500, 80, text="Email")
+    inner_b = make("card", 140, 220, 500, 80, text="Password")
+    els = [section, wrapper, inner_a, inner_b]
+    annotate_role_hints(els)
+    assert hint(wrapper) is None
+    assert hint(inner_a) == "input"
+    assert hint(inner_b) == "input"
+
+
+def test_marker_label_beats_wrapper_veto():
+    # Firm image-marker label wins even when the box contains another card.
+    section = make("section", 0, 0, 800, 900)
+    wrapper = make("card", 100, 50, 600, 640, text="[ image ]")
+    inner = make("card", 140, 100, 500, 80)
+    els = [section, wrapper, inner]
+    annotate_role_hints(els)
+    assert hint(wrapper) == "image placeholder"
 
 
 # ── role hints: container position ───────────────────────────────────────────
