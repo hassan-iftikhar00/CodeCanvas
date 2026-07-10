@@ -1040,6 +1040,11 @@ def _attach_text_annotations(
 
 _CC_ID_RE = re.compile(r'data-cc-id="cc-(\d+)"')
 
+# Rendered element whose ENTIRE visible text is a detector class name — the
+# signature of repair-era damage (old repair prompts made Gemini add literal
+# "Card"/"Navbar" stubs). No faithful generation renders these words verbatim.
+_CLASS_STUB_RE = re.compile(r">\s*(Card|Navbar|Section|Footer)\s*<")
+
 # Minimum fraction of the previous element set that must carry a data-cc-id
 # in the previous code for incremental patching to trust it as a base.
 _INCREMENTAL_MIN_ID_COVERAGE = 0.6
@@ -1048,15 +1053,26 @@ _INCREMENTAL_MIN_ID_COVERAGE = 0.6
 def _previous_code_is_degenerate(previous_code: str, n_previous_elements: int) -> bool:
     """True when previousCode is not a trustworthy base for incremental regen.
 
-    Faithful generations stamp EVERY element with data-cc-id (Decision #28),
-    so distinct-id coverage ~= 100%. Degenerate code — a repair-destroyed stub,
-    or pre-linker output with no ids at all — has far fewer. Patching such a
-    base recycles the damage forever (live case: a 'Card Card Card' stub with
-    3 ids for 9 elements kept being returned/patched across runs); the REMOVE
-    instructions also key off cc-ids, so an id-less base cannot be patched
-    correctly anyway. Force a full regeneration instead.
+    Two signals, either one disqualifies:
+
+    1. cc-id coverage. Faithful generations stamp EVERY element with
+       data-cc-id (Decision #28), so distinct-id coverage ~= 100%. A
+       repair-destroyed stub or pre-linker output has far fewer; an id-less
+       base also cannot be patched correctly (REMOVE keys off cc-ids).
+    2. Literal class-name stubs. Old repair damage glued absolute-positioned
+       '<p>Card</p>' divs ON TOP of otherwise well-id'd code (live case:
+       signup base passed coverage at 7/7 while carrying six id-less "Card"
+       stubs) — coverage alone cannot see additive damage.
+
+    Either way, patching recycles the damage forever; force full regeneration.
     """
     if n_previous_elements <= 0:
+        return True
+    if _CLASS_STUB_RE.search(previous_code):
+        print(
+            "[incremental] previous code contains literal detector-class "
+            "stubs ('Card'/'Navbar' as visible text) — full regeneration"
+        )
         return True
     distinct_ids = set(_CC_ID_RE.findall(previous_code))
     coverage = len(distinct_ids) / n_previous_elements
