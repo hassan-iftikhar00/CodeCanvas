@@ -88,6 +88,14 @@ export interface ScreenSnapshot {
     bounds: { x: number; y: number; width: number; height: number };
     label?: string;
   }>;
+  // Context generatedCode was produced under (framework + brand-kit JSON
+  // fingerprint). Read back on screen switch so the incremental-regen gate
+  // knows whether the stored code still matches the current settings —
+  // without this, editing the brand kit and regenerating an unchanged sketch
+  // zero-deltas back the old, un-styled code. Absent on legacy snapshots →
+  // treated as mismatch (one full regeneration, then recorded).
+  generationFramework?: string;
+  generationBrandKitKey?: string;
 }
 
 interface Project {

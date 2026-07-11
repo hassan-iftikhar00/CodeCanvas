@@ -784,6 +784,8 @@ function CanvasPageInner() {
             generatedCode: editedCode || generatedCode,
             detectedElements:
               detectedElements as ScreenSnapshot["detectedElements"],
+            generationFramework: previousGenRef.current.framework,
+            generationBrandKitKey: previousGenRef.current.brandKitKey,
           }
         : s
     );
@@ -816,6 +818,8 @@ function CanvasPageInner() {
               generatedCode: editedCode || generatedCode,
               detectedElements:
                 detectedElements as ScreenSnapshot["detectedElements"],
+              generationFramework: previousGenRef.current.framework,
+              generationBrandKitKey: previousGenRef.current.brandKitKey,
             }
           : s
       ),
@@ -877,11 +881,17 @@ function CanvasPageInner() {
       setFidelity(null);
       // Reset the incremental-regen mirror to THIS screen's last generation,
       // otherwise the next generation diffs against another screen's elements.
+      // Context comes from the snapshot's RECORDED values — stamping the
+      // current settings here would claim old code already matches a kit or
+      // framework it was never generated with (live bug: kit updated →
+      // dashboard regenerated styled → switch to login → login zero-deltaed
+      // back its old un-styled code). Missing record (legacy snapshot) uses a
+      // sentinel that can never match → one full regeneration, then recorded.
       previousGenRef.current = {
         code,
         elements: screen.detectedElements ?? [],
-        framework: selectedFramework,
-        brandKitKey: JSON.stringify(brandKitRef.current ?? null),
+        framework: screen.generationFramework ?? selectedFramework,
+        brandKitKey: screen.generationBrandKitKey ?? "__unrecorded__",
       };
     },
     // history.setState is stable (useHistory memoizes it).
