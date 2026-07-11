@@ -78,6 +78,7 @@ interface SketchCanvasWithHistoryProps {
 // race the load and write the OUTGOING content back over it.
 export type SketchCanvasWithHistoryRef = SketchCanvasRef & {
   loadState: (data: CanvasTemplateData) => void;
+  applyState: (data: CanvasTemplateData) => void;
 };
 
 /**
@@ -190,6 +191,23 @@ const SketchCanvasWithHistory = forwardRef<
           shapes: data.shapes ?? [],
           componentGroups: data.componentGroups ?? [],
         });
+        setTimeout(() => {
+          isApplyingHistoryRef.current = false;
+        }, 150);
+      },
+      // Like loadState but WITHOUT the history write — for undo/redo, where
+      // the history stack has already stepped and only the canvas needs to
+      // catch up. Relying on the apply-effect alone leaves the same poll-race
+      // window loadState exists to close: a pending 500ms tick can read the
+      // pre-undo canvas and push it back onto the stack as a new entry,
+      // silently reverting the undo.
+      applyState: (data: CanvasTemplateData) => {
+        isApplyingHistoryRef.current = true;
+        if (canvasRef.current) {
+          canvasRef.current.replaceCanvasState(
+            data as Parameters<SketchCanvasRef["replaceCanvasState"]>[0]
+          );
+        }
         setTimeout(() => {
           isApplyingHistoryRef.current = false;
         }, 150);

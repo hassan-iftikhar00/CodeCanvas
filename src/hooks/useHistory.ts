@@ -3,7 +3,7 @@
  * Implements a command pattern with a configurable max history limit
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 
 interface UseHistoryOptions<T> {
   initialState: T;
@@ -13,11 +13,24 @@ interface UseHistoryOptions<T> {
 interface UseHistoryReturn<T> {
   state: T;
   setState: (newState: T | ((prev: T) => T)) => void;
-  undo: () => void;
-  redo: () => void;
+  /**
+   * Step back one entry. Returns the state stepped INTO (so the caller can
+   * apply it imperatively, e.g. push it into the canvas ahead of the poll),
+   * or null when there is nothing to undo.
+   */
+  undo: () => T | null;
+  /** Step forward one entry. Same return contract as undo. */
+  redo: () => T | null;
   canUndo: boolean;
   canRedo: boolean;
   clear: () => void;
+  /**
+   * Replace the ENTIRE stack with a single entry. Used on programmatic loads
+   * that must not be undoable into the previous content — e.g. a multi-screen
+   * tab switch, where undoing across the switch would paint another screen's
+   * strokes onto the current one.
+   */
+  reset: (newState: T) => void;
   historyIndex: number;
   historyLength: number;
 }
@@ -61,42 +74,34 @@ export function useHistory<T>({
     [state, currentIndex, maxHistory]
   );
 
-  const undo = useCallback(() => {
-    if (canUndo) {
-      setCurrentIndex((prev) => prev - 1);
-    }
-  }, [canUndo]);
+  const undo = useCallback((): T | null => {
+    if (!canUndo) return null;
+    const target = history[currentIndex - 1];
+    setCurrentIndex(currentIndex - 1);
+    return target;
+  }, [canUndo, history, currentIndex]);
 
-  const redo = useCallback(() => {
-    if (canRedo) {
-      setCurrentIndex((prev) => prev + 1);
-    }
-  }, [canRedo]);
+  const redo = useCallback((): T | null => {
+    if (!canRedo) return null;
+    const target = history[currentIndex + 1];
+    setCurrentIndex(currentIndex + 1);
+    return target;
+  }, [canRedo, history, currentIndex]);
 
   const clear = useCallback(() => {
     setHistory([initialState]);
     setCurrentIndex(0);
   }, [initialState]);
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "z") {
-        e.preventDefault();
-        undo();
-      } else if (
-        (e.ctrlKey || e.metaKey) &&
-        e.shiftKey &&
-        (e.key === "z" || e.key === "Z")
-      ) {
-        e.preventDefault();
-        redo();
-      }
-    };
+  const reset = useCallback((newState: T) => {
+    setHistory([newState]);
+    setCurrentIndex(0);
+  }, []);
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo]);
+  // NOTE: this hook deliberately does NOT install its own Ctrl+Z/Ctrl+Y
+  // keyboard listener. The consumer (canvas/page.tsx) owns keyboard shortcuts;
+  // a second listener here made every Ctrl+Z fire undo() twice, stepping the
+  // index by 2 (and past 0 into an undefined state).
 
   return {
     state,
@@ -106,6 +111,7 @@ export function useHistory<T>({
     canUndo,
     canRedo,
     clear,
+    reset,
     historyIndex: currentIndex,
     historyLength: history.length,
   };

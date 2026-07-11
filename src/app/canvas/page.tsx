@@ -140,6 +140,11 @@ type RunGenerationOpts = {
   }>;
   // HITL: audit log of relabel/delete/add actions from the review overlay.
   detectionCorrections?: DetectionCorrection[];
+  // Multi-screen: the screen that initiated this generation. Stamped at the
+  // FIRST user action (detect click), not at runGeneration entry — the HITL
+  // flow can hold a review session open across a tab switch, and the result
+  // must still land on the screen whose sketch was detected.
+  originScreenId?: string;
 };
 
 const ONBOARDING_STORAGE_PREFIX = "codecanvas:onboarding:seen";
@@ -467,9 +472,45 @@ function CanvasPageInner() {
     } as CanvasData,
     maxHistory: 50,
   });
+  // Autosave payload. NEVER hand raw history.state to useAutoSave on a
+  // multi-screen project: updateProject overwrites canvas_data wholesale, so
+  // a screen-less payload silently WIPES the `screens` array (all other
+  // screens' sketches + code) from the projects row 3 seconds after any
+  // stroke. Wrap it the same way getPersistableCanvasData does. The active
+  // snapshot is refreshed only in canvas mode — in upload mode history.state
+  // does not describe this screen (the canvas is unmounted).
+  const autoSaveData = useMemo((): CanvasData => {
+    const raw = history.state as CanvasData;
+    if (screens.length <= 1) return raw;
+    return {
+      ...raw,
+      screens: screens.map((s) =>
+        s.id === activeScreenId && inputSource === "canvas"
+          ? {
+              ...s,
+              canvasData: raw,
+              generatedCode: editedCode || generatedCode,
+              detectedElements:
+                detectedElements as ScreenSnapshot["detectedElements"],
+              generationFramework: previousGenRef.current.framework,
+              generationBrandKitKey: previousGenRef.current.brandKitKey,
+            }
+          : s
+      ),
+      activeScreenId,
+    };
+  }, [
+    history.state,
+    screens,
+    activeScreenId,
+    inputSource,
+    editedCode,
+    generatedCode,
+    detectedElements,
+  ]);
   const { isSaving: isAutoSaving } = useAutoSave(
     currentProject?.id || null,
-    history.state
+    autoSaveData
   );
   const isSaving = isManualSaving || isAutoSaving;
   const versionHistory = useVersionHistory();
@@ -683,55 +724,66 @@ function CanvasPageInner() {
             brandKitRef.current = kit;
             setBrandKit(kit);
           }
-          if (project.canvas_data) {
-            const cd = project.canvas_data as CanvasData;
-            // Multi-screen project: restore the whole tab set. The top-level
-            // canvas_data mirrors the screen that was ACTIVE at save time, so
-            // the upload/canvas restore below still loads the right workspace.
-            if (cd.screens && cd.screens.length > 0) {
-              setScreens(cd.screens);
-              const active =
-                cd.screens.find((s) => s.id === cd.activeScreenId) ??
-                cd.screens[0];
-              setActiveScreenId(active.id);
-              if (active.detectedElements) {
-                setDetectedElements(active.detectedElements);
+          const cd = (project.canvas_data as CanvasData) ?? null;
+          if (cd?.screens && cd.screens.length > 0) {
+            // Multi-screen project: restore the whole tab set, then load the
+            // active screen THROUGH the same path a tab switch uses. The
+            // snapshot is authoritative for that screen's code and detection
+            // set — the top-level generated_code can mirror a DIFFERENT
+            // screen (e.g. a save made from a screen with no code yet, or a
+            // generation whose origin screen was later deleted), and loading
+            // it here painted one screen's code onto another after reload.
+            setScreens(cd.screens);
+            const active =
+              cd.screens.find((s) => s.id === cd.activeScreenId) ??
+              cd.screens[0];
+            setActiveScreenId(active.id);
+            loadScreenIntoWorkspace(active);
+            if (active.generatedCode) setShowCodePanel(true);
+          } else {
+            if (cd) {
+              // Upload-based project: the sketch is a stored image, not drawn
+              // strokes. Restore the upload workspace so a reload (or opening
+              // the ?id= URL in a new tab) shows the image again instead of an
+              // empty canvas.
+              if (cd.uploadedSketch?.dataUrl) {
+                setUploadedPreview({
+                  dataUrl: cd.uploadedSketch.dataUrl,
+                  source: cd.uploadedSketch.source,
+                  width: cd.uploadedSketch.width,
+                  height: cd.uploadedSketch.height,
+                });
+                setInputSource("upload");
+                // PROPS tab is canvas-only; mirror handleUploadDetection.
+                setRightPanel((p) => (p === "properties" ? null : p));
+              }
+              const hasContent =
+                (cd.lines?.length ?? 0) > 0 ||
+                (cd.shapes?.length ?? 0) > 0 ||
+                (cd.componentGroups?.length ?? 0) > 0;
+              if (hasContent) {
+                // Normalize to exactly the three keys the wrapper's JSON
+                // comparison tracks. Raw canvas_data also carries width/height,
+                // which would otherwise make every comparison report a diff.
+                const next = {
+                  lines: cd.lines ?? [],
+                  shapes: cd.shapes ?? [],
+                  componentGroups: cd.componentGroups ?? [],
+                };
+                // Prefer the guarded imperative load (poll-race safe); the
+                // history fallback covers a not-yet-mounted canvas, which
+                // syncs itself from history on mount.
+                if (canvasRef.current?.loadState) {
+                  canvasRef.current.loadState(next);
+                }
+                history.reset(next);
+                setHasUserInteracted(true);
               }
             }
-            // Upload-based project: the sketch is a stored image, not drawn
-            // strokes. Restore the upload workspace so a reload (or opening
-            // the ?id= URL in a new tab) shows the image again instead of an
-            // empty canvas.
-            if (cd.uploadedSketch?.dataUrl) {
-              setUploadedPreview({
-                dataUrl: cd.uploadedSketch.dataUrl,
-                source: cd.uploadedSketch.source,
-                width: cd.uploadedSketch.width,
-                height: cd.uploadedSketch.height,
-              });
-              setInputSource("upload");
-              // PROPS tab is canvas-only; mirror handleUploadDetection.
-              setRightPanel((p) => (p === "properties" ? null : p));
+            if (project.generated_code) {
+              setGeneratedCode(project.generated_code);
+              setEditedCode(project.generated_code);
             }
-            const hasContent =
-              (cd.lines?.length ?? 0) > 0 ||
-              (cd.shapes?.length ?? 0) > 0 ||
-              (cd.componentGroups?.length ?? 0) > 0;
-            if (hasContent) {
-              // Normalize to exactly the three keys the wrapper's JSON
-              // comparison tracks. Raw canvas_data also carries width/height,
-              // which would otherwise make every comparison report a diff.
-              history.setState({
-                lines: cd.lines ?? [],
-                shapes: cd.shapes ?? [],
-                componentGroups: cd.componentGroups ?? [],
-              });
-              setHasUserInteracted(true);
-            }
-          }
-          if (project.generated_code) {
-            setGeneratedCode(project.generated_code);
-            setEditedCode(project.generated_code);
           }
         }
       };
@@ -803,6 +855,54 @@ function CanvasPageInner() {
     detectedElements,
   ]);
 
+  // Persist a refinement result (chat / annotate) into the right screen.
+  // Reads screensRef (committed data) instead of relying on the calling
+  // handler's closure: the handler was created before the async call, so its
+  // captured screens/activeScreenId are stale if the user switched tabs (or
+  // added/deleted screens) while the refinement ran — persisting through that
+  // stale closure could resurrect deleted screens or stamp the wrong strokes
+  // into a snapshot. getRawCanvasData is a ref-read, so it is always the
+  // CURRENT screen's live workspace and safe to use for the active snapshot.
+  const persistRefinedCode = useCallback(
+    (originScreenId: string, code: string) => {
+      if (!currentProject?.id || currentProject.id.startsWith("temp-")) return;
+      const { screens: list, activeScreenId: activeId } = screensRef.current;
+      const stillActive = activeId === originScreenId;
+      const raw = getRawCanvasData();
+      if (list.length <= 1) {
+        if (raw) {
+          void updateProject(currentProject.id, raw, undefined, code);
+        }
+        return;
+      }
+      const base = raw ??
+        list.find((s) => s.id === activeId)?.canvasData ?? {
+          lines: [],
+          shapes: [],
+          componentGroups: [],
+        };
+      const payload: CanvasData = {
+        ...base,
+        screens: list.map((s) => {
+          let next = s;
+          if (s.id === activeId && raw) next = { ...next, canvasData: raw };
+          if (s.id === originScreenId) next = { ...next, generatedCode: code };
+          return next;
+        }),
+        activeScreenId: activeId,
+      };
+      void updateProject(
+        currentProject.id,
+        payload,
+        undefined,
+        // Top-level generated_code mirrors the ACTIVE screen; only stamp the
+        // refined code there when its screen is still the active one.
+        stillActive ? code : undefined
+      );
+    },
+    [currentProject, getRawCanvasData, updateProject]
+  );
+
   // ── Multi-screen tab handlers ──
   const activeScreenName =
     screens.find((s) => s.id === activeScreenId)?.name ?? "Home";
@@ -845,6 +945,10 @@ function CanvasPageInner() {
         });
         setInputSource("upload");
         setRightPanel((p) => (p === "properties" ? null : p));
+        // The canvas unmounts in upload mode, but history would otherwise
+        // keep holding the OUTGOING screen's strokes — which autosave and
+        // Ctrl+Z would then attribute to this screen. Reset to empty.
+        history.reset({ lines: [], shapes: [], componentGroups: [] });
       } else {
         setInputSource("canvas");
         setUploadedPreview(null);
@@ -865,9 +969,14 @@ function CanvasPageInner() {
         };
         if (canvasRef.current?.loadState) {
           canvasRef.current.loadState(nextState);
-        } else {
-          history.setState(nextState);
         }
+        // Replace the WHOLE undo stack, not push: the stack is shared across
+        // screens, so an undo after switching would otherwise step back into
+        // the previous screen's strokes and paint them onto this one (then
+        // the next snapshot capture persists the corruption). This also
+        // covers the canvasRef-null fallback (canvas unmounted in upload
+        // mode) — the canvas syncs from history on mount.
+        history.reset(nextState);
         const hasContent =
           (cd?.lines?.length ?? 0) > 0 ||
           (cd?.shapes?.length ?? 0) > 0 ||
@@ -894,9 +1003,9 @@ function CanvasPageInner() {
         brandKitKey: screen.generationBrandKitKey ?? "__unrecorded__",
       };
     },
-    // history.setState is stable (useHistory memoizes it).
+    // history.reset is stable (useHistory memoizes it with no deps).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [history.setState, selectedFramework]
+    [history.reset, selectedFramework]
   );
 
   const handleSelectScreen = useCallback(
@@ -1023,7 +1132,31 @@ function CanvasPageInner() {
       }
 
       const title = projectName.trim() || "Untitled Project";
-      const projectId = await saveProject(title, canvasData);
+      // Multi-screen (screens added before first save): wrap the payload with
+      // the tab set. Generation callers hand in a screen-less canvasData; if
+      // the row were created without `screens` and the generation then failed,
+      // the completion heal never runs and a reload loses the other screens.
+      const { screens: list, activeScreenId: activeId } = screensRef.current;
+      const createData: CanvasData =
+        list.length > 1
+          ? {
+              ...canvasData,
+              screens: list.map((s) =>
+                s.id === activeId
+                  ? {
+                      ...s,
+                      canvasData: {
+                        ...canvasData,
+                        screens: undefined,
+                        activeScreenId: undefined,
+                      },
+                    }
+                  : s
+              ),
+              activeScreenId: activeId,
+            }
+          : canvasData;
+      const projectId = await saveProject(title, createData);
 
       if (projectId) {
         setCurrentProject({ id: projectId, name: title });
@@ -1087,17 +1220,21 @@ function CanvasPageInner() {
           e.preventDefault();
           setShowCodePanel((p) => !p);
         }
-        if (e.key === "z" && !e.shiftKey) {
+        // With Shift held the key arrives as uppercase "Z" — compare
+        // case-insensitively or Shift+Z redo never fires.
+        const key = e.key.toLowerCase();
+        if (key === "z" && !e.shiftKey) {
           e.preventDefault();
-          history.undo();
+          // undo() returns the state stepped into; push it into the canvas
+          // imperatively (guarded) so a pending 500ms poll tick can't read
+          // the pre-undo canvas and push it back as a new history entry.
+          const target = history.undo();
+          if (target) canvasRef.current?.applyState?.(target);
         }
-        if (e.key === "z" && e.shiftKey) {
+        if ((key === "z" && e.shiftKey) || key === "y") {
           e.preventDefault();
-          history.redo();
-        }
-        if (e.key === "y") {
-          e.preventDefault();
-          history.redo();
+          const target = history.redo();
+          if (target) canvasRef.current?.applyState?.(target);
         }
         if (e.key === "=") {
           e.preventDefault();
@@ -1178,6 +1315,9 @@ function CanvasPageInner() {
     if (!currentCode) {
       return "Please draw a sketch and generate code first. I can only refine existing code.";
     }
+    // The screen this refinement belongs to. The user can switch tabs while
+    // the OpenRouter call runs; the result must land on THIS screen.
+    const originScreenId = screensRef.current.activeScreenId;
 
     setIsGenerating(true);
     try {
@@ -1200,26 +1340,29 @@ function CanvasPageInner() {
         );
       }
       const result = await response.json();
-      setGeneratedCode(result.code);
-      setEditedCode(result.code);
-      // Ensure code panel is visible so user sees the update
-      setShowCodePanel(true);
-      // Persist updated code immediately so it survives a reload.
-      if (currentProject?.id && !currentProject.id.startsWith("temp-")) {
-        const currentCanvasData = getPersistableCanvasData();
-        if (currentCanvasData) {
-          void updateProject(
-            currentProject.id,
-            currentCanvasData,
-            undefined,
-            result.code
-          );
-        }
+      const stillActive = screensRef.current.activeScreenId === originScreenId;
+      if (stillActive) {
+        setGeneratedCode(result.code);
+        setEditedCode(result.code);
+        // Ensure code panel is visible so user sees the update
+        setShowCodePanel(true);
+      } else {
+        // User switched screens mid-refine: file the result under the screen
+        // that asked for it; live state belongs to the new screen.
+        setScreens((prev) =>
+          prev.map((s) =>
+            s.id === originScreenId ? { ...s, generatedCode: result.code } : s
+          )
+        );
       }
-      return (
-        result.message ||
-        "Done! I've updated the code. Check the code panel below."
-      );
+      // Persist updated code immediately so it survives a reload — routed
+      // into the ORIGIN screen's snapshot via committed data, not this
+      // handler's (possibly stale) closure.
+      persistRefinedCode(originScreenId, result.code);
+      return stillActive
+        ? result.message ||
+            "Done! I've updated the code. Check the code panel below."
+        : "Done! The refined code was saved to the screen you started from.";
     } catch (err) {
       console.error(err);
       throw err;
@@ -1242,6 +1385,9 @@ function CanvasPageInner() {
       });
       return false;
     }
+    // Same mid-flight tab-switch guard as chat: results belong to the screen
+    // that was active when the annotation was submitted.
+    const originScreenId = screensRef.current.activeScreenId;
     setIsGenerating(true);
     try {
       const response = await fetch("/api/annotate", {
@@ -1263,19 +1409,20 @@ function CanvasPageInner() {
         throw new Error(err?.error || "Annotation refinement failed");
       }
       const result = await response.json();
-      setGeneratedCode(result.code);
-      setEditedCode(result.code);
-      setShowCodePanel(true);
-      // Persist so the refined code survives a reload (same as chat).
-      const currentCanvasData = getPersistableCanvasData();
-      if (currentCanvasData) {
-        void updateProject(
-          currentProject.id,
-          currentCanvasData,
-          undefined,
-          result.code
+      const stillActive = screensRef.current.activeScreenId === originScreenId;
+      if (stillActive) {
+        setGeneratedCode(result.code);
+        setEditedCode(result.code);
+        setShowCodePanel(true);
+      } else {
+        setScreens((prev) =>
+          prev.map((s) =>
+            s.id === originScreenId ? { ...s, generatedCode: result.code } : s
+          )
         );
       }
+      // Persist so the refined code survives a reload (same as chat).
+      persistRefinedCode(originScreenId, result.code);
       toast.success(
         payload.targets.length > 0
           ? `Applied to ${payload.targets.length} marked element${payload.targets.length === 1 ? "" : "s"}.`
@@ -1306,7 +1453,11 @@ function CanvasPageInner() {
     // TODO: replace with a custom modal that allows naming a checkpoint;
     // window.prompt is intentionally avoided. For now, use a default label.
     const description = `Checkpoint ${new Date().toLocaleString()}`;
-    const canvasData = canvasRef.current?.getCanvasData();
+    // Persistable shape, not the raw canvas read: a raw read is screen-less,
+    // so restoring the checkpoint on a multi-screen project would only bring
+    // back one screen's strokes. This also makes checkpoints work in upload
+    // mode, where the canvas is unmounted (raw read returned nothing).
+    const canvasData = getPersistableCanvasData();
     if (canvasData) {
       await versionHistory.createVersion(
         currentProject.id,
@@ -1323,14 +1474,19 @@ function CanvasPageInner() {
   // back to canvas mode if the user was in the upload view.
   const restoreCanvasSnapshot = (cd: CanvasData | null | undefined) => {
     if (!cd) return;
-    // Multi-screen snapshot: bring back the whole tab set as of that save.
+    // Multi-screen snapshot: bring back the whole tab set as of that save,
+    // then load the active screen through the same path a tab switch uses —
+    // it restores that screen's code, detection set, and incremental-regen
+    // context from the snapshot (the top-level mirrors can belong to a
+    // different screen), and resets the undo stack so Ctrl+Z can't step
+    // across the restore into another screen's strokes.
     if (cd.screens && cd.screens.length > 0) {
       setScreens(cd.screens);
       const active =
         cd.screens.find((s) => s.id === cd.activeScreenId) ?? cd.screens[0];
       setActiveScreenId(active.id);
-      // Top-level fields mirror the active screen; fall through to the
-      // regular restore below so its workspace loads too.
+      loadScreenIntoWorkspace(active);
+      return;
     }
     if (cd.uploadedSketch?.dataUrl) {
       setUploadedPreview({
@@ -1350,11 +1506,21 @@ function CanvasPageInner() {
     if (!hasContent) return;
     setInputSource("canvas");
     setUploadedPreview(null);
-    history.setState({
+    // Guarded imperative load: history.setState alone waits for the wrapper's
+    // apply-effect, and a pending 500ms poll tick in that window writes the
+    // pre-restore canvas back over the restored strokes (same race class as
+    // the screen-switch bleed). loadState replaces the canvas synchronously
+    // and pushes ONE history entry, so the restore stays undoable.
+    const next = {
       lines: cd.lines ?? [],
       shapes: cd.shapes ?? [],
       componentGroups: cd.componentGroups ?? [],
-    });
+    };
+    if (canvasRef.current?.loadState) {
+      canvasRef.current.loadState(next);
+    } else {
+      history.setState(next);
+    }
     setHasUserInteracted(true);
   };
 
@@ -1660,6 +1826,10 @@ function CanvasPageInner() {
     sketchImage: string;
     allowRepair: boolean;
     before?: number;
+    // Screen the scored generation belongs to. Scoring takes 10-30s (render +
+    // re-detect); if the user switches tabs meanwhile, the badge and any
+    // repair write must NOT land on the new screen's live state.
+    originScreenId: string;
   }): Promise<void> {
     setIsScoringFidelity(true);
     try {
@@ -1679,6 +1849,10 @@ function CanvasPageInner() {
       if (!response.ok) return;
       const result = await response.json();
       if (typeof result.score !== "number") return;
+      // Switched away while scoring ran: the badge (and any repair) belongs
+      // to another screen. Drop silently — fidelity is an enhancement, and
+      // the badge was already cleared by the screen switch.
+      if (screensRef.current.activeScreenId !== opts.originScreenId) return;
       const missing: Array<Record<string, unknown>> =
         result.report?.missing ?? [];
       const extra: Array<Record<string, unknown>> = result.report?.extra ?? [];
@@ -1720,6 +1894,19 @@ function CanvasPageInner() {
         if (!repairResponse.ok) return;
         const repaired = await repairResponse.json();
         if (typeof repaired.code !== "string" || !repaired.code.trim()) return;
+        if (screensRef.current.activeScreenId !== opts.originScreenId) {
+          // Switched during the repair call: file the repaired code under its
+          // screen's snapshot instead of pasting it into the live editor.
+          // Skip the rescore — its badge would also belong to that screen.
+          setScreens((prev) =>
+            prev.map((s) =>
+              s.id === opts.originScreenId
+                ? { ...s, generatedCode: repaired.code }
+                : s
+            )
+          );
+          return;
+        }
         setGeneratedCode(repaired.code);
         setEditedCode(repaired.code);
         await scoreRun({
@@ -1744,6 +1931,15 @@ function CanvasPageInner() {
   // `sketchSource` tag (which tells the backend whether to photo-normalize).
   const runGeneration = useCallback(
     async (opts: RunGenerationOpts) => {
+      // Which screen INITIATED this generation. The user can switch tabs while
+      // the Gemini call is in flight; on completion we must route the result to
+      // THIS screen, not to whatever screen is active when the response lands —
+      // otherwise the code lands on the wrong screen and the origin reads "yet
+      // to generate". HITL callers stamp it earlier (at detect time) because
+      // the user can switch tabs during detection or while the review overlay
+      // is opening.
+      const originScreenId =
+        opts.originScreenId ?? screensRef.current.activeScreenId;
       setIsGenerating(true);
       setGeneratedCode("");
       setDetectedElements([]);
@@ -1792,9 +1988,13 @@ function CanvasPageInner() {
             ...(screensRef.current.screens.length > 1
               ? {
                   screens: screensRef.current.screens.map((s) => s.name),
+                  // The ORIGIN screen's name, not the currently-active one:
+                  // the user may already be on another tab by the time this
+                  // request is built, and the prompt's nav wiring must match
+                  // the screen the sketch belongs to.
                   currentScreen:
                     screensRef.current.screens.find(
-                      (s) => s.id === screensRef.current.activeScreenId
+                      (s) => s.id === originScreenId
                     )?.name ?? screensRef.current.screens[0].name,
                 }
               : {}),
@@ -1822,26 +2022,59 @@ function CanvasPageInner() {
         }
         const result = await response.json();
         const elements = result.detectedElements ?? result.elements ?? [];
-        // Stamp the incremental-regen mirror with this generation's full
-        // context; the live-sync effect only refreshes code/elements after
-        // edits and leaves these context fields alone.
-        previousGenRef.current = {
-          code: result.code,
-          elements,
-          framework: opts.framework ?? "react",
-          brandKitKey: JSON.stringify(brandKitRef.current ?? null),
-        };
-        setGeneratedCode(result.code);
-        setEditedCode(result.code);
-        setDetectedElements(elements);
-        setUsedFallback(Boolean(result.usedFallback));
-        setFallbackMessage(result.message ?? null);
-        setCurrentMode("preview");
-        setShowCodePanel(true);
-        if (result.usedIncremental) {
+        // Did the user switch to another screen while this generation ran? If
+        // so the live workspace now belongs to a DIFFERENT screen — writing
+        // this result into live state would paste the origin screen's code
+        // onto the screen the user is now looking at.
+        const stillActive =
+          screensRef.current.activeScreenId === originScreenId;
+
+        if (stillActive) {
+          // Stamp the incremental-regen mirror with this generation's full
+          // context; the live-sync effect only refreshes code/elements after
+          // edits and leaves these context fields alone. Only when this screen
+          // is still active — the mirror tracks the ACTIVE screen's last gen.
+          previousGenRef.current = {
+            code: result.code,
+            elements,
+            framework: opts.framework ?? "react",
+            brandKitKey: JSON.stringify(brandKitRef.current ?? null),
+          };
+          setGeneratedCode(result.code);
+          setEditedCode(result.code);
+          setDetectedElements(elements);
+          setUsedFallback(Boolean(result.usedFallback));
+          setFallbackMessage(result.message ?? null);
+          setCurrentMode("preview");
+          setShowCodePanel(true);
+          if (result.usedIncremental) {
+            toast.success(
+              "Only the changed elements were updated. Your existing code and refinements were kept.",
+              { title: "Incremental update" }
+            );
+          }
+        } else {
+          // Route the result into the origin screen's snapshot so it is there
+          // when the user switches back. Do NOT touch live state or the
+          // incremental mirror — those belong to the now-active screen.
+          setScreens((prev) =>
+            prev.map((s) =>
+              s.id === originScreenId
+                ? {
+                    ...s,
+                    generatedCode: result.code,
+                    detectedElements:
+                      elements as ScreenSnapshot["detectedElements"],
+                  }
+                : s
+            )
+          );
+          const originName =
+            screensRef.current.screens.find((s) => s.id === originScreenId)
+              ?.name ?? "another screen";
           toast.success(
-            "Only the changed elements were updated. Your existing code and refinements were kept.",
-            { title: "Incremental update" }
+            `Code for "${originName}" is ready. Open that tab to view it.`,
+            { title: "Generation complete" }
           );
         }
         // Persist generated code immediately so it survives a reload without
@@ -1849,16 +2082,18 @@ function CanvasPageInner() {
         if (projectId) {
           // Multi-screen heal: callers hand in a screen-less canvasData (the
           // API payload stays lean); writing that raw would WIPE the other
-          // screens from projects.canvas_data. Re-attach the full tab set
-          // with the active screen's snapshot refreshed to this generation.
-          const { screens: screenList, activeScreenId: activeId } =
-            screensRef.current;
+          // screens from projects.canvas_data. Re-attach the full tab set with
+          // the ORIGIN screen's snapshot refreshed to this generation. Origin,
+          // not the currently-active screen: the user may have switched tabs
+          // while the call was in flight, and this result + sketch belong to
+          // the screen that started it.
+          const { screens: screenList } = screensRef.current;
           const persistWithScreens: CanvasData =
             screenList.length > 1
               ? {
                   ...persistData,
                   screens: screenList.map((s) =>
-                    s.id === activeId
+                    s.id === originScreenId
                       ? {
                           ...s,
                           canvasData: {
@@ -1872,7 +2107,7 @@ function CanvasPageInner() {
                         }
                       : s
                   ),
-                  activeScreenId: activeId,
+                  activeScreenId: originScreenId,
                 }
               : persistData;
           void updateProject(
@@ -1887,7 +2122,11 @@ function CanvasPageInner() {
         }
         // Kick off the fidelity self-check in the background. Skip fallback
         // and template outputs — scoring a degraded result is meaningless.
+        // Also skip when the user switched screens mid-generation: the badge
+        // and (on low scores) the repair pass write LIVE state, which now
+        // belongs to a different screen.
         if (
+          stillActive &&
           !result.usedFallback &&
           result.code &&
           elements.length > 0 &&
@@ -1900,6 +2139,7 @@ function CanvasPageInner() {
             elements,
             sketchImage: opts.sketchImage,
             allowRepair: true,
+            originScreenId,
           });
         }
       } catch (err) {
@@ -1927,7 +2167,15 @@ function CanvasPageInner() {
   // unavailable or finds nothing, falls back to the direct one-shot pipeline
   // (which has its own contour fallback) so the feature never blocks a user.
   const runDetectionReview = useCallback(
-    async (opts: RunGenerationOpts) => {
+    async (rawOpts: RunGenerationOpts) => {
+      // Stamp the origin screen NOW: detection takes seconds and the review
+      // overlay can sit open even longer — the user may be on another tab by
+      // the time generation actually starts.
+      const opts: RunGenerationOpts = {
+        ...rawOpts,
+        originScreenId:
+          rawOpts.originScreenId ?? screensRef.current.activeScreenId,
+      };
       if (!opts.sketchImage) {
         void runGeneration(opts);
         return;
