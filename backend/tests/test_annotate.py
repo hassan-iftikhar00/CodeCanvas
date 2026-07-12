@@ -66,6 +66,16 @@ class TestBuildAnnotationPrompt:
         assert "never renumber" in prompt
         assert "complete, valid vue file" in prompt
 
+    def test_this_binding_and_container_rule_present(self):
+        # "make this red only" on a button must not restyle the wrapper the
+        # markup also crossed: the prompt pins "this" to the marked elements
+        # and forbids per-child restyling of a marked container.
+        prompt = build_annotation_prompt(
+            CODE, "react", "make this red only", _targets(), None, 1000, 600
+        )
+        assert '"this"/"it" in the instruction refer to the marked' in prompt
+        assert "ONE marked area" in prompt
+
     def test_note_is_stripped(self):
         prompt = build_annotation_prompt(
             CODE, "react", "  center it \n", _targets(), None, 1000, 600

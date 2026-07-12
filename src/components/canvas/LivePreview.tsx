@@ -238,6 +238,25 @@ export default function LivePreview({
     a.y < b.y + b.height &&
     a.y + a.height > b.y;
 
+  const rectIntersectionArea = (
+    a: { x: number; y: number; width: number; height: number },
+    b: { x: number; y: number; width: number; height: number }
+  ) => {
+    const w = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+    const h = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+    return w > 0 && h > 0 ? w * h : 0;
+  };
+
+  /** outer fully contains inner (small tolerance for border/rounding). */
+  const rectContains = (
+    outer: { x: number; y: number; width: number; height: number },
+    inner: { x: number; y: number; width: number; height: number }
+  ) =>
+    outer.x <= inner.x + 2 &&
+    outer.y <= inner.y + 2 &&
+    outer.x + outer.width >= inner.x + inner.width - 2 &&
+    outer.y + outer.height >= inner.y + inner.height - 2;
+
   const handleApplyAnnotation = async () => {
     if (!onAnnotate || annotateBusy) return;
     if (strokes.length === 0 || !annotateNote.trim()) return;
@@ -253,7 +272,7 @@ export default function LivePreview({
         const b = strokeBBox(s);
         return { ...b, x: b.x + scrollX, y: b.y + scrollY };
       });
-      const targets: AnnotateTarget[] = (reply?.rects ?? [])
+      const intersecting: AnnotateTarget[] = (reply?.rects ?? [])
         .map((r) => ({
           ccId: r.ccId,
           tag: r.tag,
@@ -265,6 +284,42 @@ export default function LivePreview({
           },
         }))
         .filter((t) => boxes.some((b) => rectsIntersect(b, t.rect)));
+
+      // Raw intersection over-targets: a circle around a button also crosses
+      // the form wrapper's (and page container's) box, and Gemini then applies
+      // the instruction to ALL listed elements (live case: "make this red
+      // only" on a button painted the whole form). Resolve to what the user
+      // actually marked:
+      //   1. coverage = how much of an element the markup's bbox covers. An
+      //      element the markup (mostly) encloses was deliberately circled; a
+      //      big wrapper the stroke merely passes through has tiny coverage.
+      //   2. If anything is enclosed, keep only enclosed elements.
+      //   3. Otherwise (scribble/arrow touching part of an element), drop any
+      //      target whose rect contains another matched target — keep the
+      //      innermost. Circling a whole form still works: the form itself is
+      //      enclosed then, so it survives step 2.
+      const ENCLOSED_MIN_COVERAGE = 0.55;
+      const coverageOf = (rect: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }) => {
+        const area = rect.width * rect.height;
+        if (area <= 0) return 0;
+        return (
+          Math.max(...boxes.map((b) => rectIntersectionArea(b, rect))) / area
+        );
+      };
+      const enclosed = intersecting.filter(
+        (t) => coverageOf(t.rect) >= ENCLOSED_MIN_COVERAGE
+      );
+      const pool = enclosed.length > 0 ? enclosed : intersecting;
+      const targets = pool.filter(
+        (t) =>
+          coverageOf(t.rect) >= ENCLOSED_MIN_COVERAGE ||
+          !pool.some((o) => o !== t && rectContains(t.rect, o.rect))
+      );
 
       const minX = Math.min(...boxes.map((b) => b.x));
       const minY = Math.min(...boxes.map((b) => b.y));

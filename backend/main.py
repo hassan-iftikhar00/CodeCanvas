@@ -957,6 +957,16 @@ _CLASS_STUB_RE = re.compile(r">\s*(Card|Navbar|Section|Footer)\s*<")
 _INCREMENTAL_MIN_ID_COVERAGE = 0.6
 
 
+def _repair_introduced_class_stubs(repaired_code: str, original_code: str) -> bool:
+    """True when the repair output renders a literal detector-class name as
+    visible text that the input code did not — the patch fabricated a stub
+    element instead of a real component (live case: '<p>Card</p>' heading +
+    stub injected into a correct signup form despite the prompt rule)."""
+    return bool(_CLASS_STUB_RE.search(repaired_code)) and not bool(
+        _CLASS_STUB_RE.search(original_code)
+    )
+
+
 def _previous_code_is_degenerate(previous_code: str, n_previous_elements: int) -> bool:
     """True when previousCode is not a trustworthy base for incremental regen.
 
@@ -2127,6 +2137,22 @@ async def repair(request: RepairRequest, http_request: Request):
         raise HTTPException(
             status_code=422,
             detail="Repair output failed sanity check (code shrank drastically)",
+        )
+
+    # Second sanity guard: the repair prompt names missing elements by their
+    # detector class ("card", "navbar"...) and despite an explicit rule Gemini
+    # sometimes renders that word as the element's visible text (live case:
+    # a '<p>Card</p>' heading + stub injected into a correct signup form). A
+    # class stub the INPUT didn't have means the patch fabricated garbage.
+    if _repair_introduced_class_stubs(repaired_code, request.code):
+        print(
+            "[repair] REJECTED: output renders a literal detector-class name "
+            "('Card'/'Navbar'/...) as visible text that the input did not — "
+            "fabricated stub, not a patch"
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="Repair output failed sanity check (introduced detector-class stubs)",
         )
 
     # Version history stays truthful: the repaired code is a new iteration.

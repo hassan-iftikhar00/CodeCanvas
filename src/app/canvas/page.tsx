@@ -1872,6 +1872,13 @@ function CanvasPageInner() {
       // to another screen. Drop silently — fidelity is an enhancement, and
       // the badge was already cleared by the screen switch.
       if (screensRef.current.activeScreenId !== opts.originScreenId) return;
+      // Scored code superseded: annotate/chat/manual edits can land during
+      // the 10-30s render + re-detect. A badge — and above all a REPAIR — for
+      // code that is no longer on screen must not clobber the newer code
+      // (live case: auto-repair of the pre-annotate code overwrote a fresh
+      // annotate result and injected "Card" stubs). previousGenRef.code is
+      // live-synced with editedCode/generatedCode, so it is the current code.
+      if (previousGenRef.current.code !== opts.code) return;
       const missing: Array<Record<string, unknown>> =
         result.report?.missing ?? [];
       const extra: Array<Record<string, unknown>> = result.report?.extra ?? [];
@@ -1915,17 +1922,22 @@ function CanvasPageInner() {
         if (typeof repaired.code !== "string" || !repaired.code.trim()) return;
         if (screensRef.current.activeScreenId !== opts.originScreenId) {
           // Switched during the repair call: file the repaired code under its
-          // screen's snapshot instead of pasting it into the live editor.
+          // screen's snapshot instead of pasting it into the live editor —
+          // but only if the snapshot still holds the code the repair was
+          // based on (a refinement routed to that screen mid-flight wins).
           // Skip the rescore — its badge would also belong to that screen.
           setScreens((prev) =>
             prev.map((s) =>
-              s.id === opts.originScreenId
+              s.id === opts.originScreenId && s.generatedCode === opts.code
                 ? { ...s, generatedCode: repaired.code }
                 : s
             )
           );
           return;
         }
+        // Same staleness rule as above: the repair Gemini call takes 40-80s —
+        // if the user refined the code meanwhile, drop the repair.
+        if (previousGenRef.current.code !== opts.code) return;
         setGeneratedCode(repaired.code);
         setEditedCode(repaired.code);
         await scoreRun({

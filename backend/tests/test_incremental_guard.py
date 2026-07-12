@@ -6,7 +6,7 @@ its damage forever. Faithful generations stamp every element with data-cc-id
 (Decision #28), so distinct-id coverage is the trust signal.
 """
 
-from main import _previous_code_is_degenerate
+from main import _previous_code_is_degenerate, _repair_introduced_class_stubs
 
 
 def code_with_ids(*ns: int) -> str:
@@ -64,3 +64,33 @@ def test_class_word_inside_longer_text_is_fine():
 def test_class_word_in_attribute_is_fine():
     code = code_with_ids(1, 2) + '\n<input placeholder="Card number" />'
     assert _previous_code_is_degenerate(code, 2) is False
+
+
+# ── /api/repair stub guard ───────────────────────────────────────────────────
+
+GOOD = code_with_ids(1, 2, 3)
+
+
+def test_repair_adding_stub_is_rejected():
+    # Live case: repair injected a '<p>Card</p>' heading + stub into a
+    # correct signup form.
+    repaired = GOOD + "\n<p>Card</p>"
+    assert _repair_introduced_class_stubs(repaired, GOOD) is True
+
+
+def test_repair_without_stubs_passes():
+    repaired = GOOD + '\n<footer data-cc-id="cc-4">Contact us</footer>'
+    assert _repair_introduced_class_stubs(repaired, GOOD) is False
+
+
+def test_preexisting_stub_not_blamed_on_repair():
+    # Input already carried the stub — the repair did not introduce it, and
+    # rejecting would block legitimate patches of already-damaged code.
+    original = GOOD + "\n<p>Card</p>"
+    repaired = original + '\n<div data-cc-id="cc-4">real content</div>'
+    assert _repair_introduced_class_stubs(repaired, original) is False
+
+
+def test_repair_class_word_in_real_copy_passes():
+    repaired = GOOD + "\n<label>Credit Card Number</label>"
+    assert _repair_introduced_class_stubs(repaired, GOOD) is False

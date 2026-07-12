@@ -870,6 +870,11 @@ def build_annotation_prompt(
 
     lines += [
         "RULES:",
+        '- Words like "this"/"it" in the instruction refer to the marked',
+        "  elements/region above — nothing else on the page.",
+        "- If the marked list contains both a container and elements inside",
+        "  it, treat them as ONE marked area; do not restyle each child",
+        "  separately unless the instruction says so.",
         "- Apply the instruction ONLY to the marked elements/region. Do not",
         "  restyle, rename, reorder, or rewrite anything else — unchanged parts",
         "  of the code must remain byte-identical.",
