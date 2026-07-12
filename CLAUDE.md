@@ -2,7 +2,7 @@
 
 > Read this file before helping with any task.
 > This is a FYP (Final Year Project) at a university.
-> Last updated: 2026-07-12 (multi-screen isolation audit: autosave screen-wipe fix + per-screen undo stack + origin-routed async results — see Fully Done entry; 2026-07-11: stale-previousCode guard + wrapper container hint; 2026-07-09: positional bar snap + sidebar nav rule + create-verb button + Windows fidelity render fix + honest incremental debug log; 2026-07-08: container-shadow-card dedup + wrapper-card image veto — phantom image placeholder fix; earlier 2026-07-05: live-test fixes round 2: CanvasData persistence passthrough + share via server route + version restore code; earlier: App Uplift C Element-Code Linker + D Incremental Regeneration; I Share Link + E Version Diff Viewer + H Brand Kit; StackBlitz split button in top bar; 2026-07-04: App Uplift round 2 started — see Audits/APP_UPLIFT_ROADMAP.md; G responsive generation + tablet frame, J Open-in-StackBlitz; earlier same day: reading-order sort + zigzag text-block rule; HITL detection review editor; upload-session persistence UX pass; auto-repair pass + lint migration to ESLint CLI; fidelity self-check loop; role hints, alignment stamping, temperature, eval harness)
+> Last updated: 2026-07-13 (chat refinement rewired onto the Gemini key pool and OpenRouter removed from code — `refine_chat_with_openrouter`/`call_openrouter`/`FREE_MODELS`/`OPENROUTER_API_URL` + urllib imports deleted from main.py; chat now builds a prompt via `build_chat_refine_prompt` and calls `generate_with_gemini(prompt_override=...)` (same paid-first-key + `GEMINI_API_KEY_2..10` rotation/cooldown/model-fallback as code gen), preserving data-cc-id; quota exhaustion falls back to the comment stub with `usedFallback`; earlier same day docs scrub had removed OpenRouter project-wide from prose; 2026-07-12: multi-screen isolation audit: autosave screen-wipe fix + per-screen undo stack + origin-routed async results — see Fully Done entry; 2026-07-11: stale-previousCode guard + wrapper container hint; 2026-07-09: positional bar snap + sidebar nav rule + create-verb button + Windows fidelity render fix + honest incremental debug log; 2026-07-08: container-shadow-card dedup + wrapper-card image veto — phantom image placeholder fix; earlier 2026-07-05: live-test fixes round 2: CanvasData persistence passthrough + share via server route + version restore code; earlier: App Uplift C Element-Code Linker + D Incremental Regeneration; I Share Link + E Version Diff Viewer + H Brand Kit; StackBlitz split button in top bar; 2026-07-04: App Uplift round 2 started — see Audits/APP_UPLIFT_ROADMAP.md; G responsive generation + tablet frame, J Open-in-StackBlitz; earlier same day: reading-order sort + zigzag text-block rule; HITL detection review editor; upload-session persistence UX pass; auto-repair pass + lint migration to ESLint CLI; fidelity self-check loop; role hints, alignment stamping, temperature, eval harness)
 
 ---
 
@@ -19,7 +19,6 @@ CodeCanvas is a **sketch-to-code web application**. Users draw UI wireframes on 
 ### Frontend
 - Next.js 14 (App Router), TypeScript, Tailwind CSS
 - Konva.js (canvas drawing), Supabase (auth + database)
-- OpenRouter API (chat-based code refinement)
 
 ### Backend
 - Python FastAPI (port 8000), Supabase PostgreSQL
@@ -63,8 +62,9 @@ Step 7: Code returned to frontend and displayed
 
 Step 8: User can refine code via chat
         Frontend: src/components/canvas/ChatInterface.tsx
-        Backend: refine_chat_with_openrouter in backend/main.py
-        Uses: OpenRouter API (separate from Gemini)
+        Backend: chat refinement path in backend/main.py
+        NOTE: chat refinement runs on the Gemini key pool (build_chat_refine_prompt
+        -> generate_with_gemini(prompt_override=...)), same rotation as code gen.
 ```
 
 **Alternate input (Upload Image):** instead of drawing, the user can upload a photo of a hand-drawn sketch or a clean digital wireframe (`src/components/canvas/UploadSketchModal.tsx`). It bypasses the canvas and feeds the image straight into Step 3 as `sketchImage` with `sketchSource: "upload-photo" | "upload-clean"`; the backend photo-normalizes it (`preprocess_uploaded_photo`) before Roboflow. Because the detector returns boxes with no text and uploads carry no `textAnnotations`, Step 6 additionally hands the processed image to Gemini (multimodal) so it READS the labels baked into the image. Steps 3-8 are otherwise identical. See Decisions #21 and #22.
@@ -136,9 +136,8 @@ Cards live INSIDE sections. Disambiguation (button vs input etc.) happens via bb
 | ------------------ | ------------------------------------------------ |
 | **Gemini 2.5 Pro** | Initial code generation from detected components |
 | **Gemini Flash**   | Fallback if 2.5 Pro is slow                      |
-| **OpenRouter**     | Chat-based code refinement ONLY                  |
 
-Gemini and OpenRouter serve different purposes and do NOT overlap.
+Code generation AND chat refinement both run on the Gemini key pool (paid first key + free-key rotation). OpenRouter fully removed.
 
 ---
 
@@ -193,8 +192,8 @@ delete_project(project_id uuid)  -- cascades: deletes iterations then project
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-OPENROUTER_API_KEY=        # For chat refinement
-GEMINI_API_KEY=            # For code generation
+GEMINI_API_KEY=            # For code generation (paid first key)
+GEMINI_API_KEY_2=          # ... up to _10: free-key rotation pool (see inference.py)
 ROBOFLOW_API_KEY=          # For sketch detection
 ROBOFLOW_MODEL_ID=object-detection-4affw/4
 
@@ -226,7 +225,6 @@ INCREMENTAL_ENABLED=true            # feature D: set false during prompt tuning 
 - Backend text-to-element matching (canvas-extent inference, oversized containers, navbar/footer synthesis)
 - User authentication (Supabase)
 - Project save/load (`useProjectSave`, canonical `title`/`thumbnail_url`)
-- OpenRouter chat refinement
 - Version history (`useVersionHistory`, `iterations` table)
 - Project rename (`updateProjectTitle`)
 - Toast notifications (`src/components/ui/Toast.tsx`)
@@ -301,7 +299,7 @@ Most-touched files:
 | `src/components/canvas/SketchCanvasWithHistory.tsx` | Drawing + undo/redo wiring |
 | `backend/main.py` | FastAPI server, `/api/predict`, synthesis helpers |
 | `backend/app/models/inference.py` | SketchDetector + CodeGenerator + Gemini |
-| `src/app/api/generate-code/route.ts` | Proxy to FastAPI; OpenRouter routing |
+| `src/app/api/generate-code/route.ts` | Proxy to FastAPI (generation + chat routing) |
 | `src/hooks/useProjectSave.ts` | Project CRUD (canonical schema) |
 | `src/types/canvas.ts` | `Tool`, `Mode`, zoom constants, `TOOL_KEY_MAP` |
 | `src/lib/drafting-room/tokens.ts` | Single source of truth for Drafting Room palette (`DRAFTING_TOKENS`, `DRAFTING_DARK`) |
@@ -354,8 +352,8 @@ Most-touched files:
 ## Important Decisions Already Made
 
 1. **Use Roboflow cloud API** — not local model (free tier limitation workaround)
-2. **Use Gemini 2.5 Pro** for code generation (not OpenRouter — too slow/limited)
-3. **Keep OpenRouter** for chat refinement only (already working, don't touch)
+2. **Use Gemini 2.5 Pro** for code generation, via a multi-key rotation pool (paid first key + free keys `GEMINI_API_KEY_2..10`)
+3. **Chat refinement runs on the Gemini key pool** — OpenRouter fully removed (2026-07-13). `build_chat_refine_prompt` builds the refine prompt, sent via `generate_with_gemini(prompt_override=...)` which reuses the same key rotation / cooldown / model-fallback as code generation. No separate refinement key. On quota exhaustion the handler falls back to appending the request as a comment (`usedFallback`).
 4. **Canonical DB schema** uses title/thumbnail_url/iterations (not name/thumbnail/project_versions)
 5. **Output React + Tailwind** as default, HTML + CSS as secondary option
 6. **Fork-based git workflow** — Maarij and Bilal work on forks
@@ -410,7 +408,6 @@ Backend URL:   http://localhost:8000
 Database:      Supabase (see .env)
 Roboflow:      https://detect.roboflow.com   (NOT serverless.roboflow.com)
 Gemini:        https://aistudio.google.com
-OpenRouter:    https://openrouter.ai
 ```
 
 ---

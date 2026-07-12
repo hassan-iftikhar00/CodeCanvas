@@ -9,8 +9,8 @@ This README is the single source of truth for local setup.
 - Frontend: Next.js 16 + React 19 + TypeScript
 - Auth/data/storage: Supabase
 - Optional AI services:
-  - FastAPI service for sketch detection (`backend/main.py`)
-  - OpenRouter API key for chat-based code refinement
+  - FastAPI service for sketch detection + code generation (`backend/main.py`)
+  - Gemini API keys for code generation (paid first key + free-key rotation pool)
 
 ## Prerequisites
 
@@ -47,15 +47,12 @@ Create a file named `.env.local` in the project root.
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 
-# Optional but recommended (for OpenRouter request headers)
+# Optional but recommended
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 # Optional: sketch detection backend endpoint
 # If omitted, app defaults to http://localhost:8000/api/predict
 FASTAPI_URL=http://localhost:8000/api/predict
-
-# Optional: enables chat code refinement via OpenRouter
-OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxx
 ```
 
 If you plan to run the Python backend, create `backend/.env`:
@@ -141,7 +138,7 @@ pnpm start
   - Supabase project (auth + PostgreSQL + storage)
 - Optional:
   - FastAPI backend at `FASTAPI_URL`
-  - OpenRouter key for chat refinement (`OPENROUTER_API_KEY`)
+  - Gemini API keys in `backend/.env` for code generation (`GEMINI_API_KEY` + `_2..10`)
 
 ## 7. Common Commands
 
@@ -164,7 +161,7 @@ After setup, verify:
 3. Dashboard and canvas pages load
 4. Project create/save works
 5. If backend is running, sketch detection requests reach FastAPI
-6. If OpenRouter key is set, chat refinement works
+6. If Gemini keys are set, code generation returns real code
 
 ## Additional Docs
 

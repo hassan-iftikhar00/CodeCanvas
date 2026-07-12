@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { T_CANVAS } from "./canvasTokens";
 import {
   buildReactDocument,
@@ -85,6 +85,15 @@ export default function LivePreview({
     width: 800,
     height: 600,
   });
+  // The annotation overlay's SVG coordinate space (viewBox) MUST equal the
+  // iframe's real CSS-pixel box, or drawn strokes land off the cursor. Driving
+  // the viewBox from the `containerSize` STATE was fragile: the SVG renders at
+  // the live DOM height (h-full) while the viewBox trailed the observed state
+  // during panel resize / split / zoom, giving a proportional Y offset (lines
+  // above the cursor, worse the smaller the preview). Measure the iframe's own
+  // clientWidth/clientHeight instead — same value when fresh, correct when the
+  // state lags, and identical for fit AND device modes.
+  const [overlaySize, setOverlaySize] = useState({ width: 800, height: 600 });
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
   const [showConsole, setShowConsole] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -348,6 +357,29 @@ export default function LivePreview({
     device === "desktop"
       ? Math.max(dimensions.height, Math.round(availHeight / scale))
       : dimensions.height;
+
+  // Keep the overlay coordinate box locked to the iframe's live CSS size. Runs
+  // after every layout-affecting change (device/scale/zoom/panel resize) so the
+  // annotation viewBox never trails the rendered iframe. clientWidth/Height
+  // report the CSS box (unaffected by the parent's scale transform), which is
+  // exactly the pixel space the stroke points live in.
+  useLayoutEffect(() => {
+    const el = iframeRef.current;
+    if (!el) return;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    if (w > 0 && h > 0) setOverlaySize({ width: w, height: h });
+  }, [
+    device,
+    orientation,
+    manualZoom,
+    scale,
+    dimensions.width,
+    dimensions.height,
+    frameHeight,
+    containerSize.width,
+    containerSize.height,
+  ]);
 
   const selectDevice = (next: DeviceType) => {
     setDevice(next);
@@ -844,10 +876,7 @@ export default function LivePreview({
                 transformOrigin: "top left",
               }}
             />
-            {annotationOverlay(
-              containerSize.width / scale,
-              containerSize.height / scale
-            )}
+            {annotationOverlay(overlaySize.width, overlaySize.height)}
           </div>
         ) : (
           /* Device-frame mode. The flex wrapper + margin:auto centers the frame
@@ -890,7 +919,7 @@ export default function LivePreview({
                     height: frameHeight,
                   }}
                 />
-                {annotationOverlay(dimensions.width, frameHeight)}
+                {annotationOverlay(overlaySize.width, overlaySize.height)}
               </div>
             </div>
           </div>

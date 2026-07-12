@@ -160,8 +160,8 @@ These are real failure patterns seen in production or testing.
 
 1. Hand-drawn sketch -> real code (not Figma/design tool)
 2. Custom trained AI model (Shahwaiz's Roboflow model)
-3. AI chat refinement built in (OpenRouter)
-4. Multiple framework output (React + HTML)
+3. Self-verifying generation (fidelity re-detection + auto-repair loop)
+4. Multiple framework output (React / HTML / Vue)
 5. Version history of generated code
 
 ---
@@ -171,7 +171,7 @@ These are real failure patterns seen in production or testing.
 1. Read CLAUDE.md first for context
 2. Do NOT suggest reassigning work to Hassan unless it's integration/review
 3. Do NOT change canvas editor core — it is complete
-4. Do NOT change OpenRouter chat refinement — it is working
+4. Chat refinement runs on the Gemini key pool (same paid-first-key + GEMINI_API_KEY_2..10 rotation as code generation); OpenRouter fully removed
 5. Always keep existing endpoint shapes (no frontend contract changes)
 6. Prefer React + Tailwind in code suggestions
 7. Keep DB column names canonical: title, thumbnail_url, iterations

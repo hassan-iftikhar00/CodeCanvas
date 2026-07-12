@@ -16,7 +16,7 @@
 | `src/components/canvas/FloatingToolbar.tsx` | Tool picker (select/pen/shapes/erase) w/ shortcuts |
 | `src/components/canvas/StyleRibbon.tsx` | Stroke / fill / width / opacity controls |
 | `src/components/canvas/ZoomPill.tsx` | Zoom presets + fit-to-screen |
-| `src/components/canvas/ChatInterface.tsx` | OpenRouter chat refinement panel |
+| `src/components/canvas/ChatInterface.tsx` | Chat refinement panel (backend path migrating to Gemini key pool) |
 | `src/components/canvas/LivePreview.tsx` | Code → live preview iframe |
 | `src/types/canvas.ts` | Canonical `Tool`, `Mode`, zoom constants, `TOOL_KEY_MAP` |
 | `src/hooks/useCanvasShortcuts.ts` | Keyboard shortcut handler for canvas page |
@@ -47,7 +47,7 @@
 
 | File | Purpose |
 |------|---------|
-| `src/app/api/generate-code/route.ts` | Proxy to FastAPI; OpenRouter routing |
+| `src/app/api/generate-code/route.ts` | Proxy to FastAPI (generation + chat routing) |
 | `src/app/api/account/delete/route.ts` | Delete current user (auth.users) via service-role admin client |
 | `src/hooks/useProjectSave.ts` | Project CRUD (canonical schema) |
 | `src/hooks/useVersionHistory.ts` | Iterations table queries |

@@ -8,8 +8,6 @@ import math
 import os
 import re
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -51,13 +49,6 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 load_dotenv(BASE_DIR.parent / ".env.local", override=False)
 
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-FREE_MODELS = [
-    "openai/gpt-oss-120b:free",
-    "deepseek/deepseek-r1-0528:free",
-    "openai/gpt-oss-20b:free",
-]
-
 _MAX_BODY_BYTES = 20 * 1024 * 1024  # 20 MB
 
 # Gemini code-gen ceiling. When the Pro key is on its daily-quota cooldown, every
@@ -76,7 +67,7 @@ def _env_flag(name: str, default: bool) -> bool:
 
 
 # Rate limiting for /api/predict (B7). The endpoint is expensive (Roboflow +
-# Gemini, or OpenRouter for chat) and would otherwise let a single user burn the
+# Gemini for generation, Gemini for chat refinement) and would otherwise let a single user burn the
 # shared API quota — especially relevant while Roboflow is credit-capped. Keyed
 # on the authenticated user id the proxy stamps in (see _rate_limit_key). Defaults
 # allow normal interactive use; override per-deploy via env. Set
@@ -431,117 +422,33 @@ def create_supabase_client():
     return _get_supabase_client()
 
 
-def call_openrouter(
-    api_key: str,
-    model: str,
-    system_prompt: str,
-    user_content: str,
-) -> tuple[int, str]:
-    payload = json.dumps(
-        {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-            "temperature": 0.3,
-            "max_tokens": 4096,
-        }
-    ).encode("utf-8")
-
-    request = urllib.request.Request(
-        OPENROUTER_API_URL,
-        data=payload,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": os.getenv(
-                "NEXT_PUBLIC_SITE_URL", "http://localhost:3000"
-            ),
-            "X-Title": "CodeCanvas",
-        },
-    )
-
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return response.getcode(), response.read().decode("utf-8")
-    except urllib.error.HTTPError as error:
-        return error.code, error.read().decode("utf-8")
-
-
-async def refine_chat_with_openrouter(
+def build_chat_refine_prompt(
     user_message: str,
     current_code: str,
-) -> Dict[str, Any]:
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY is not set")
+    framework: str,
+) -> str:
+    """Full prompt for a chat-driven code refinement.
 
-    system_prompt = (
-        "You are CodeCanvas AI - a code-refinement assistant.\n"
+    Sent to Gemini via ``generate_with_gemini(prompt_override=...)``, which reuses
+    the same key-rotation / cooldown / model-fallback pool as code generation
+    (paid first key + GEMINI_API_KEY_2..10). No separate refinement key exists.
+    """
+    fw = (framework or "react").strip().lower()
+    return (
+        "You are CodeCanvas AI, a code-refinement assistant.\n"
         "You receive the user's CURRENT CODE and an INSTRUCTION describing what to change.\n"
-        "Return ONLY the complete, updated code - no explanations, no markdown fences, no commentary.\n"
+        "Return ONLY the complete, updated code. No explanations, no markdown fences, no commentary.\n"
         "Rules:\n"
         "- Preserve the overall structure unless the instruction says otherwise.\n"
         "- Use Tailwind CSS classes for styling changes.\n"
-        "- Keep the code valid HTML / JSX.\n"
-        "- If the instruction is unclear, make a reasonable best-effort change."
-    )
-    user_content = (
+        f"- Keep the code valid for the {fw} framework.\n"
+        "- Preserve every existing data-cc-id attribute so element/code linking keeps working.\n"
+        "- If the instruction is unclear, make a reasonable best-effort change.\n\n"
         "CURRENT CODE:\n```\n"
         f"{current_code}\n"
         "```\n\n"
         f"INSTRUCTION: {user_message}"
     )
-
-    last_error = ""
-
-    for model in FREE_MODELS:
-        for attempt in range(2):
-            try:
-                status, body = call_openrouter(
-                    api_key,
-                    model,
-                    system_prompt,
-                    user_content,
-                )
-
-                if 200 <= status < 300:
-                    try:
-                        data = json.loads(body or "{}")
-                    except json.JSONDecodeError:
-                        last_error = f"{model}: invalid JSON response"
-                        break
-
-                    refined = (
-                        data.get("choices", [{}])[0]
-                        .get("message", {})
-                        .get("content", current_code)
-                        .strip()
-                    )
-                    refined = re.sub(r"^```[\w]*\n?", "", refined)
-                    refined = re.sub(r"\n?```$", "", refined).strip()
-
-                    used_model = model.split("/")[-1].replace(":free", "")
-                    return {
-                        "code": refined,
-                        "message": f"Code updated (via {used_model}).",
-                    }
-
-                last_error = f"{model}: {status} {body}"
-                print(f"OpenRouter [{model}] attempt {attempt + 1}: {status}")
-
-                if status == 429 and attempt == 0:
-                    await asyncio.sleep(2)
-                    continue
-
-                break
-            except Exception as fetch_error:
-                last_error = f"{model}: {fetch_error}"
-                break
-
-    raise RuntimeError(f"All free models failed. Last: {last_error}")
 
 
 def persist_generation_result(
@@ -1615,17 +1522,47 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
                 )
 
             last_message = request.messages[-1].content
+            chat_prompt = build_chat_refine_prompt(
+                last_message,
+                request.currentCode,
+                request.framework,
+            )
+            used_fallback = False
             try:
-                result = await refine_chat_with_openrouter(
-                    last_message,
-                    request.currentCode,
+                refined = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        generate_with_gemini,
+                        [],
+                        request.framework,
+                        request.styling,
+                        None,
+                        prompt_override=chat_prompt,
+                    ),
+                    timeout=GEMINI_TIMEOUT_SECONDS,
                 )
-            except Exception as error:
-                print(f"OpenRouter chat error: {error}")
+                refined = re.sub(r"^```[\w]*\n?", "", refined.strip())
+                refined = re.sub(r"\n?```$", "", refined).strip()
+                if not refined:
+                    raise RuntimeError("Gemini returned empty code")
                 result = {
-                    "code": request.currentCode + f"\n\n<!-- Refinement: {last_message} -->",
+                    "code": refined,
+                    "message": "Code updated.",
+                }
+            except (GeminiRateLimited, GeminiQuotaExhausted) as error:
+                print(f"Gemini chat unavailable: {error}")
+                used_fallback = True
+                result = {
+                    "code": request.currentCode
+                    + f"\n\n<!-- Refinement: {last_message} -->",
+                    "message": "AI service is busy right now - added your request as a comment. Try again shortly.",
+                }
+            except Exception as error:
+                print(f"Gemini chat error: {error}")
+                used_fallback = True
+                result = {
+                    "code": request.currentCode
+                    + f"\n\n<!-- Refinement: {last_message} -->",
                     "message": "AI service temporarily unavailable - added your request as a comment.",
-                    "usedFallback": True,
                 }
 
             iteration_id = persist_generation_result(
@@ -1642,7 +1579,7 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
                 detectedElements=[],
                 message=result["message"],
                 iteration_id=iteration_id,
-                usedFallback=result.get("usedFallback"),
+                usedFallback=used_fallback or None,
             )
 
         if not request.canvasData:

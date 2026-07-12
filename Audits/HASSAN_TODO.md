@@ -376,7 +376,7 @@ HOTFIXES (bugs fixed outside original P0/P1 list)
 
 VERIFY BEFORE DEMO (confirm working, not broken by other changes)
 [ ] Detection pipeline works end-to-end with real sketch image
-[ ] Chat refinement (OpenRouter) returns meaningful output
+[ ] Chat refinement returns meaningful output (backend path migrating to Gemini key pool — currently a no-op stub)
 [ ] Project save/load roundtrip works (canvas_data persists correctly)
 [ ] Version history creates a new iteration on each generation run
 [ ] Onboarding tour completes without JS errors
@@ -453,13 +453,6 @@ for key in API_KEYS:
 - If live generation fails, show the cached result — audience sees identical output
 - No infrastructure needed. Can be done the night before.
 - Only works if your demo sketch is fixed.
-
-### Option D — Research: OpenRouter as Generation Fallback
-- Currently OpenRouter is used only for chat refinement
-- Could be wired as a code generation fallback when both Gemini models fail
-- OpenRouter free tier has different quota limits — could complement Gemini
-- **Warning:** This breaks architectural decision #2 in CLAUDE_CONTEXT.md. Needs explicit sign-off before implementing.
-- Files: `backend/app/models/inference.py` (`generate_with_gemini` return path), `backend/main.py` (`resolve_external_model_output`)
 
 **Recommendation:** Do Option A (paid tier) + Option C (pre-warm cache) as belt-and-suspenders. Total cost for a presentation is under $0.10. Option B is a good fallback if billing isn't available.
 

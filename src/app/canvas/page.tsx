@@ -1335,7 +1335,7 @@ function CanvasPageInner() {
       return "Please draw a sketch and generate code first. I can only refine existing code.";
     }
     // The screen this refinement belongs to. The user can switch tabs while
-    // the OpenRouter call runs; the result must land on THIS screen.
+    // the Gemini refinement call runs; the result must land on THIS screen.
     const originScreenId = screensRef.current.activeScreenId;
 
     setIsGenerating(true);
