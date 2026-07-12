@@ -89,7 +89,7 @@ export default function PublicPreviewPage() {
 
   return (
     <div
-      className="flex h-screen flex-col"
+      className="flex h-dvh flex-col"
       style={{
         background: T_CANVAS.paper,
         fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -100,10 +100,10 @@ export default function PublicPreviewPage() {
         className="flex h-11 shrink-0 items-center justify-between border-b px-4"
         style={{ borderColor: T_CANVAS.rule, background: T_CANVAS.vellum }}
       >
-        <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <CanvasMark size={18} color={T_CANVAS.graphite} />
           <span
-            className="truncate text-[11px] tracking-[0.14em] uppercase"
+            className="min-w-0 truncate text-[11px] tracking-[0.14em] uppercase"
             style={{ color: T_CANVAS.graphite }}
           >
             {state === "ready" ? project?.title : "Shared preview"}

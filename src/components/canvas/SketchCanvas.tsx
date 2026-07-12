@@ -18,7 +18,6 @@ import {
   Transformer,
   Arrow,
   Ellipse,
-  RegularPolygon,
 } from "react-konva";
 import type Konva from "konva";
 import TextInputModal from "./TextInputModal";
@@ -205,9 +204,9 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       height: 600,
     });
     const containerRef = useRef<HTMLDivElement>(null);
-    const [isDrawing, setIsDrawing] = useState(false);
+    const [, setIsDrawing] = useState(false);
     const [currentShape, setCurrentShape] = useState<ShapeData | null>(null);
-    const [isPanning, setIsPanning] = useState(false);
+    const [, setIsPanning] = useState(false);
     const [spacePressed, setSpacePressed] = useState(false);
     const stageRef = useRef<Konva.Stage>(null);
 
@@ -262,7 +261,6 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(
       null
     );
-    const [isTransforming, setIsTransforming] = useState(false);
     const transformerRef = useRef<Konva.Transformer>(null);
     const selectedShapeRef = useRef<Konva.Shape | Konva.Group | null>(null);
     const gridGroupRef = useRef<Konva.Group>(null);
@@ -500,11 +498,12 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       };
       updateSize();
       const ro = new ResizeObserver(updateSize);
-      if (containerRef.current) {
-        ro.observe(containerRef.current);
+      const container = containerRef.current;
+      if (container) {
+        ro.observe(container);
       }
       return () => {
-        if (containerRef.current) ro.unobserve(containerRef.current);
+        if (container) ro.unobserve(container);
         ro.disconnect();
       };
     }, [zoom]);
@@ -1918,251 +1917,261 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
                 the layer (see the z-index effect) so standalone shapes/lines
                 drawn on top of a template stay selectable. */}
             <Group ref={templatesGroupRef}>
-            {componentGroups.map((group) => {
-              const isGroupSelected =
-                selectedGroupId === group.id && tool === "select";
-              const isInEditMode =
-                editingGroupId === group.id && tool === "select";
+              {componentGroups.map((group) => {
+                const isGroupSelected =
+                  selectedGroupId === group.id && tool === "select";
+                const isInEditMode =
+                  editingGroupId === group.id && tool === "select";
 
-              // Helper to handle individual shape drag within group
-              const handleGroupShapeDrag = (
-                shapeId: string,
-                newX: number,
-                newY: number
-              ) => {
-                setComponentGroups((prev) =>
-                  prev.map((g) => {
-                    if (g.id === group.id) {
-                      return {
-                        ...g,
-                        shapes: g.shapes.map((s) =>
-                          s.id === shapeId ? { ...s, x: newX, y: newY } : s
-                        ),
-                      };
-                    }
-                    return g;
-                  })
-                );
-              };
+                // Helper to handle individual shape drag within group
+                const handleGroupShapeDrag = (
+                  shapeId: string,
+                  newX: number,
+                  newY: number
+                ) => {
+                  setComponentGroups((prev) =>
+                    prev.map((g) => {
+                      if (g.id === group.id) {
+                        return {
+                          ...g,
+                          shapes: g.shapes.map((s) =>
+                            s.id === shapeId ? { ...s, x: newX, y: newY } : s
+                          ),
+                        };
+                      }
+                      return g;
+                    })
+                  );
+                };
 
-              return (
-                <Group
-                  key={group.id}
-                  x={group.x}
-                  y={group.y}
-                  draggable={tool === "select" && !isInEditMode}
-                  onClick={(e) => {
-                    if (tool === "select" && !isInEditMode) {
-                      e.cancelBubble = true;
-                      setSelectedGroupId(group.id);
-                      setSelectedShapeId(null);
-                      setSelectedLineIndex(null);
-                    }
-                  }}
-                  onDblClick={(e) => {
-                    if (tool === "select") {
-                      e.cancelBubble = true;
-                      // Enter edit mode on double-click
-                      setEditingGroupId(group.id);
-                      setSelectedGroupId(group.id);
-                      setSelectedGroupShapeId(null);
-                    }
-                  }}
-                  onDragEnd={(e) => {
-                    if (!isInEditMode) {
-                      const newX = e.target.x();
-                      const newY = e.target.y();
-                      setComponentGroups((prev) =>
-                        prev.map((g) =>
-                          g.id === group.id ? { ...g, x: newX, y: newY } : g
-                        )
-                      );
-                    }
-                  }}
-                >
-                  {/* Selection highlight border */}
-                  {isGroupSelected &&
-                    (() => {
-                      // Calculate group bounds
-                      let maxWidth = 0,
-                        maxHeight = 0;
-                      group.shapes.forEach((s) => {
-                        const right = (s.x || 0) + (s.width || 100);
-                        const bottom = (s.y || 0) + (s.height || 40);
-                        maxWidth = Math.max(maxWidth, right);
-                        maxHeight = Math.max(maxHeight, bottom);
-                      });
-                      return (
-                        <Rect
-                          x={-4}
-                          y={-4}
-                          width={maxWidth + 8}
-                          height={maxHeight + 8}
-                          stroke={isInEditMode ? T.cobaltInk : T.cobalt}
-                          strokeWidth={2}
-                          dash={isInEditMode ? undefined : [5, 5]}
-                          fill="transparent"
-                          listening={false}
-                        />
-                      );
-                    })()}
+                return (
+                  <Group
+                    key={group.id}
+                    x={group.x}
+                    y={group.y}
+                    draggable={tool === "select" && !isInEditMode}
+                    onClick={(e) => {
+                      if (tool === "select" && !isInEditMode) {
+                        e.cancelBubble = true;
+                        setSelectedGroupId(group.id);
+                        setSelectedShapeId(null);
+                        setSelectedLineIndex(null);
+                      }
+                    }}
+                    onDblClick={(e) => {
+                      if (tool === "select") {
+                        e.cancelBubble = true;
+                        // Enter edit mode on double-click
+                        setEditingGroupId(group.id);
+                        setSelectedGroupId(group.id);
+                        setSelectedGroupShapeId(null);
+                      }
+                    }}
+                    onDragEnd={(e) => {
+                      if (!isInEditMode) {
+                        const newX = e.target.x();
+                        const newY = e.target.y();
+                        setComponentGroups((prev) =>
+                          prev.map((g) =>
+                            g.id === group.id ? { ...g, x: newX, y: newY } : g
+                          )
+                        );
+                      }
+                    }}
+                  >
+                    {/* Selection highlight border */}
+                    {isGroupSelected &&
+                      (() => {
+                        // Calculate group bounds
+                        let maxWidth = 0,
+                          maxHeight = 0;
+                        group.shapes.forEach((s) => {
+                          const right = (s.x || 0) + (s.width || 100);
+                          const bottom = (s.y || 0) + (s.height || 40);
+                          maxWidth = Math.max(maxWidth, right);
+                          maxHeight = Math.max(maxHeight, bottom);
+                        });
+                        return (
+                          <Rect
+                            x={-4}
+                            y={-4}
+                            width={maxWidth + 8}
+                            height={maxHeight + 8}
+                            stroke={isInEditMode ? T.cobaltInk : T.cobalt}
+                            strokeWidth={2}
+                            dash={isInEditMode ? undefined : [5, 5]}
+                            fill="transparent"
+                            listening={false}
+                          />
+                        );
+                      })()}
 
-                  {/* Edit mode indicator */}
-                  {isInEditMode && (
-                    <KonvaText
-                      x={0}
-                      y={-24}
-                      text="Edit Mode (Esc to exit)"
-                      fontSize={12}
-                      fontFamily="Inter, sans-serif"
-                      fill={T.cobalt}
-                      listening={false}
-                    />
-                  )}
-
-                  {/* Render shapes within the group */}
-                  {group.shapes.map((shape, shapeIndex) => {
-                    const isShapeSelected =
-                      selectedGroupShapeId === shape.id && isInEditMode;
-
-                    // Common props for draggable shapes in edit mode
-                    const editModeProps = isInEditMode
-                      ? {
-                          draggable: true,
-                          onClick: (e: Konva.KonvaEventObject<MouseEvent>) => {
-                            e.cancelBubble = true;
-                            setSelectedGroupShapeId(shape.id);
-                          },
-                          onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
-                            const node = e.target;
-                            handleGroupShapeDrag(shape.id, node.x(), node.y());
-                          },
-                        }
-                      : {};
-
-                    // Selection highlight for individual shape
-                    const shapeHighlight = isShapeSelected ? (
-                      <Rect
-                        key={`highlight-${shape.id}`}
-                        x={(shape.x || 0) - 3}
-                        y={(shape.y || 0) - 3}
-                        width={(shape.width || 100) + 6}
-                        height={(shape.height || 40) + 6}
-                        stroke={T.cobalt}
-                        strokeWidth={2}
-                        fill="transparent"
+                    {/* Edit mode indicator */}
+                    {isInEditMode && (
+                      <KonvaText
+                        x={0}
+                        y={-24}
+                        text="Edit Mode (Esc to exit)"
+                        fontSize={12}
+                        fontFamily="Inter, sans-serif"
+                        fill={T.cobalt}
                         listening={false}
                       />
-                    ) : null;
+                    )}
 
-                    if (shape.type === "rectangle") {
-                      return (
-                        <React.Fragment key={shape.id || shapeIndex}>
-                          {shapeHighlight}
-                          <Rect
-                            x={shape.x}
-                            y={shape.y}
-                            width={shape.width}
-                            height={shape.height}
-                            stroke={shape.stroke || "#000000"}
-                            strokeWidth={shape.strokeWidth || 2}
-                            fill={shape.fill || "transparent"}
-                            cornerRadius={shape.cornerRadius || 5}
-                            {...editModeProps}
-                          />
-                        </React.Fragment>
-                      );
-                    } else if (shape.type === "text") {
-                      const textHighlight = isShapeSelected ? (
+                    {/* Render shapes within the group */}
+                    {group.shapes.map((shape, shapeIndex) => {
+                      const isShapeSelected =
+                        selectedGroupShapeId === shape.id && isInEditMode;
+
+                      // Common props for draggable shapes in edit mode
+                      const editModeProps = isInEditMode
+                        ? {
+                            draggable: true,
+                            onClick: (
+                              e: Konva.KonvaEventObject<MouseEvent>
+                            ) => {
+                              e.cancelBubble = true;
+                              setSelectedGroupShapeId(shape.id);
+                            },
+                            onDragEnd: (
+                              e: Konva.KonvaEventObject<DragEvent>
+                            ) => {
+                              const node = e.target;
+                              handleGroupShapeDrag(
+                                shape.id,
+                                node.x(),
+                                node.y()
+                              );
+                            },
+                          }
+                        : {};
+
+                      // Selection highlight for individual shape
+                      const shapeHighlight = isShapeSelected ? (
                         <Rect
                           key={`highlight-${shape.id}`}
                           x={(shape.x || 0) - 3}
                           y={(shape.y || 0) - 3}
-                          width={100}
-                          height={(shape.fontSize || 16) + 6}
+                          width={(shape.width || 100) + 6}
+                          height={(shape.height || 40) + 6}
                           stroke={T.cobalt}
                           strokeWidth={2}
                           fill="transparent"
                           listening={false}
                         />
                       ) : null;
-                      return (
-                        <React.Fragment key={shape.id || shapeIndex}>
-                          {textHighlight}
-                          <KonvaText
-                            x={shape.x}
-                            y={shape.y}
-                            text={shape.text || "Text"}
-                            fontSize={shape.fontSize || 16}
-                            fontFamily={shape.fontFamily || "Inter, sans-serif"}
-                            fill={shape.stroke || shape.fill || "#000000"}
-                            {...editModeProps}
+
+                      if (shape.type === "rectangle") {
+                        return (
+                          <React.Fragment key={shape.id || shapeIndex}>
+                            {shapeHighlight}
+                            <Rect
+                              x={shape.x}
+                              y={shape.y}
+                              width={shape.width}
+                              height={shape.height}
+                              stroke={shape.stroke || "#000000"}
+                              strokeWidth={shape.strokeWidth || 2}
+                              fill={shape.fill || "transparent"}
+                              cornerRadius={shape.cornerRadius || 5}
+                              {...editModeProps}
+                            />
+                          </React.Fragment>
+                        );
+                      } else if (shape.type === "text") {
+                        const textHighlight = isShapeSelected ? (
+                          <Rect
+                            key={`highlight-${shape.id}`}
+                            x={(shape.x || 0) - 3}
+                            y={(shape.y || 0) - 3}
+                            width={100}
+                            height={(shape.fontSize || 16) + 6}
+                            stroke={T.cobalt}
+                            strokeWidth={2}
+                            fill="transparent"
+                            listening={false}
                           />
-                        </React.Fragment>
-                      );
-                    } else if (shape.type === "circle") {
-                      const circleHighlight = isShapeSelected ? (
-                        <Rect
-                          key={`highlight-${shape.id}`}
-                          x={(shape.x || 0) - (shape.radius || 0) - 3}
-                          y={(shape.y || 0) - (shape.radius || 0) - 3}
-                          width={(shape.radius || 0) * 2 + 6}
-                          height={(shape.radius || 0) * 2 + 6}
-                          stroke={T.cobalt}
-                          strokeWidth={2}
-                          fill="transparent"
-                          listening={false}
-                        />
-                      ) : null;
-                      return (
-                        <React.Fragment key={shape.id || shapeIndex}>
-                          {circleHighlight}
-                          <Circle
-                            x={shape.x}
-                            y={shape.y}
-                            radius={shape.radius}
-                            stroke={shape.stroke || "#000000"}
-                            strokeWidth={shape.strokeWidth || 2}
-                            fill={shape.fill || "transparent"}
-                            {...editModeProps}
+                        ) : null;
+                        return (
+                          <React.Fragment key={shape.id || shapeIndex}>
+                            {textHighlight}
+                            <KonvaText
+                              x={shape.x}
+                              y={shape.y}
+                              text={shape.text || "Text"}
+                              fontSize={shape.fontSize || 16}
+                              fontFamily={
+                                shape.fontFamily || "Inter, sans-serif"
+                              }
+                              fill={shape.stroke || shape.fill || "#000000"}
+                              {...editModeProps}
+                            />
+                          </React.Fragment>
+                        );
+                      } else if (shape.type === "circle") {
+                        const circleHighlight = isShapeSelected ? (
+                          <Rect
+                            key={`highlight-${shape.id}`}
+                            x={(shape.x || 0) - (shape.radius || 0) - 3}
+                            y={(shape.y || 0) - (shape.radius || 0) - 3}
+                            width={(shape.radius || 0) * 2 + 6}
+                            height={(shape.radius || 0) * 2 + 6}
+                            stroke={T.cobalt}
+                            strokeWidth={2}
+                            fill="transparent"
+                            listening={false}
                           />
-                        </React.Fragment>
-                      );
-                    } else if (shape.type === "ellipse") {
-                      const ellipseHighlight = isShapeSelected ? (
-                        <Rect
-                          key={`highlight-${shape.id}`}
-                          x={(shape.x || 0) - (shape.radiusX || 0) - 3}
-                          y={(shape.y || 0) - (shape.radiusY || 0) - 3}
-                          width={(shape.radiusX || 0) * 2 + 6}
-                          height={(shape.radiusY || 0) * 2 + 6}
-                          stroke={T.cobalt}
-                          strokeWidth={2}
-                          fill="transparent"
-                          listening={false}
-                        />
-                      ) : null;
-                      return (
-                        <React.Fragment key={shape.id || shapeIndex}>
-                          {ellipseHighlight}
-                          <Ellipse
-                            x={shape.x}
-                            y={shape.y}
-                            radiusX={shape.radiusX || 0}
-                            radiusY={shape.radiusY || 0}
-                            stroke={shape.stroke || "#000000"}
-                            strokeWidth={shape.strokeWidth || 2}
-                            fill={shape.fill || "transparent"}
-                            {...editModeProps}
+                        ) : null;
+                        return (
+                          <React.Fragment key={shape.id || shapeIndex}>
+                            {circleHighlight}
+                            <Circle
+                              x={shape.x}
+                              y={shape.y}
+                              radius={shape.radius}
+                              stroke={shape.stroke || "#000000"}
+                              strokeWidth={shape.strokeWidth || 2}
+                              fill={shape.fill || "transparent"}
+                              {...editModeProps}
+                            />
+                          </React.Fragment>
+                        );
+                      } else if (shape.type === "ellipse") {
+                        const ellipseHighlight = isShapeSelected ? (
+                          <Rect
+                            key={`highlight-${shape.id}`}
+                            x={(shape.x || 0) - (shape.radiusX || 0) - 3}
+                            y={(shape.y || 0) - (shape.radiusY || 0) - 3}
+                            width={(shape.radiusX || 0) * 2 + 6}
+                            height={(shape.radiusY || 0) * 2 + 6}
+                            stroke={T.cobalt}
+                            strokeWidth={2}
+                            fill="transparent"
+                            listening={false}
                           />
-                        </React.Fragment>
-                      );
-                    }
-                    return null;
-                  })}
-                </Group>
-              );
-            })}
+                        ) : null;
+                        return (
+                          <React.Fragment key={shape.id || shapeIndex}>
+                            {ellipseHighlight}
+                            <Ellipse
+                              x={shape.x}
+                              y={shape.y}
+                              radiusX={shape.radiusX || 0}
+                              radiusY={shape.radiusY || 0}
+                              stroke={shape.stroke || "#000000"}
+                              strokeWidth={shape.strokeWidth || 2}
+                              fill={shape.fill || "transparent"}
+                              {...editModeProps}
+                            />
+                          </React.Fragment>
+                        );
+                      }
+                      return null;
+                    })}
+                  </Group>
+                );
+              })}
             </Group>
 
             {/* Transformer for selected shapes */}

@@ -128,6 +128,35 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ========== RESPONSIVE OVERFLOW GUARDS ========== */
+/* Phase 1 (Audits/RESPONSIVE_ZERO_BUG_PLAN.md): prevent any element from
+   forcing horizontal page scroll on small viewports. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Non-Konva canvases (charts, thumbnails, etc.) also get capped. */
+canvas {
+  max-width: 100%;
+}
+
+/* The Konva drawing stage is EXCLUDED: react-konva sizes its <canvas> via
+   inline style tied to clampZoom's pointer-mapping math. Constraining it
+   here would shrink the rendered box while the stage's internal coordinate
+   system stays unchanged, desyncing drawing from the pointer. */
+.konvajs-content canvas {
+  max-width: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

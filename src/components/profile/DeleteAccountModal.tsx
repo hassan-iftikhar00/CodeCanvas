@@ -103,22 +103,19 @@ export function DeleteAccountModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-50"
-            style={{
-              background: "rgba(14, 14, 15, 0.55)",
-              backdropFilter: "blur(4px)",
-            }}
-            onClick={handleClose}
-            aria-hidden="true"
-          />
-
+        <motion.div
+          key="backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6"
+          style={{
+            background: "rgba(14, 14, 15, 0.55)",
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={handleClose}
+        >
           <motion.div
             key="dialog"
             ref={modalRef}
@@ -130,11 +127,12 @@ export function DeleteAccountModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 10 }}
             transition={{ duration: 0.18, ease: [0.22, 0.9, 0.28, 1] }}
-            className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2"
+            className="flex max-h-[85dvh] w-full max-w-md flex-col overflow-y-auto"
             style={{
               background: T.paper,
               border: `1px solid ${T.error}`,
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Title strip */}
             <div
@@ -152,7 +150,7 @@ export function DeleteAccountModal({
                 onClick={handleClose}
                 disabled={isDeleting}
                 aria-label="Close"
-                className="flex h-5 w-5 items-center justify-center transition-colors disabled:opacity-40"
+                className="relative flex h-5 w-5 items-center justify-center transition-colors before:absolute before:-inset-3 before:content-[''] disabled:opacity-40"
                 style={{ color: T.error }}
               >
                 <svg
@@ -435,7 +433,7 @@ export function DeleteAccountModal({
               </>
             )}
           </motion.div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
   );

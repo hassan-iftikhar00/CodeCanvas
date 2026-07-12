@@ -57,7 +57,7 @@ export default function DraftingModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.16 }}
-          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6"
           style={{
             background: `${T_CANVAS.graphite}8C`,
             backdropFilter: "blur(4px)",
@@ -72,7 +72,7 @@ export default function DraftingModal({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
-            className="w-full max-h-[90vh] flex flex-col"
+            className="flex max-h-[85dvh] w-full flex-col"
             style={{
               maxWidth,
               background: T_CANVAS.paper,
@@ -95,7 +95,7 @@ export default function DraftingModal({
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="flex h-5 w-5 items-center justify-center transition-colors"
+                className="relative flex h-5 w-5 items-center justify-center transition-colors before:absolute before:-inset-3 before:content-['']"
                 style={{ color: T_CANVAS.muted }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.color = T_CANVAS.graphite)

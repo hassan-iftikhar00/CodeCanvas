@@ -58,7 +58,7 @@ export default function ProfileSkeleton() {
       >
         <Strip slug="Personal information" />
         <div className="space-y-5 px-5 py-5">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col items-start gap-4 sm:flex-row">
             <div
               className="h-16 w-16 flex-none"
               style={{

@@ -508,7 +508,7 @@ export default function LivePreview({
       }}
     >
       <div
-        className="flex items-center justify-between border-b px-3 py-1.5"
+        className="flex flex-wrap items-center justify-between gap-y-1.5 border-b px-3 py-1.5"
         style={{ borderColor: T_CANVAS.rule, background: T_CANVAS.vellum }}
       >
         {/* DEVICE picker — Drafting Room mono tabs */}
@@ -577,7 +577,7 @@ export default function LivePreview({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {/* INSPECT — Element↔Code Linker toggle. Deliberately prominent
               (solid fill when active, cobalt accent when idle): it changes
               what clicking the preview does. */}
