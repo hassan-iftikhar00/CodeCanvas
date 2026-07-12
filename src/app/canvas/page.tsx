@@ -1169,6 +1169,25 @@ function CanvasPageInner() {
     [currentProject?.id, projectName, saveProject]
   );
 
+  // Mini-canvas imports never had a project row: autosave keys on
+  // currentProject.id (null here), so a design imported from the landing page
+  // and merely "continued"/"analyzed" without a manual save or a generation
+  // vanished the moment the user navigated back. Once the user COMMITS to
+  // keeping the imported strokes (Analyze design / Continue designing), create
+  // a draft row so autosave engages and the strokes are persisted immediately.
+  // "Start fresh" rejects the strokes and must NOT create a row.
+  const persistImportedDraft = useCallback(async () => {
+    if (currentProject?.id && !currentProject.id.startsWith("temp-")) return;
+    const canvasData = getPersistableCanvasData();
+    if (!canvasData) return;
+    const hasContent =
+      (canvasData.lines?.length ?? 0) > 0 ||
+      (canvasData.shapes?.length ?? 0) > 0 ||
+      (canvasData.componentGroups?.length ?? 0) > 0;
+    if (!hasContent) return;
+    await ensureGenerationProject(canvasData);
+  }, [currentProject?.id, getPersistableCanvasData, ensureGenerationProject]);
+
   // Ã¢â€â‚¬Ã¢â€â‚¬ Keyboard shortcuts Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   // Listen for the command-palette redirect — when a user picks "Keyboard
   // shortcuts" from Ctrl+K, the palette closes and asks us to open the
@@ -3724,7 +3743,10 @@ function CanvasPageInner() {
 
       <DraftingModal
         open={showWelcomeDialog}
-        onClose={() => setShowWelcomeDialog(false)}
+        onClose={() => {
+          setShowWelcomeDialog(false);
+          void persistImportedDraft();
+        }}
         slug="CANVAS · IMPORT"
         title="Design imported."
         subtitle="Your sketch from the mini canvas has been loaded. Choose how to proceed."
@@ -3735,6 +3757,7 @@ function CanvasPageInner() {
               variant="primary"
               onClick={() => {
                 setShowWelcomeDialog(false);
+                void persistImportedDraft();
                 setCurrentMode("detect");
               }}
             >
@@ -3743,7 +3766,10 @@ function CanvasPageInner() {
             <div className="flex gap-2">
               <ModalButton
                 variant="ghost"
-                onClick={() => setShowWelcomeDialog(false)}
+                onClick={() => {
+                  setShowWelcomeDialog(false);
+                  void persistImportedDraft();
+                }}
               >
                 Continue designing
               </ModalButton>
