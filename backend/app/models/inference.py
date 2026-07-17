@@ -87,8 +87,21 @@ _DEFAULT_NMS_IOU = 0.5
 # section.
 _MAX_CARD_AREA_RATIO = 0.85
 
-GEMINI_PRIMARY_MODEL = "gemini-2.5-pro"
-GEMINI_FALLBACK_MODEL = "gemini-2.5-flash"
+# Model ladder, best first. Env-overridable (comma-separated) so demo-day
+# swaps need no redeploy. Pro models left the free tier on 2026-04-01;
+# gemini-3.5-flash is the strongest free model (beats 2.5-pro on coding
+# benchmarks) and is multimodal, so the upload text-reading path keeps working.
+# Keep the default in sync with scripts/check_gemini_keys.py.
+_DEFAULT_GEMINI_MODELS = "gemini-3.5-flash,gemini-3-flash-preview,gemini-2.5-flash"
+
+
+def _parse_gemini_models() -> tuple:
+    raw = os.getenv("GEMINI_MODELS", _DEFAULT_GEMINI_MODELS)
+    models = tuple(m.strip() for m in raw.split(",") if m.strip())
+    return models or tuple(_DEFAULT_GEMINI_MODELS.split(","))
+
+
+GEMINI_PRIMARY_MODEL = _parse_gemini_models()[0]
 
 
 class ExternalModelElement(BaseModel):
@@ -1452,9 +1465,59 @@ def _build_gemini_prompt(
 # on the same key have independent quota pools. Pro hitting per_day does not
 # prevent Flash from serving on the same key, and the next request should skip
 # the known-exhausted Pro instead of paying ~2s to confirm it's still 429.
-_GEMINI_MODELS = (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL)
+_GEMINI_MODELS = _parse_gemini_models()
 _model_cooldowns: dict[tuple[int, str], float] = {}  # (key_index, model_name) → unix ts
 _key_last_used: dict[int, float] = {}                # key_index → last_success_at
+# Successful generations per (key_index, model_name) since the process started,
+# keyed by UTC date so /api/llm-status can show today's usage. Google exposes
+# no remaining-quota API, so this local count is the best available signal.
+_key_model_success_counts: dict[tuple[str, int, str], int] = {}  # (utc_date, key, model) → n
+
+
+def _record_model_success(key_index: int, model_name: str) -> None:
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    bucket = (day, key_index, model_name)
+    _key_model_success_counts[bucket] = _key_model_success_counts.get(bucket, 0) + 1
+    # Drop stale days so the dict never grows unbounded.
+    for k in [k for k in _key_model_success_counts if k[0] != day]:
+        del _key_model_success_counts[k]
+
+
+def _success_count_today(key_index: int, model_name: str) -> int:
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    return _key_model_success_counts.get((day, key_index, model_name), 0)
+
+
+def get_llm_pool_status() -> dict:
+    """Snapshot of the Gemini key pool for the /api/llm-status endpoint.
+
+    Keys are identified by slot index only — NEVER key material. Counts are
+    process-local (Google exposes no remaining-quota API); a model showing a
+    long cooldown_remaining_s (~hours) hit its per-day quota.
+    """
+    _key_re = re.compile(r"^GEMINI_API_KEY(_(\d+))?$")
+    _env_keys = sorted(
+        ((int(m.group(2)) if m.group(2) else 0), k)
+        for k, v in os.environ.items()
+        if (m := _key_re.match(k)) and v.strip()
+    )
+    keys = []
+    for key_index, (_, env_name) in enumerate(_env_keys):
+        models = {}
+        for model_name in _GEMINI_MODELS:
+            models[model_name] = {
+                "cooldown_remaining_s": _model_cooldown_remaining(key_index, model_name),
+                "success_count_today": _success_count_today(key_index, model_name),
+            }
+        keys.append(
+            {
+                "slot": key_index + 1,
+                "env": env_name,
+                "last_success_ts": _key_last_used.get(key_index),
+                "models": models,
+            }
+        )
+    return {"ladder": list(_GEMINI_MODELS), "keys": keys}
 
 
 def _is_model_cooled(key_index: int, model_name: str) -> bool:
@@ -1558,6 +1621,7 @@ def generate_with_gemini(
     brand_kit: Optional[Dict[str, str]] = None,
     screens: Optional[List[str]] = None,
     current_screen: Optional[str] = None,
+    force_model: Optional[str] = None,
 ) -> str:
     """Call Gemini to synthesize code from detected elements.
 
@@ -1570,6 +1634,10 @@ def generate_with_gemini(
     it is sent to Gemini alongside the text prompt so the model can READ the text
     baked into the pixels (the detector returns boxes but no text). The canvas
     path leaves it None, so the request stays text-only and byte-identical.
+
+    ``force_model`` (UI model-control panel) restricts the ladder to that single
+    model — key rotation still applies, but no model fallback. Unknown values
+    are ignored (full ladder) so a stale client can never brick generation.
 
     Routing:
       - Keys tried in deterministic order (sorted by env var suffix).
@@ -1603,9 +1671,26 @@ def generate_with_gemini(
 
     n = len(api_keys)
 
+    # ── Model scope: full ladder, or a single forced model (UI panel) ────────
+    # An unknown force_model falls back to the full ladder rather than failing —
+    # a stale localStorage value must never brick generation.
+    if force_model and force_model in _GEMINI_MODELS:
+        models_to_try: tuple = (force_model,)
+        print(f"[gemini] force_model={force_model} (ladder bypassed)")
+    else:
+        if force_model:
+            print(f"[gemini] force_model={force_model!r} not in ladder — using full ladder")
+        models_to_try = _GEMINI_MODELS
+
+    def _key_cooled_for_scope(i: int) -> bool:
+        return all(_is_model_cooled(i, m) for m in models_to_try)
+
+    def _scope_resume_ts() -> float:
+        return min(_model_cooldowns.get((i, m), 0.0) for i in range(n) for m in models_to_try)
+
     # ── Pre-flight: bail immediately if every (key, model) is cooling ────────
-    if all(_is_key_fully_cooled(i) for i in range(n)):
-        retry_after = max(1, int(_earliest_resume_ts(n) - time.time()))
+    if all(_key_cooled_for_scope(i) for i in range(n)):
+        retry_after = max(1, int(_scope_resume_ts() - time.time()))
         print(f"[gemini] all_keys_cooling retry_after={retry_after}s")
         raise GeminiRateLimited(
             f"All Gemini keys are temporarily rate limited. Retry in {retry_after}s."
@@ -1640,9 +1725,9 @@ def generate_with_gemini(
 
     for key_index, current_key in enumerate(api_keys):
 
-        if _is_key_fully_cooled(key_index):
+        if _key_cooled_for_scope(key_index):
             remaining = min(
-                _model_cooldown_remaining(key_index, m) for m in _GEMINI_MODELS
+                _model_cooldown_remaining(key_index, m) for m in models_to_try
             )
             print(
                 f"[gemini] key={key_index + 1} status=skipped"
@@ -1656,7 +1741,7 @@ def generate_with_gemini(
             print(f"[gemini] key={key_index + 1} status=configure_error error={exc!r}")
             continue
 
-        for model_name in _GEMINI_MODELS:
+        for model_name in models_to_try:
             if _is_model_cooled(key_index, model_name):
                 print(
                     f"[gemini] key={key_index + 1} model={model_name} status=skipped"
@@ -1682,6 +1767,7 @@ def generate_with_gemini(
                 text = getattr(response, "text", None)
                 if text:
                     _key_last_used[key_index] = time.time()
+                    _record_model_success(key_index, model_name)
                     print(
                         f"[gemini] key={key_index + 1} model={model_name}"
                         f" status=success chars={len(text)}"
@@ -1694,7 +1780,7 @@ def generate_with_gemini(
 
             except Exception as exc:
                 kind = _classify_gemini_429(exc)
-                trying_next = "yes" if model_name == GEMINI_PRIMARY_MODEL else "no"
+                trying_next = "yes" if model_name != models_to_try[-1] else "no"
 
                 if kind == "per_day":
                     _apply_model_cooldown(key_index, model_name, 86_400)
@@ -1723,12 +1809,12 @@ def generate_with_gemini(
                 )
 
         # Key became fully cooled during this iteration — log the routing decision.
-        if _is_key_fully_cooled(key_index):
+        if _key_cooled_for_scope(key_index):
             next_key = next(
-                (j + 1 for j in range(key_index + 1, n) if not _is_key_fully_cooled(j)),
+                (j + 1 for j in range(key_index + 1, n) if not _key_cooled_for_scope(j)),
                 None,
             )
-            available = sum(1 for j in range(n) if not _is_key_fully_cooled(j))
+            available = sum(1 for j in range(n) if not _key_cooled_for_scope(j))
             if next_key:
                 print(
                     f"[gemini] routing key={key_index + 1}->key={next_key}"
@@ -1738,8 +1824,8 @@ def generate_with_gemini(
                 print(f"[gemini] routing key={key_index + 1}->none available={available}")
 
     # ── Post-loop: all keys tried ─────────────────────────────────────────────
-    if all(_is_key_fully_cooled(i) for i in range(n)):
-        retry_after = max(1, int(_earliest_resume_ts(n) - time.time()))
+    if all(_key_cooled_for_scope(i) for i in range(n)):
+        retry_after = max(1, int(_scope_resume_ts() - time.time()))
         print(f"[gemini] all_keys_cooling retry_after={retry_after}s")
         raise GeminiRateLimited(
             f"All Gemini keys are temporarily rate limited. Retry in {retry_after}s."

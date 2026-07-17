@@ -35,6 +35,7 @@ from app.models.inference import (
     detect_with_roboflow,
     diff_detection_sets,
     generate_with_gemini,
+    get_llm_pool_status,
 )
 
 
@@ -124,6 +125,7 @@ def _generation_cache_key(
     brand_kit: Optional["BrandKit"] = None,
     screens: Optional[List[str]] = None,
     current_screen: Optional[str] = None,
+    force_model: Optional[str] = None,
 ) -> str:
     """Stable cache key for an AI generation request.
 
@@ -171,7 +173,11 @@ def _generation_cache_key(
     else:
         screen_hash = "noscr"
 
-    return f"{img_hash}|{fw}|{src}|{ann_hash}|{kit_hash}|{screen_hash}"
+    # Forced model changes which model answered — a SAVER-mode result must not
+    # serve a BEST-mode request (and vice versa).
+    model_part = (force_model or "auto").lower()
+
+    return f"{img_hash}|{fw}|{src}|{ann_hash}|{kit_hash}|{screen_hash}|{model_part}"
 
 
 class BodySizeLimitMiddleware(BaseHTTPMiddleware):
@@ -301,6 +307,9 @@ class GenerateCodeRequest(BaseModel):
     # unchanged.
     screens: Optional[List[str]] = None
     currentScreen: Optional[str] = None
+    # Model-control panel: restrict the Gemini ladder to this single model
+    # ("BEST"/"SAVER" modes). Absent/unknown = full ladder (AUTO).
+    forceModel: Optional[str] = None
 
 
 class DetectedElement(BaseModel):
@@ -375,6 +384,8 @@ class RepairRequest(BaseModel):
     extra: List[Dict[str, Any]] = Field(default_factory=list)
     width: int = Field(default=1000, gt=0, le=8000)
     height: int = Field(default=600, gt=0, le=8000)
+    # Same semantics as GenerateCodeRequest.forceModel.
+    forceModel: Optional[str] = None
 
 
 class RepairResponse(BaseModel):
@@ -403,6 +414,8 @@ class AnnotateRequest(BaseModel):
     region: Optional[Dict[str, Any]] = None
     width: float = Field(default=1000, gt=0, le=16000)
     height: float = Field(default=600, gt=0, le=64000)
+    # Same semantics as GenerateCodeRequest.forceModel.
+    forceModel: Optional[str] = None
 
 
 class AnnotateResponse(BaseModel):
@@ -1335,6 +1348,7 @@ async def _generate_from_output(
                 prompt_override=incremental_prompt,
                 screens=request.screens,
                 current_screen=request.currentScreen,
+                force_model=request.forceModel,
             ),
             timeout=GEMINI_TIMEOUT_SECONDS,
         )
@@ -1469,6 +1483,18 @@ async def health_check():
     }
 
 
+@app.get("/api/llm-status")
+async def llm_status():
+    """Gemini key-pool status for the frontend model-control panel.
+
+    Read-only snapshot: configured model ladder + per key×model cooldowns and
+    today's success counts. Key slots only — no key material ever leaves the
+    process. Counts are in-memory (reset on backend restart); Google has no
+    remaining-quota API, so a per-day cooldown is the "exhausted today" signal.
+    """
+    return get_llm_pool_status()
+
+
 @app.post("/api/predict", response_model=GenerateCodeResponse)
 async def predict(request: GenerateCodeRequest, http_request: Request):
     """
@@ -1547,6 +1573,7 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
                         request.styling,
                         None,
                         prompt_override=chat_prompt,
+                        force_model=request.forceModel,
                     ),
                     timeout=GEMINI_TIMEOUT_SECONDS,
                 )
@@ -1639,6 +1666,7 @@ async def predict(request: GenerateCodeRequest, http_request: Request):
                 request.brandKit,
                 request.screens,
                 request.currentScreen,
+                request.forceModel,
             )
             cached = generation_cache.get(cache_key)
             if cached is not None:
@@ -2104,6 +2132,7 @@ async def repair(request: RepairRequest, http_request: Request):
                 "tailwind",
                 None,
                 prompt_override=prompt,
+                force_model=request.forceModel,
             ),
             timeout=GEMINI_TIMEOUT_SECONDS,
         )
@@ -2227,6 +2256,7 @@ async def annotate(request: AnnotateRequest, http_request: Request):
                 "tailwind",
                 None,
                 prompt_override=prompt,
+                force_model=request.forceModel,
             ),
             timeout=GEMINI_TIMEOUT_SECONDS,
         )

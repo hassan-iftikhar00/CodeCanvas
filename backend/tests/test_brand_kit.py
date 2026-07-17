@@ -117,8 +117,9 @@ class TestBrandKitCacheKey:
     def test_no_kit_keeps_nokit_suffix(self):
         key = _generation_cache_key(self.IMG, "react", "canvas", None)
         # Multi-screen (feature A) appends a screen segment; single-screen
-        # requests get the legacy-stable "noscr" marker after "nokit".
-        assert key.endswith("|nokit|noscr")
+        # requests get the legacy-stable "noscr" marker after "nokit". The
+        # model-control panel appends a final model segment ("auto" default).
+        assert key.endswith("|nokit|noscr|auto")
 
     def test_kit_changes_key(self):
         base = _generation_cache_key(self.IMG, "react", "canvas", None)
