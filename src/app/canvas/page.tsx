@@ -56,6 +56,12 @@ import LivePreview, {
 import ChatInterface from "@/components/canvas/ChatInterface";
 import ComponentPalette from "@/components/canvas/ComponentPalette";
 import GenerationProgress from "@/components/canvas/GenerationProgress";
+import ModelControlPanel, {
+  MODEL_MODE_FORCE,
+  MODEL_MODE_STORAGE_KEY,
+  AUTO_REPAIR_STORAGE_KEY,
+  type ModelMode,
+} from "@/components/canvas/ModelControlPanel";
 import DraftingToolbox, {
   type ToolboxTabId,
   type ToolboxTab,
@@ -451,6 +457,43 @@ function CanvasPageInner() {
   } | null>(null);
   const [isScoringFidelity, setIsScoringFidelity] = useState(false);
   const [isRepairing, setIsRepairing] = useState(false);
+  // Hidden model-control panel (Ctrl+Shift+G): pick which Gemini tier answers
+  // generations + watch the key pool. Refs mirror the states so long-lived
+  // callbacks (runGeneration/scoreFidelity have frozen deps) read live values.
+  const [showModelPanel, setShowModelPanel] = useState(false);
+  const [modelMode, setModelMode] = useState<ModelMode>("auto");
+  const [autoRepairEnabled, setAutoRepairEnabled] = useState(true);
+  const modelModeRef = useRef<ModelMode>("auto");
+  const autoRepairRef = useRef(true);
+  useEffect(() => {
+    modelModeRef.current = modelMode;
+    autoRepairRef.current = autoRepairEnabled;
+  }, [modelMode, autoRepairEnabled]);
+  // Restore persisted choices (localStorage is browser-only).
+  useEffect(() => {
+    const storedMode = window.localStorage.getItem(MODEL_MODE_STORAGE_KEY);
+    if (
+      storedMode === "auto" ||
+      storedMode === "best" ||
+      storedMode === "saver"
+    ) {
+      setModelMode(storedMode);
+    }
+    if (window.localStorage.getItem(AUTO_REPAIR_STORAGE_KEY) === "off") {
+      setAutoRepairEnabled(false);
+    }
+  }, []);
+  const handleModelModeChange = useCallback((mode: ModelMode) => {
+    setModelMode(mode);
+    window.localStorage.setItem(MODEL_MODE_STORAGE_KEY, mode);
+  }, []);
+  const handleAutoRepairChange = useCallback((enabled: boolean) => {
+    setAutoRepairEnabled(enabled);
+    window.localStorage.setItem(
+      AUTO_REPAIR_STORAGE_KEY,
+      enabled ? "on" : "off"
+    );
+  }, []);
   // HITL detection review (roadmap idea #4): detection runs first (/api/detect),
   // the boxes open in an overlay for correction, and only the reviewed set goes
   // to generation. Null = no review in progress.
@@ -1350,6 +1393,7 @@ function CanvasPageInner() {
           projectId: currentProject?.id,
           framework: selectedFramework,
           styling: "tailwind",
+          forceModel: MODEL_MODE_FORCE[modelModeRef.current],
         }),
       });
       if (!response.ok) {
@@ -1421,6 +1465,7 @@ function CanvasPageInner() {
           region: payload.region,
           width: payload.width,
           height: payload.height,
+          forceModel: MODEL_MODE_FORCE[modelModeRef.current],
         }),
       });
       if (!response.ok) {
@@ -1897,6 +1942,9 @@ function CanvasPageInner() {
       // mismatches.
       const needsRepair =
         opts.allowRepair &&
+        // Model-control panel toggle: repair costs a full extra Gemini call —
+        // during quota-tight demo hours the user can switch it off.
+        autoRepairRef.current &&
         result.score > 0 &&
         result.score < REPAIR_THRESHOLD &&
         missing.length + extra.length > 0;
@@ -1915,6 +1963,7 @@ function CanvasPageInner() {
             extra,
             width,
             height,
+            forceModel: MODEL_MODE_FORCE[modelModeRef.current],
           }),
         });
         if (!repairResponse.ok) return;
@@ -2006,6 +2055,7 @@ function CanvasPageInner() {
             styling: "tailwind",
             description: "",
             projectId,
+            forceModel: MODEL_MODE_FORCE[modelModeRef.current],
             sketchImage: opts.sketchImage,
             textAnnotations: opts.textAnnotations,
             sketchSource: opts.sketchSource,
@@ -2599,7 +2649,34 @@ function CanvasPageInner() {
         group: "View",
         onSelect: () => setZoom(ZOOM_DEFAULT),
       },
+      {
+        id: "canvas:model-control",
+        title: "Model control",
+        subtitle: "Pick the Gemini tier and watch API key quota status",
+        keywords: "model gemini quota keys api tier best saver flash",
+        shortcut: "Ctrl+Shift+G",
+        group: "Advanced",
+        onSelect: () => setShowModelPanel(true),
+      },
     ]);
+  }, []);
+
+  // Hidden model-control panel shortcut (Ctrl+Shift+G). Raw listener rather
+  // than useCanvasShortcuts: this panel is deliberately not part of the
+  // documented canvas shortcut surface.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "g"
+      ) {
+        e.preventDefault();
+        setShowModelPanel((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   // Hydrate split ratio from localStorage and persist on change.
@@ -3216,6 +3293,25 @@ function CanvasPageInner() {
                                 </>
                               ) : null}
                             </span>
+                          )}
+                          {modelMode !== "auto" && (
+                            <button
+                              type="button"
+                              onClick={() => setShowModelPanel(true)}
+                              title="Model mode is forced. Click to open model control."
+                              className={`shrink-0 px-1.5 py-0.5 text-[9px] tracking-[0.12em] uppercase transition-colors ${
+                                isScoringFidelity || isRepairing || fidelity
+                                  ? "ml-1.5"
+                                  : "ml-auto"
+                              }`}
+                              style={{
+                                background: T_DARK.surfaceSoft,
+                                border: `1px solid ${T_DARK.cobalt}`,
+                                color: T_DARK.cobalt,
+                              }}
+                            >
+                              MODE · {modelMode.toUpperCase()}
+                            </button>
                           )}
                         </>
                       )}
@@ -3917,6 +4013,14 @@ function CanvasPageInner() {
         onClose={() => setShowUpload(false)}
         onDetect={handleUploadDetection}
         isGenerating={isGenerating || isDetecting}
+      />
+      <ModelControlPanel
+        open={showModelPanel}
+        onClose={() => setShowModelPanel(false)}
+        mode={modelMode}
+        onModeChange={handleModelModeChange}
+        autoRepairEnabled={autoRepairEnabled}
+        onAutoRepairChange={handleAutoRepairChange}
       />
       {/* Detection-in-flight loader: /api/detect has no other visible
           progress surface (GenerationProgress is gated on isGenerating),
