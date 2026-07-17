@@ -247,6 +247,7 @@ export default function ExportDialog({
                   max={100}
                   value={quality}
                   onChange={(e) => setQuality(Number(e.target.value))}
+                  aria-label="Export quality"
                   className="h-px flex-1 cursor-pointer appearance-none"
                   style={{
                     background: `linear-gradient(to right, ${T_CANVAS.cobalt} 0%, ${T_CANVAS.cobalt} ${quality}%, ${T_CANVAS.rule} ${quality}%, ${T_CANVAS.rule} 100%)`,

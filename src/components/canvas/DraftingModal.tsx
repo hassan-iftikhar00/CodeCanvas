@@ -1,8 +1,11 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { T_CANVAS } from "./canvasTokens";
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * Drafting Room modal scaffold. Paper sheet on a paper-tinted backdrop,
@@ -35,16 +38,43 @@ export default function DraftingModal({
   maxWidth = 640,
   dataOnboarding,
 }: DraftingModalProps) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !sheetRef.current) return;
+      const focusable = Array.from(
+        sheetRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+      ).filter((el) => el.offsetParent !== null);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+
+    const firstFocusable =
+      sheetRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+    (firstFocusable ?? sheetRef.current)?.focus();
+
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      previouslyFocused?.focus();
     };
   }, [open, onClose]);
 
@@ -68,11 +98,13 @@ export default function DraftingModal({
           aria-labelledby={`${slug.replace(/\s+/g, "-")}-title`}
         >
           <motion.div
+            ref={sheetRef}
+            tabIndex={-1}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             transition={{ duration: 0.22, ease: [0.22, 0.9, 0.28, 1] }}
-            className="flex max-h-[85dvh] w-full flex-col"
+            className="flex max-h-[85dvh] w-full flex-col outline-none"
             style={{
               maxWidth,
               background: T_CANVAS.paper,

@@ -1407,6 +1407,7 @@ function FooterBlock() {
               <input
                 type="email"
                 required
+                aria-label="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@studio.com"
@@ -1415,6 +1416,9 @@ function FooterBlock() {
               <button
                 type="submit"
                 disabled={subscribed}
+                aria-label={
+                  subscribed ? "Subscribed" : "Subscribe to newsletter"
+                }
                 className="d5-btn"
                 style={{ padding: "8px 14px", fontSize: 10 }}
               >

@@ -55,6 +55,7 @@ export default function TextInputModal({
       <div className="space-y-4">
         <div>
           <label
+            htmlFor="text-input-modal-value"
             className="mb-2 block text-[10px] tracking-[0.18em] uppercase"
             style={{
               color: T_CANVAS.muted,
@@ -64,6 +65,7 @@ export default function TextInputModal({
             {isButton ? "Button label" : "Text"}
           </label>
           <textarea
+            id="text-input-modal-value"
             ref={textareaRef}
             rows={5}
             value={value}

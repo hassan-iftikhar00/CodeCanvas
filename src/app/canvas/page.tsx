@@ -10,10 +10,12 @@ import {
 } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import type { SketchCanvasWithHistoryRef } from "@/components/canvas/SketchCanvasWithHistory";
 import { createClient } from "@/lib/supabase/client";
 
 import { useHistory } from "@/hooks/useHistory";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import ShortcutsPanel from "@/components/ShortcutsPanel";
 import { SHORTCUTS_PANEL_EVENT } from "@/components/CommandPalette";
 import ExportDialog, { type ExportOptions } from "@/components/ExportDialog";
@@ -184,6 +186,107 @@ function CanvasPageFallback() {
   );
 }
 
+// Rendered below `md` (768px) in place of the editor. The drawing surface is a
+// desktop-first tool; on phones we show a clean, branded "open on a larger
+// screen" panel with a route back to the dashboard. Token-based (T_CANVAS),
+// no horizontal overflow at 320px.
+function SmallScreenGate() {
+  return (
+    <div
+      className="flex min-h-[100dvh] flex-col items-center justify-center px-6 py-12 text-center"
+      style={{ background: T_CANVAS.paper, color: T_CANVAS.graphite }}
+    >
+      <div className="flex w-full max-w-sm flex-col items-center">
+        {/* Brand mark */}
+        <div
+          className="flex h-11 w-11 items-center justify-center"
+          style={{
+            background: T_CANVAS.cobalt,
+            color: T_CANVAS.paper,
+          }}
+          aria-hidden="true"
+        >
+          <svg
+            className="h-6 w-6"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 19l7-7 3 3-7 7-3-3z" />
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+            <path d="M2 2l7.586 7.586" />
+            <circle cx="11" cy="11" r="2" />
+          </svg>
+        </div>
+
+        <div
+          className="mt-6 text-[10px] tracking-[0.28em] uppercase"
+          style={{
+            color: T_CANVAS.muted,
+            fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+          }}
+        >
+          CodeCanvas · Studio
+        </div>
+
+        <h1
+          className="mt-3 text-[26px] leading-[1.1] tracking-[-0.02em]"
+          style={{
+            color: T_CANVAS.graphite,
+            fontFamily:
+              "var(--font-instrument-serif, ui-serif, Georgia, serif)",
+            fontWeight: 400,
+          }}
+        >
+          Open on a larger screen to draw.
+        </h1>
+
+        <p
+          className="mt-3 text-[13px] leading-[1.6]"
+          style={{
+            color: T_CANVAS.muted,
+            fontFamily:
+              "var(--font-inter, ui-sans-serif, system-ui, sans-serif)",
+          }}
+        >
+          The drawing studio is built for a laptop or desktop — pointer-precise
+          sketching, a live code panel, and side-by-side preview. Reopen this
+          project on a wider screen (768px+) to start creating.
+        </p>
+
+        <Link
+          href="/dashboard"
+          className="mt-7 inline-flex items-center gap-2 px-5 py-3 text-[10px] tracking-[0.18em] uppercase transition-colors"
+          style={{
+            background: T_CANVAS.graphite,
+            color: T_CANVAS.paper,
+            border: `1px solid ${T_CANVAS.graphite}`,
+            fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
+            minHeight: 44,
+          }}
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+          Back to Dashboard
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function DraftingToggle({
   label,
   enabled,
@@ -228,6 +331,11 @@ function DraftingToggle({
 
 function CanvasPageInner() {
   const toast = useToast();
+  // The drawing surface is a desktop-first professional tool. Below `md`
+  // (768px) we render a branded gate instead of the editor (see the render
+  // branch just above the JSX return — it sits AFTER every hook so hook order
+  // stays stable across the breakpoint; never make this an early return here).
+  const isMobile = useIsMobile();
   // ── Core state ──────────────────────────────────────────────────────────
   const [currentTool, setCurrentTool] = useState<Tool>("pen");
   const [currentMode, setCurrentMode] = useState<Mode>("sketch");
@@ -1071,15 +1179,7 @@ function CanvasPageInner() {
     const codeToSave = editedCode || generatedCode || undefined;
 
     if (currentProject?.id && !currentProject.id.startsWith("temp-")) {
-      const success = await updateProject(
-        currentProject.id,
-        canvasData,
-        undefined,
-        codeToSave
-      );
-      if (success) {
-        console.log("Project saved successfully");
-      }
+      await updateProject(currentProject.id, canvasData, undefined, codeToSave);
     } else {
       const newId = await saveProject(
         projectName || "Untitled Project",
@@ -2582,6 +2682,14 @@ function CanvasPageInner() {
   // ═════════════════════════════════════════════════════════════════════════
   // JSX
   // ═════════════════════════════════════════════════════════════════════════
+
+  // Small-screen gate: the Konva editor is desktop-first. Below `md` (768px)
+  // show a branded panel instead of the cramped/unusable drawing surface.
+  // This is a POST-hook render branch — every hook above has already run, so
+  // hook order is identical whether or not the gate shows (React invariant).
+  if (isMobile) {
+    return <SmallScreenGate />;
+  }
 
   return (
     <div

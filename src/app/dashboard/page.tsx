@@ -349,11 +349,6 @@ export default function DashboardPage() {
     setDeletingProjectId(projectId);
     setDeleteError(null);
 
-    console.debug("[delete-project] optimistic remove", {
-      projectId,
-      projectTitle: deleteDialogProject.title,
-    });
-
     setProjects((current) =>
       current.filter((project) => project.id !== projectId)
     );
@@ -393,11 +388,6 @@ export default function DashboardPage() {
       if (!data || data.length === 0) {
         throw new Error("Delete did not remove any records.");
       }
-
-      console.debug("[delete-project] backend delete succeeded", {
-        projectId,
-        deletedCount: data.length,
-      });
     } catch (error) {
       const isAbortError =
         error instanceof DOMException && error.name === "AbortError";

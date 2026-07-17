@@ -36,8 +36,12 @@ export function DeleteAccountModal({
       setError(null);
       setIsDeleting(false);
       setDeletionComplete(false);
+      const previouslyFocused = document.activeElement as HTMLElement | null;
       const t = setTimeout(() => inputRef.current?.focus(), 60);
-      return () => clearTimeout(t);
+      return () => {
+        clearTimeout(t);
+        previouslyFocused?.focus();
+      };
     }
   }, [isOpen]);
 

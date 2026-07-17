@@ -340,6 +340,7 @@ export default function ProfilePage() {
                         <img
                           src={avatarUrl}
                           alt=""
+                          referrerPolicy="no-referrer"
                           className="h-16 w-16 object-cover"
                           onError={(e) => {
                             e.currentTarget.style.display = "none";
