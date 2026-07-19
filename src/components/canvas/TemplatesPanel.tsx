@@ -55,7 +55,7 @@ export default function TemplatesPanel({
       maxWidth={760}
       footer={
         <div
-          className="flex items-center justify-between text-[10px] tracking-[0.16em] uppercase"
+          className="flex items-center justify-between text-[13px] tracking-[0.16em] uppercase"
           style={{
             color: T_CANVAS.muted,
             fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -67,7 +67,7 @@ export default function TemplatesPanel({
           <span>
             PRESS{" "}
             <kbd
-              className="inline-flex min-w-[24px] items-center justify-center px-1.5 py-0.5 text-[10px]"
+              className="inline-flex min-w-[24px] items-center justify-center px-1.5 py-0.5 text-[13px]"
               style={{
                 background: T_CANVAS.paper,
                 border: `1px solid ${T_CANVAS.rule}`,
@@ -110,7 +110,7 @@ export default function TemplatesPanel({
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="SEARCH BY NAME, DESCRIPTION, OR TAG..."
             aria-label="Search templates"
-            className="flex-1 bg-transparent text-[11px] tracking-[0.14em] uppercase outline-none placeholder:opacity-60"
+            className="flex-1 bg-transparent text-[13px] tracking-[0.14em] uppercase outline-none placeholder:opacity-60"
             style={{
               color: T_CANVAS.graphite,
               fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -121,7 +121,7 @@ export default function TemplatesPanel({
               type="button"
               onClick={() => setSearchQuery("")}
               aria-label="Clear search"
-              className="text-[10px]"
+              className="text-[13px]"
               style={{ color: T_CANVAS.muted }}
             >
               <svg
@@ -194,7 +194,7 @@ function CategoryPill({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className="px-3 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+      className="px-3 py-1 text-[13px] tracking-[0.16em] uppercase transition-colors"
       style={{
         background: active ? T_CANVAS.graphite : T_CANVAS.paper,
         border: `1px solid ${active ? T_CANVAS.graphite : T_CANVAS.rule}`,
@@ -253,7 +253,7 @@ function TemplateCard({
       <div className="flex flex-col gap-1 p-3">
         <div className="flex items-start justify-between gap-2">
           <h3
-            className="truncate text-[12px]"
+            className="truncate text-[13px]"
             style={{
               color: T_CANVAS.graphite,
               fontFamily:
@@ -263,7 +263,7 @@ function TemplateCard({
             {template.name}
           </h3>
           <span
-            className="flex-none px-1.5 py-0.5 text-[9px] tracking-[0.16em] uppercase"
+            className="flex-none px-1.5 py-0.5 text-[12px] tracking-[0.16em] uppercase"
             style={{
               background: T_CANVAS.vellum,
               color: T_CANVAS.muted,
@@ -274,7 +274,7 @@ function TemplateCard({
           </span>
         </div>
         <p
-          className="line-clamp-2 text-[11px]"
+          className="line-clamp-2 text-[13px]"
           style={{
             color: T_CANVAS.muted,
             fontFamily:
@@ -318,7 +318,7 @@ function EmptyState({ query }: { query: string }) {
         </svg>
       </span>
       <p
-        className="text-[12px] tracking-[0.14em] uppercase"
+        className="text-[13px] tracking-[0.14em] uppercase"
         style={{
           color: T_CANVAS.graphite,
           fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -327,7 +327,7 @@ function EmptyState({ query }: { query: string }) {
         NO TEMPLATES FOUND{query ? ` FOR "${query.toUpperCase()}"` : ""}
       </p>
       <p
-        className="mt-2 text-[11px]"
+        className="mt-2 text-[13px]"
         style={{
           color: T_CANVAS.muted,
           fontFamily: "var(--font-inter, ui-sans-serif, system-ui)",

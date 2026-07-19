@@ -1065,6 +1065,17 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
         // Erase at current position
         eraseAtPosition(pos);
       } else if (toolRef.current === "select") {
+        // If the mousedown landed on the Transformer (a resize/rotate anchor
+        // or its border), let Konva drive the transform. Anchors are Konva
+        // nodes whose parent is the Transformer and they sit slightly OUTSIDE
+        // the shape's bbox, so the manual hit-test below would find no shape
+        // and clear the selection, unmounting the Transformer mid-drag.
+        const targetClass = e.target.getClassName?.();
+        const parentClass = e.target.getParent()?.getClassName?.();
+        if (targetClass === "Transformer" || parentClass === "Transformer") {
+          return;
+        }
+
         // Check if clicking on a shape first
         let clickedShapeId: string | null = null;
         let clickedLineIdx: number | null = null;

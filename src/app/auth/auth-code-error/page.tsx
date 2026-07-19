@@ -29,7 +29,7 @@ export default function AuthCodeErrorPage() {
         >
           {/* Title strip */}
           <div
-            className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+            className="flex items-center justify-between border-b px-5 py-2 text-[13px] tracking-[0.16em] uppercase"
             style={{
               background: `${T.error}10`,
               borderColor: T.error,
@@ -92,13 +92,13 @@ export default function AuthCodeErrorPage() {
               }}
             >
               <div
-                className="text-[10px] tracking-[0.16em] uppercase"
+                className="text-[13px] tracking-[0.16em] uppercase"
                 style={{ color: T.muted, fontFamily: MONO }}
               >
                 Possible reasons
               </div>
               <ul
-                className="mt-2 space-y-1 text-[12px]"
+                className="mt-2 space-y-1 text-[13px]"
                 style={{ color: T.graphite, fontFamily: SANS }}
               >
                 {[
@@ -129,7 +129,7 @@ export default function AuthCodeErrorPage() {
           >
             <Link
               href="/"
-              className="inline-flex items-center justify-center px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+              className="inline-flex items-center justify-center px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
               style={{
                 background: T.paper,
                 border: `1px solid ${T.rule}`,
@@ -152,7 +152,7 @@ export default function AuthCodeErrorPage() {
             </Link>
             <Link
               href="/auth/login"
-              className="inline-flex items-center justify-center px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+              className="inline-flex items-center justify-center px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
               style={{
                 background: T.cobalt,
                 border: `1px solid ${T.cobalt}`,
@@ -176,7 +176,7 @@ export default function AuthCodeErrorPage() {
 
         {/* Developer tip */}
         <div
-          className="px-4 py-3 text-[11px] leading-relaxed"
+          className="px-4 py-3 text-[13px] leading-relaxed"
           style={{
             background: T.paper,
             border: `1px solid ${T.rule}`,
@@ -185,7 +185,7 @@ export default function AuthCodeErrorPage() {
           }}
         >
           <span
-            className="mr-2 inline-block px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
+            className="mr-2 inline-block px-1.5 py-0.5 text-[12px] tracking-[0.18em] uppercase"
             style={{
               background: T.vellum,
               border: `1px solid ${T.rule}`,

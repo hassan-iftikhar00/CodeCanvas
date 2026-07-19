@@ -171,7 +171,7 @@ function PreviewNav() {
           <span className="text-[13px] font-medium tracking-tight text-neutral-900">
             CodeCanvas - Design Preview
           </span>
-          <span className="text-[12px] text-neutral-500">
+          <span className="text-[13px] text-neutral-500">
             4 directions, one decision
           </span>
         </div>
@@ -180,7 +180,7 @@ function PreviewNav() {
             <li key={l.href}>
               <a
                 href={l.href}
-                className="rounded-full px-3 py-1.5 text-[12px] text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900"
+                className="rounded-full px-3 py-1.5 text-[13px] text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-900"
               >
                 {l.label}
               </a>
@@ -212,7 +212,7 @@ function StickyNote({
       style={{ fontFamily: "var(--font-inter)" }}
     >
       <div className="px-5 py-3">
-        <div className="text-[10px] uppercase tracking-[0.18em] opacity-70">
+        <div className="text-[13px] uppercase tracking-[0.18em] opacity-70">
           Direction {num}
         </div>
         <div className="text-[15px] font-semibold tracking-tight">{name}</div>
@@ -246,18 +246,18 @@ function PaletteRow({
           />
           <div>
             <div
-              className={`text-[11px] font-medium tracking-tight ${textClass}`}
+              className={`text-[13px] font-medium tracking-tight ${textClass}`}
             >
               {s.name}
             </div>
             <div
-              className={`text-[10px] tracking-wide ${mutedClass}`}
+              className={`text-[13px] tracking-wide ${mutedClass}`}
               style={{ fontFamily: "var(--font-jetbrains)" }}
             >
               {s.hex.toUpperCase()}
             </div>
             {s.note && (
-              <div className={`mt-0.5 text-[10px] ${mutedClass}`}>{s.note}</div>
+              <div className={`mt-0.5 text-[13px] ${mutedClass}`}>{s.note}</div>
             )}
           </div>
         </div>
@@ -300,13 +300,13 @@ function DirectionOne() {
         <div className="grid grid-cols-12 gap-8 border-b border-[#E5DFD3] pb-16">
           <div className="col-span-2 pt-3">
             <div
-              className="text-[10px] uppercase tracking-[0.22em]"
+              className="text-[13px] uppercase tracking-[0.22em]"
               style={{ color: "#76706A" }}
             >
               Direction 01
             </div>
             <div
-              className="mt-2 text-[12px] tracking-tight"
+              className="mt-2 text-[13px] tracking-tight"
               style={{ color: "#4A4B8C", fontFamily: "var(--font-jetbrains)" }}
             >
               · quiet / paper / editorial
@@ -432,7 +432,7 @@ function DirectionOne() {
             <div className="col-span-4">
               <div className="border border-[#E5DFD3] bg-[#FBF9F4] p-5">
                 <div
-                  className="text-[10px] uppercase tracking-[0.18em]"
+                  className="text-[13px] uppercase tracking-[0.18em]"
                   style={{ color: "#76706A" }}
                 >
                   Project
@@ -445,7 +445,7 @@ function DirectionOne() {
                   <br />
                   v3
                 </div>
-                <div className="mt-1 text-[12px]" style={{ color: "#76706A" }}>
+                <div className="mt-1 text-[13px]" style={{ color: "#76706A" }}>
                   Updated 2 hours ago · 14 iterations
                 </div>
                 <div
@@ -456,11 +456,11 @@ function DirectionOne() {
                   }}
                 />
                 <div className="mt-4 flex items-center justify-between">
-                  <span className="text-[11px]" style={{ color: "#4A4B8C" }}>
+                  <span className="text-[13px]" style={{ color: "#4A4B8C" }}>
                     Open ↗
                   </span>
                   <span
-                    className="text-[10px] tracking-wide"
+                    className="text-[13px] tracking-wide"
                     style={{
                       color: "#76706A",
                       fontFamily: "var(--font-jetbrains)",
@@ -476,7 +476,7 @@ function DirectionOne() {
           {/* Code / preview panel */}
           <div className="mt-6 grid grid-cols-2 border border-[#E5DFD3] bg-[#FBF9F4]">
             <div
-              className="border-r border-[#E5DFD3] p-6 text-[12px] leading-[1.8]"
+              className="border-r border-[#E5DFD3] p-6 text-[13px] leading-[1.8]"
               style={{ fontFamily: "var(--font-jetbrains)", color: "#1C1A17" }}
             >
               <div style={{ color: "#76706A" }}>// generated.tsx</div>
@@ -502,7 +502,7 @@ function DirectionOne() {
             </div>
             <div className="p-10">
               <div
-                className="text-[10px] uppercase tracking-[0.18em]"
+                className="text-[13px] uppercase tracking-[0.18em]"
                 style={{ color: "#76706A" }}
               >
                 Live preview
@@ -578,13 +578,13 @@ function DirectionOne() {
                 Body copy in Inter - neutral, gets out of the way.
               </div>
               <div
-                className="text-[11px] uppercase tracking-[0.18em]"
+                className="text-[13px] uppercase tracking-[0.18em]"
                 style={{ color: "#76706A" }}
               >
                 Caption - Inter, 11px, +0.18em
               </div>
               <div
-                className="text-[12px]"
+                className="text-[13px]"
                 style={{
                   fontFamily: "var(--font-jetbrains)",
                   color: "#4A4B8C",
@@ -635,7 +635,7 @@ function DirectionTwo() {
         {/* Hero */}
         <div>
           <div
-            className="text-[11px] uppercase tracking-[0.24em]"
+            className="text-[13px] uppercase tracking-[0.24em]"
             style={{ color: "#D4A24C", fontFamily: "var(--font-geist-mono)" }}
           >
             02 / Deep Jewel - premium · midnight · confident
@@ -680,7 +680,7 @@ function DirectionTwo() {
                 CodeCanvas
               </span>
               <span
-                className="rounded-full border px-2 py-0.5 text-[10px]"
+                className="rounded-full border px-2 py-0.5 text-[13px]"
                 style={{
                   borderColor: "rgba(110,139,232,0.3)",
                   color: "#6E8BE8",
@@ -779,7 +779,7 @@ function DirectionTwo() {
               >
                 <div className="flex h-full w-full items-center justify-center">
                   <div
-                    className="rounded-full border px-4 py-1.5 text-[12px] backdrop-blur"
+                    className="rounded-full border px-4 py-1.5 text-[13px] backdrop-blur"
                     style={{
                       borderColor: "rgba(212,162,76,0.3)",
                       color: "#D4A24C",
@@ -805,7 +805,7 @@ function DirectionTwo() {
                 }}
               >
                 <div
-                  className="text-[10px] uppercase tracking-[0.22em]"
+                  className="text-[13px] uppercase tracking-[0.22em]"
                   style={{
                     color: "#D4A24C",
                     fontFamily: "var(--font-geist-mono)",
@@ -816,7 +816,7 @@ function DirectionTwo() {
                 <div className="mt-2 text-[24px] font-medium tracking-[-0.02em]">
                   Pricing page rebuild
                 </div>
-                <div className="mt-1 text-[12px]" style={{ color: "#8892AC" }}>
+                <div className="mt-1 text-[13px]" style={{ color: "#8892AC" }}>
                   14 iterations · last edit 4m ago
                 </div>
                 <div
@@ -827,7 +827,7 @@ function DirectionTwo() {
                       "linear-gradient(135deg, #1F2A42 0%, #161E30 100%)",
                   }}
                 />
-                <div className="mt-4 flex items-center justify-between text-[11px]">
+                <div className="mt-4 flex items-center justify-between text-[13px]">
                   <span style={{ color: "#6E8BE8" }}>Open ↗</span>
                   <span
                     style={{
@@ -851,7 +851,7 @@ function DirectionTwo() {
             }}
           >
             <div
-              className="border-r p-6 text-[12px] leading-[1.8]"
+              className="border-r p-6 text-[13px] leading-[1.8]"
               style={{
                 borderColor: "rgba(255,255,255,0.06)",
                 fontFamily: "var(--font-geist-mono)",
@@ -881,7 +881,7 @@ function DirectionTwo() {
             </div>
             <div className="p-10">
               <div
-                className="text-[10px] uppercase tracking-[0.22em]"
+                className="text-[13px] uppercase tracking-[0.22em]"
                 style={{
                   color: "#D4A24C",
                   fontFamily: "var(--font-geist-mono)",
@@ -961,7 +961,7 @@ function DirectionTwo() {
                 Body in Geist 400 - calm, modern, opinion-free.
               </div>
               <div
-                className="text-[11px] uppercase tracking-[0.22em]"
+                className="text-[13px] uppercase tracking-[0.22em]"
                 style={{
                   color: "#8892AC",
                   fontFamily: "var(--font-geist-mono)",
@@ -970,7 +970,7 @@ function DirectionTwo() {
                 Caption - mono, +0.22em
               </div>
               <div
-                className="text-[12px]"
+                className="text-[13px]"
                 style={{
                   fontFamily: "var(--font-geist-mono)",
                   color: "#D4A24C",
@@ -1029,7 +1029,7 @@ function DirectionThree() {
         {/* Hero */}
         <div>
           <div
-            className="text-[11px] uppercase tracking-[0.2em]"
+            className="text-[13px] uppercase tracking-[0.2em]"
             style={{ color: "#BD5B3D", fontFamily: "var(--font-fraunces)" }}
           >
             03 - Warm Studio · creative · human · structured
@@ -1162,7 +1162,7 @@ function DirectionThree() {
                 >
                   <div className="flex h-full w-full items-center justify-center">
                     <div
-                      className="rounded-full px-4 py-1.5 text-[12px] font-medium"
+                      className="rounded-full px-4 py-1.5 text-[13px] font-medium"
                       style={{ background: "#3F5E4F", color: "#FAF4E4" }}
                     >
                       canvas ready · start sketching
@@ -1171,7 +1171,7 @@ function DirectionThree() {
                 </div>
                 {/* Dark ink status bar - mono, file path, dims, active tool */}
                 <div
-                  className="flex items-center justify-between px-4 py-2 text-[10px]"
+                  className="flex items-center justify-between px-4 py-2 text-[13px]"
                   style={{
                     background: "#1A1410",
                     color: "#E3D9C3",
@@ -1214,20 +1214,20 @@ function DirectionThree() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span
-                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      className="rounded-full px-2 py-0.5 text-[13px] font-medium"
                       style={{ background: "#3F5E4F", color: "#FAF4E4" }}
                     >
                       Active
                     </span>
                     <span
-                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      className="rounded-full px-2 py-0.5 text-[13px] font-medium"
                       style={{ background: "#F1E9D8", color: "#BD5B3D" }}
                     >
                       React
                     </span>
                   </div>
                   <span
-                    className="text-[10px]"
+                    className="text-[13px]"
                     style={{
                       color: "#7A6B5A",
                       fontFamily: "var(--font-jetbrains)",
@@ -1247,7 +1247,7 @@ function DirectionThree() {
                   <br />
                   v2
                 </div>
-                <div className="mt-1 text-[12px]" style={{ color: "#7A6B5A" }}>
+                <div className="mt-1 text-[13px]" style={{ color: "#7A6B5A" }}>
                   Updated this morning
                 </div>
                 <div
@@ -1259,7 +1259,7 @@ function DirectionThree() {
                 />
                 {/* Mono stats row - tool-feel inside the warm tile */}
                 <div
-                  className="mt-3 grid grid-cols-3 rounded-xl border text-[10px]"
+                  className="mt-3 grid grid-cols-3 rounded-xl border text-[13px]"
                   style={{
                     borderColor: "#E3D9C3",
                     color: "#7A6B5A",
@@ -1317,7 +1317,7 @@ function DirectionThree() {
               <div style={{ background: "#1A1410" }}>
                 {/* Tab / file header */}
                 <div
-                  className="flex items-center justify-between border-b px-5 py-2.5 text-[10px]"
+                  className="flex items-center justify-between border-b px-5 py-2.5 text-[13px]"
                   style={{
                     borderColor: "rgba(227,217,195,0.08)",
                     color: "#7A6B5A",
@@ -1338,7 +1338,7 @@ function DirectionThree() {
                 </div>
                 {/* Code body with line numbers */}
                 <div
-                  className="px-2 py-5 text-[12px] leading-[1.85]"
+                  className="px-2 py-5 text-[13px] leading-[1.85]"
                   style={{
                     fontFamily: "var(--font-jetbrains)",
                     color: "#F1E9D8",
@@ -1441,7 +1441,7 @@ function DirectionThree() {
               {/* Preview side - Parchment */}
               <div className="p-10" style={{ background: "#FAF4E4" }}>
                 <div
-                  className="text-[10px] uppercase tracking-[0.18em]"
+                  className="text-[13px] uppercase tracking-[0.18em]"
                   style={{
                     color: "#7A6B5A",
                     fontFamily: "var(--font-fraunces)",
@@ -1470,7 +1470,7 @@ function DirectionThree() {
             </div>
             {/* Bottom command bar - mono keyboard shortcuts + provider status */}
             <div
-              className="flex items-center justify-between border-t px-5 py-2 text-[10px]"
+              className="flex items-center justify-between border-t px-5 py-2 text-[13px]"
               style={{
                 borderColor: "#E3D9C3",
                 background: "#FAF4E4",
@@ -1545,13 +1545,13 @@ function DirectionThree() {
                 Body in Inter - keeps the serif as the personality.
               </div>
               <div
-                className="text-[11px] uppercase tracking-[0.2em]"
+                className="text-[13px] uppercase tracking-[0.2em]"
                 style={{ color: "#7A6B5A", fontFamily: "var(--font-fraunces)" }}
               >
                 Caption · Fraunces small caps
               </div>
               <div
-                className="text-[12px]"
+                className="text-[13px]"
                 style={{
                   fontFamily: "var(--font-jetbrains)",
                   color: "#BD5B3D",
@@ -1602,19 +1602,19 @@ function DirectionFour() {
         <div className="grid grid-cols-12 gap-8 border-b border-[#E5E5E5] pb-12">
           <div className="col-span-3">
             <div
-              className="text-[10px] uppercase tracking-[0.2em]"
+              className="text-[13px] uppercase tracking-[0.2em]"
               style={{ color: "#525252", fontFamily: "var(--font-jetbrains)" }}
             >
               04 / Precision
             </div>
             <div
-              className="mt-2 text-[10px] tracking-wide"
+              className="mt-2 text-[13px] tracking-wide"
               style={{ color: "#A3A3A3", fontFamily: "var(--font-jetbrains)" }}
             >
               surgical · focused · dense
             </div>
             <div
-              className="mt-6 inline-flex items-center gap-2 text-[10px]"
+              className="mt-6 inline-flex items-center gap-2 text-[13px]"
               style={{ color: "#525252", fontFamily: "var(--font-jetbrains)" }}
             >
               <span
@@ -1653,7 +1653,7 @@ function DirectionFour() {
                 codecanvas
               </span>
               <span
-                className="text-[10px]"
+                className="text-[13px]"
                 style={{
                   color: "#A3A3A3",
                   fontFamily: "var(--font-jetbrains)",
@@ -1663,7 +1663,7 @@ function DirectionFour() {
               </span>
             </div>
             <ul
-              className="flex items-center gap-6 text-[12px]"
+              className="flex items-center gap-6 text-[13px]"
               style={{ fontFamily: "var(--font-inter-tight)" }}
             >
               <li>Canvas</li>
@@ -1673,7 +1673,7 @@ function DirectionFour() {
             </ul>
             <div className="flex items-center gap-3">
               <div
-                className="flex items-center gap-1.5 text-[10px]"
+                className="flex items-center gap-1.5 text-[13px]"
                 style={{
                   color: "#525252",
                   fontFamily: "var(--font-jetbrains)",
@@ -1685,7 +1685,7 @@ function DirectionFour() {
                 />
                 connected
               </div>
-              <button className="border border-[#0A0A0A] bg-[#0A0A0A] px-3 py-1.5 text-[12px] font-medium text-white">
+              <button className="border border-[#0A0A0A] bg-[#0A0A0A] px-3 py-1.5 text-[13px] font-medium text-white">
                 Open
               </button>
             </div>
@@ -1740,7 +1740,7 @@ function DirectionFour() {
               >
                 <div className="flex h-full w-full items-center justify-center">
                   <div
-                    className="flex items-center gap-2 border border-[#E5E5E5] bg-white px-3 py-1.5 text-[11px]"
+                    className="flex items-center gap-2 border border-[#E5E5E5] bg-white px-3 py-1.5 text-[13px]"
                     style={{
                       fontFamily: "var(--font-jetbrains)",
                       color: "#525252",
@@ -1759,7 +1759,7 @@ function DirectionFour() {
               <div className="border border-[#E5E5E5] bg-white">
                 <div className="border-b border-[#E5E5E5] px-4 py-2.5">
                   <div
-                    className="text-[10px] uppercase tracking-[0.18em]"
+                    className="text-[13px] uppercase tracking-[0.18em]"
                     style={{
                       color: "#A3A3A3",
                       fontFamily: "var(--font-jetbrains)",
@@ -1774,7 +1774,7 @@ function DirectionFour() {
                 <div className="grid grid-cols-2 divide-x divide-[#E5E5E5] border-b border-[#E5E5E5]">
                   <div className="px-4 py-2.5">
                     <div
-                      className="text-[10px]"
+                      className="text-[13px]"
                       style={{
                         color: "#A3A3A3",
                         fontFamily: "var(--font-jetbrains)",
@@ -1791,7 +1791,7 @@ function DirectionFour() {
                   </div>
                   <div className="px-4 py-2.5">
                     <div
-                      className="text-[10px]"
+                      className="text-[13px]"
                       style={{
                         color: "#A3A3A3",
                         fontFamily: "var(--font-jetbrains)",
@@ -1808,7 +1808,7 @@ function DirectionFour() {
                   </div>
                 </div>
                 <div
-                  className="px-4 py-3 text-[11px]"
+                  className="px-4 py-3 text-[13px]"
                   style={{
                     color: "#525252",
                     fontFamily: "var(--font-jetbrains)",
@@ -1839,11 +1839,11 @@ function DirectionFour() {
           {/* Code / preview */}
           <div className="mt-4 grid grid-cols-2 border border-[#E5E5E5] bg-white">
             <div
-              className="border-r border-[#E5E5E5] p-5 text-[12px] leading-[1.7]"
+              className="border-r border-[#E5E5E5] p-5 text-[13px] leading-[1.7]"
               style={{ fontFamily: "var(--font-jetbrains)", color: "#0A0A0A" }}
             >
               <div
-                className="flex items-center justify-between border-b border-[#E5E5E5] pb-2 text-[10px]"
+                className="flex items-center justify-between border-b border-[#E5E5E5] pb-2 text-[13px]"
                 style={{ color: "#A3A3A3" }}
               >
                 <span>landing.v3.tsx</span>
@@ -1885,7 +1885,7 @@ function DirectionFour() {
             </div>
             <div className="p-8">
               <div
-                className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em]"
+                className="flex items-center gap-2 text-[13px] uppercase tracking-[0.18em]"
                 style={{
                   color: "#525252",
                   fontFamily: "var(--font-jetbrains)",
@@ -1902,7 +1902,7 @@ function DirectionFour() {
                 <br />
                 Ship more.
               </h3>
-              <p className="mt-3 text-[12px]" style={{ color: "#525252" }}>
+              <p className="mt-3 text-[13px]" style={{ color: "#525252" }}>
                 Built with precision. Shipped with confidence.
               </p>
             </div>
@@ -1914,20 +1914,20 @@ function DirectionFour() {
           <div className="col-span-6">
             <SectionLabel color="#525252">Buttons</SectionLabel>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button className="bg-[#0A0A0A] px-4 py-2 text-[12px] font-medium text-white">
+              <button className="bg-[#0A0A0A] px-4 py-2 text-[13px] font-medium text-white">
                 Primary
               </button>
-              <button className="border border-[#0A0A0A] px-4 py-2 text-[12px] font-medium text-[#0A0A0A]">
+              <button className="border border-[#0A0A0A] px-4 py-2 text-[13px] font-medium text-[#0A0A0A]">
                 Secondary
               </button>
-              <button className="px-4 py-2 text-[12px] font-medium text-[#0A0A0A] hover:bg-white">
+              <button className="px-4 py-2 text-[13px] font-medium text-[#0A0A0A] hover:bg-white">
                 Ghost
               </button>
-              <button className="border border-[#0A0A0A] px-4 py-2 text-[12px] font-medium text-[#0A0A0A] hover:bg-[#0A0A0A] hover:text-white">
+              <button className="border border-[#0A0A0A] px-4 py-2 text-[13px] font-medium text-[#0A0A0A] hover:bg-[#0A0A0A] hover:text-white">
                 Delete
               </button>
               <button
-                className="flex items-center gap-1.5 border border-[#E5E5E5] bg-white px-3 py-2 text-[11px]"
+                className="flex items-center gap-1.5 border border-[#E5E5E5] bg-white px-3 py-2 text-[13px]"
                 style={{
                   color: "#525252",
                   fontFamily: "var(--font-jetbrains)",
@@ -1954,7 +1954,7 @@ function DirectionFour() {
                 Body in Inter - dense, neutral, calibrated.
               </div>
               <div
-                className="text-[10px] uppercase tracking-[0.2em]"
+                className="text-[13px] uppercase tracking-[0.2em]"
                 style={{
                   color: "#525252",
                   fontFamily: "var(--font-jetbrains)",
@@ -1963,7 +1963,7 @@ function DirectionFour() {
                 CAPTION · MONO · +0.20EM
               </div>
               <div
-                className="text-[12px]"
+                className="text-[13px]"
                 style={{ fontFamily: "var(--font-jetbrains)" }}
               >
                 <span style={{ color: "#525252" }}>const</span> code{" "}
@@ -1988,7 +1988,7 @@ function SectionLabel({
 }) {
   return (
     <div
-      className="text-[10px] uppercase tracking-[0.22em]"
+      className="text-[13px] uppercase tracking-[0.22em]"
       style={{ color, fontFamily: "var(--font-jetbrains)" }}
     >
       {children}
@@ -2006,7 +2006,7 @@ function VotingSection() {
       style={{ fontFamily: "var(--font-inter)" }}
     >
       <div className="mx-auto max-w-[1440px] px-16 py-24">
-        <div className="text-[10px] uppercase tracking-[0.22em] text-neutral-500">
+        <div className="text-[13px] uppercase tracking-[0.22em] text-neutral-500">
           Voting · TBD
         </div>
         <h2 className="mt-3 text-[40px] font-semibold tracking-tight text-neutral-900">
@@ -2027,13 +2027,13 @@ function VotingSection() {
               key={d.n}
               className="rounded-2xl border border-dashed border-neutral-300 p-6"
             >
-              <div className="text-[10px] uppercase tracking-[0.22em] text-neutral-500">
+              <div className="text-[13px] uppercase tracking-[0.22em] text-neutral-500">
                 Direction {d.n}
               </div>
               <div className="mt-1 text-[18px] font-semibold tracking-tight text-neutral-900">
                 {d.name}
               </div>
-              <div className="mt-6 text-[11px] text-neutral-400">
+              <div className="mt-6 text-[13px] text-neutral-400">
                 vote · placeholder
               </div>
             </div>

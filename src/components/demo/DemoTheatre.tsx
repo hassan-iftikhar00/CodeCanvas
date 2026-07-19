@@ -215,7 +215,7 @@ export default function DemoTheatre() {
         {stage === 0 && (
           <div className="flex flex-col items-center justify-center space-y-8">
             <div
-              className="px-3 py-1 text-[10px] tracking-[0.16em] uppercase"
+              className="px-3 py-1 text-[13px] tracking-[0.16em] uppercase"
               style={{
                 background: T.vellum,
                 border: `1px solid ${T.rule}`,
@@ -313,7 +313,7 @@ export default function DemoTheatre() {
                     />
                     <div className="flex-1">
                       <p
-                        className="text-[10px] tracking-[0.14em] uppercase mb-1"
+                        className="text-[13px] tracking-[0.14em] uppercase mb-1"
                         style={{ color: T.muted, fontFamily: MONO }}
                       >
                         INSTRUCTIONS · OPTIONAL
@@ -370,7 +370,7 @@ export default function DemoTheatre() {
               />
             </div>
             <p
-              className="text-[11px] tracking-[0.14em] uppercase"
+              className="text-[13px] tracking-[0.14em] uppercase"
               style={{ color: T.muted, fontFamily: MONO }}
             >
               ANALYZING SKETCH · GENERATING COMPONENTS · OPTIMIZING CODE
@@ -383,7 +383,7 @@ export default function DemoTheatre() {
           <div className="space-y-6">
             <div className="text-center mb-8">
               <div
-                className="inline-flex px-3 py-1 mb-4 text-[10px] tracking-[0.16em] uppercase"
+                className="inline-flex px-3 py-1 mb-4 text-[13px] tracking-[0.16em] uppercase"
                 style={{
                   background: T.cobaltWash,
                   border: `1px solid ${T.cobalt}`,
@@ -414,7 +414,7 @@ export default function DemoTheatre() {
                 }}
               >
                 <div
-                  className="flex items-center gap-2 mb-4 text-[10px] tracking-[0.14em] uppercase"
+                  className="flex items-center gap-2 mb-4 text-[13px] tracking-[0.14em] uppercase"
                   style={{ color: "#86868A", fontFamily: MONO }}
                 >
                   <span>~/output.tsx</span>
@@ -444,7 +444,7 @@ export default function DemoTheatre() {
                     }}
                   >
                     <span
-                      className="text-[10px] tracking-[0.16em] uppercase"
+                      className="text-[13px] tracking-[0.16em] uppercase"
                       style={{ color: T.muted, fontFamily: MONO }}
                     >
                       LIVE PREVIEW
@@ -529,7 +529,7 @@ export default function DemoTheatre() {
                     }}
                   >
                     <span
-                      className="text-[10px] tracking-[0.12em] uppercase"
+                      className="text-[13px] tracking-[0.12em] uppercase"
                       style={{ color: T.muted, fontFamily: MONO }}
                     >
                       DESKTOP · 1920×1080
@@ -540,14 +540,14 @@ export default function DemoTheatre() {
                         style={{ background: "#1E6A3C" }}
                       />
                       <span
-                        className="text-[10px] tracking-[0.12em] uppercase"
+                        className="text-[13px] tracking-[0.12em] uppercase"
                         style={{ color: T.muted, fontFamily: MONO }}
                       >
                         LIVE · AUTO-UPDATING
                       </span>
                     </div>
                     <span
-                      className="text-[10px] tracking-[0.12em] uppercase"
+                      className="text-[13px] tracking-[0.12em] uppercase"
                       style={{ color: T.cobalt, fontFamily: MONO }}
                     >
                       GENERATED IN 2.3S

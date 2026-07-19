@@ -56,7 +56,7 @@ export default function ProjectCard({
     >
       {/* Title strip — mono "PROJECT · {framework}" */}
       <div
-        className="flex items-center justify-between gap-2 border-b px-3 py-1.5 text-[10px] tracking-[0.16em] uppercase"
+        className="flex items-center justify-between gap-2 border-b px-3 py-1.5 text-[13px] tracking-[0.16em] uppercase"
         style={{
           background: T.vellum,
           borderColor: T.rule,
@@ -128,7 +128,7 @@ export default function ProjectCard({
           style={{ background: "rgba(14, 14, 15, 0.55)" }}
         >
           <span
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] tracking-[0.18em] uppercase"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] tracking-[0.18em] uppercase"
             style={{
               background: T.cobalt,
               color: T.paper,
@@ -171,7 +171,7 @@ export default function ProjectCard({
               </h3>
               {isStarred && (
                 <span
-                  className="flex-none px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
+                  className="flex-none px-1.5 py-0.5 text-[12px] tracking-[0.18em] uppercase"
                   style={{
                     background: T.cobaltWash,
                     color: T.cobaltInk,
@@ -185,7 +185,7 @@ export default function ProjectCard({
             </div>
             {project.description && (
               <p
-                className="mt-1 line-clamp-2 text-[11px] leading-relaxed"
+                className="mt-1 line-clamp-2 text-[13px] leading-relaxed"
                 style={{ color: T.muted, fontFamily: SANS }}
               >
                 {project.description}
@@ -282,7 +282,7 @@ export default function ProjectCard({
 
         <div className="mt-3 flex items-center justify-between">
           <span
-            className="text-[10px] tracking-[0.14em] uppercase"
+            className="text-[13px] tracking-[0.14em] uppercase"
             style={{ color: T.muted, fontFamily: MONO }}
           >
             Edited{" "}

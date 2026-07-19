@@ -428,7 +428,7 @@ export default function SignupPage() {
         </div>
 
         <p
-          className="d5-sans mt-6 text-center text-[11px] leading-[1.5]"
+          className="d5-sans mt-6 text-center text-[13px] leading-[1.5]"
           style={{ color: T_AUTH.muted }}
         >
           By creating an account, you agree to our{" "}

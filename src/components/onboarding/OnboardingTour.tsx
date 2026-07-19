@@ -296,7 +296,7 @@ export default function OnboardingTour({
           }}
         >
           <div
-            className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em]"
+            className="flex items-center justify-between text-[13px] uppercase tracking-[0.18em]"
             style={{
               color: T.muted,
               fontFamily: MONO,
@@ -308,7 +308,7 @@ export default function OnboardingTour({
             <button
               type="button"
               onClick={onSkip}
-              className="text-[10px] tracking-[0.16em] uppercase transition-colors"
+              className="text-[13px] tracking-[0.16em] uppercase transition-colors"
               style={{ color: T.muted }}
               onMouseEnter={(e) => (e.currentTarget.style.color = T.cobalt)}
               onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
@@ -327,7 +327,7 @@ export default function OnboardingTour({
             {currentStep.title}
           </h3>
           <p
-            className="mt-2 text-[12px] leading-[1.55]"
+            className="mt-2 text-[13px] leading-[1.55]"
             style={{ color: T.muted }}
           >
             {currentStep.description}
@@ -338,7 +338,7 @@ export default function OnboardingTour({
               type="button"
               onClick={onBack}
               disabled={stepIndex === 0}
-              className="px-3 py-1.5 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              className="px-3 py-1.5 text-[13px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               style={{
                 background: T.paper,
                 border: `1px solid ${T.rule}`,
@@ -355,7 +355,7 @@ export default function OnboardingTour({
             <button
               type="button"
               onClick={isLastStep ? onFinish : onNext}
-              className="px-3.5 py-1.5 text-[10px] tracking-[0.18em] uppercase transition-colors"
+              className="px-3.5 py-1.5 text-[13px] tracking-[0.18em] uppercase transition-colors"
               style={{
                 background: T.cobalt,
                 border: `1px solid ${T.cobalt}`,

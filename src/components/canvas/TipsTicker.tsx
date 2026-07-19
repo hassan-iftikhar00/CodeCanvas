@@ -98,7 +98,7 @@ export default function TipsTicker() {
           setStored(false);
           nextTip();
         }}
-        className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] tracking-[0.16em] uppercase transition-colors"
+        className="pointer-events-auto flex items-center gap-1.5 px-2.5 py-1.5 text-[13px] tracking-[0.16em] uppercase transition-colors"
         style={{
           background: T.paper,
           border: `1px solid ${T.rule}`,
@@ -136,7 +136,7 @@ export default function TipsTicker() {
       aria-label="Tip"
     >
       <span
-        className="mt-[1px] flex flex-shrink-0 items-center gap-1 px-1.5 py-0.5 text-[9px] tracking-[0.16em]"
+        className="mt-[1px] flex flex-shrink-0 items-center gap-1 px-1.5 py-0.5 text-[12px] tracking-[0.16em]"
         style={{
           background: T.cobaltWash,
           color: T.cobaltInk,
@@ -149,7 +149,7 @@ export default function TipsTicker() {
 
       <p
         key={index}
-        className="min-w-0 flex-1 text-[11px] leading-[1.5]"
+        className="min-w-0 flex-1 text-[13px] leading-[1.5]"
         style={{ color: T.rule }}
       >
         {TIPS[index]}

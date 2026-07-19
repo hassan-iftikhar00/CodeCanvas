@@ -86,7 +86,7 @@ export default function ScreenTabs({
                 }}
                 maxLength={24}
                 aria-label="Screen name"
-                className="w-24 px-2 py-1 text-[10px] tracking-[0.1em] uppercase outline-none"
+                className="w-24 px-2 py-1 text-[13px] tracking-[0.1em] uppercase outline-none"
                 style={{
                   background: T_CANVAS.paper,
                   color: T_CANVAS.graphite,
@@ -102,7 +102,7 @@ export default function ScreenTabs({
                   setEditingId(screen.id);
                   setDraftName(screen.name);
                 }}
-                className="max-w-[140px] truncate px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase transition-colors"
+                className="max-w-[140px] truncate px-2.5 py-1 text-[13px] tracking-[0.14em] uppercase transition-colors"
                 style={{
                   color: active ? T_CANVAS.paper : T_CANVAS.muted,
                 }}

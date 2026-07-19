@@ -140,7 +140,7 @@ export function DeleteAccountModal({
           >
             {/* Title strip */}
             <div
-              className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+              className="flex items-center justify-between border-b px-5 py-2 text-[13px] tracking-[0.16em] uppercase"
               style={{
                 background: `${T.error}10`,
                 borderColor: T.error,
@@ -195,7 +195,7 @@ export function DeleteAccountModal({
                   </svg>
                 </div>
                 <div
-                  className="text-[10px] tracking-[0.18em] uppercase"
+                  className="text-[13px] tracking-[0.18em] uppercase"
                   style={{ color: T.muted, fontFamily: MONO }}
                 >
                   Confirmed
@@ -211,7 +211,7 @@ export function DeleteAccountModal({
                   Account deleted.
                 </h2>
                 <p
-                  className="text-[12px]"
+                  className="text-[13px]"
                   style={{ color: T.muted, fontFamily: SANS }}
                 >
                   Redirecting you now...
@@ -234,7 +234,7 @@ export function DeleteAccountModal({
                   </h2>
                   <p
                     id="delete-account-desc"
-                    className="mt-1.5 text-[12px] leading-[1.55]"
+                    className="mt-1.5 text-[13px] leading-[1.55]"
                     style={{ color: T.muted, fontFamily: SANS }}
                   >
                     This action cannot be undone. Read carefully before
@@ -252,13 +252,13 @@ export function DeleteAccountModal({
                     }}
                   >
                     <div
-                      className="text-[10px] tracking-[0.16em] uppercase"
+                      className="text-[13px] tracking-[0.16em] uppercase"
                       style={{ color: T.error, fontFamily: MONO }}
                     >
                       Permanently removed
                     </div>
                     <ul
-                      className="mt-2 space-y-1 text-[12px]"
+                      className="mt-2 space-y-1 text-[13px]"
                       style={{ color: T.graphite, fontFamily: SANS }}
                     >
                       {[
@@ -284,7 +284,7 @@ export function DeleteAccountModal({
                 <div className="px-6 pt-4 pb-2">
                   <label
                     htmlFor="delete-account-input"
-                    className="mb-1.5 block text-[10px] tracking-[0.16em] uppercase"
+                    className="mb-1.5 block text-[13px] tracking-[0.16em] uppercase"
                     style={{ color: T.muted, fontFamily: MONO }}
                   >
                     Type{" "}
@@ -345,7 +345,7 @@ export function DeleteAccountModal({
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -4 }}
                       role="alert"
-                      className="mx-6 mb-2 flex items-start gap-2 px-3 py-2 text-[12px]"
+                      className="mx-6 mb-2 flex items-start gap-2 px-3 py-2 text-[13px]"
                       style={{
                         border: `1px solid ${T.error}`,
                         background: `${T.error}10`,
@@ -375,7 +375,7 @@ export function DeleteAccountModal({
                     type="button"
                     onClick={handleClose}
                     disabled={isDeleting}
-                    className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     style={{
                       background: T.paper,
                       border: `1px solid ${T.rule}`,
@@ -401,7 +401,7 @@ export function DeleteAccountModal({
                     type="button"
                     onClick={handleDelete}
                     disabled={!isConfirmed || isDeleting}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+                    className="inline-flex items-center gap-2 px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
                     style={{
                       background: T.error,
                       color: T.paper,

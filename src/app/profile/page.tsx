@@ -240,7 +240,7 @@ export default function ProfilePage() {
           >
             <div className="mb-6">
               <div
-                className="text-[10px] tracking-[0.18em] uppercase"
+                className="text-[13px] tracking-[0.18em] uppercase"
                 style={{ color: T.muted, fontFamily: MONO }}
               >
                 Account · Profile
@@ -271,7 +271,7 @@ export default function ProfilePage() {
                   exit={{ opacity: 0, y: -4 }}
                   role="status"
                   aria-live="polite"
-                  className="mb-5 flex items-center gap-2.5 px-3.5 py-2 text-[12px]"
+                  className="mb-5 flex items-center gap-2.5 px-3.5 py-2 text-[13px]"
                   style={{
                     border: `1px solid ${
                       message.type === "success" ? T.success : T.error
@@ -284,7 +284,7 @@ export default function ProfilePage() {
                   }}
                 >
                   <span
-                    className="px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
+                    className="px-1.5 py-0.5 text-[12px] tracking-[0.18em] uppercase"
                     style={{
                       border: `1px solid currentColor`,
                       fontFamily: MONO,
@@ -306,7 +306,7 @@ export default function ProfilePage() {
                 }}
               >
                 <div
-                  className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+                  className="flex items-center justify-between border-b px-5 py-2 text-[13px] tracking-[0.16em] uppercase"
                   style={{
                     background: T.vellum,
                     borderColor: T.rule,
@@ -356,20 +356,20 @@ export default function ProfilePage() {
                     </div>
                     <div className="flex-1">
                       <div
-                        className="text-[10px] tracking-[0.16em] uppercase"
+                        className="text-[13px] tracking-[0.16em] uppercase"
                         style={{ color: T.muted, fontFamily: MONO }}
                       >
                         Profile picture
                       </div>
                       <p
-                        className="mt-0.5 text-[11px]"
+                        className="mt-0.5 text-[13px]"
                         style={{ color: T.muted, fontFamily: SANS }}
                       >
                         Max 5MB. JPEG, PNG, GIF or WebP.
                       </p>
                       <label
                         htmlFor="avatar-upload"
-                        className="mt-2 inline-flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                        className="mt-2 inline-flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-[13px] tracking-[0.16em] uppercase transition-colors"
                         style={{
                           background: T.paper,
                           border: `1px solid ${T.rule}`,
@@ -495,7 +495,7 @@ export default function ProfilePage() {
                       whileTap={{ scale: 0.96 }}
                       type="submit"
                       disabled={saving || uploading}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-2 px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                       style={{
                         background: T.cobalt,
                         color: T.paper,
@@ -531,7 +531,7 @@ export default function ProfilePage() {
                     </motion.button>
                     <Link
                       href="/dashboard"
-                      className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                      className="px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
                       style={{
                         background: T.paper,
                         border: `1px solid ${T.rule}`,
@@ -566,7 +566,7 @@ export default function ProfilePage() {
                 }}
               >
                 <div
-                  className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+                  className="flex items-center justify-between border-b px-5 py-2 text-[13px] tracking-[0.16em] uppercase"
                   style={{
                     background: T.vellum,
                     borderColor: T.rule,
@@ -605,7 +605,7 @@ export default function ProfilePage() {
                 }}
               >
                 <div
-                  className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+                  className="flex items-center justify-between border-b px-5 py-2 text-[13px] tracking-[0.16em] uppercase"
                   style={{
                     background: `${T.error}10`,
                     borderColor: T.error,
@@ -622,7 +622,7 @@ export default function ProfilePage() {
                   <div className="flex flex-col items-start gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
                       <div
-                        className="text-[12px]"
+                        className="text-[13px]"
                         style={{
                           color: T.graphite,
                           fontFamily: SANS,
@@ -632,7 +632,7 @@ export default function ProfilePage() {
                         Sign out
                       </div>
                       <p
-                        className="mt-0.5 text-[11px]"
+                        className="mt-0.5 text-[13px]"
                         style={{ color: T.muted, fontFamily: SANS }}
                       >
                         End your current session on this device.
@@ -641,7 +641,7 @@ export default function ProfilePage() {
                     <motion.button
                       whileTap={{ scale: 0.96 }}
                       onClick={handleLogout}
-                      className="flex-none inline-flex items-center gap-1.5 px-3.5 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                      className="flex-none inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
                       style={{
                         background: T.paper,
                         border: `1px solid ${T.rule}`,
@@ -671,7 +671,7 @@ export default function ProfilePage() {
                   >
                     <div>
                       <div
-                        className="text-[12px]"
+                        className="text-[13px]"
                         style={{
                           color: T.graphite,
                           fontFamily: SANS,
@@ -681,7 +681,7 @@ export default function ProfilePage() {
                         Delete account
                       </div>
                       <p
-                        className="mt-0.5 text-[11px]"
+                        className="mt-0.5 text-[13px]"
                         style={{ color: T.muted, fontFamily: SANS }}
                       >
                         Permanently remove your account, all projects, and all
@@ -691,7 +691,7 @@ export default function ProfilePage() {
                     <motion.button
                       whileTap={{ scale: 0.96 }}
                       onClick={() => setShowDeleteModal(true)}
-                      className="flex-none inline-flex items-center gap-1.5 px-3.5 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                      className="flex-none inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
                       style={{
                         background: T.error,
                         color: T.paper,
@@ -740,7 +740,7 @@ function Field({
     <div>
       <label
         htmlFor={id}
-        className="mb-1.5 block text-[10px] tracking-[0.16em] uppercase"
+        className="mb-1.5 block text-[13px] tracking-[0.16em] uppercase"
         style={{ color: T.muted, fontFamily: MONO }}
       >
         {label}
@@ -748,7 +748,7 @@ function Field({
       {children}
       {hint && (
         <p
-          className="mt-1 text-[11px]"
+          className="mt-1 text-[13px]"
           style={{ color: T.muted, fontFamily: SANS }}
         >
           {hint}
@@ -762,13 +762,13 @@ function AccountRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between py-2.5">
       <dt
-        className="text-[10px] tracking-[0.16em] uppercase"
+        className="text-[13px] tracking-[0.16em] uppercase"
         style={{ color: T.muted, fontFamily: MONO }}
       >
         {label}
       </dt>
       <dd
-        className="text-[12px]"
+        className="text-[13px]"
         style={{ color: T.graphite, fontFamily: SANS, fontWeight: 500 }}
       >
         {value}

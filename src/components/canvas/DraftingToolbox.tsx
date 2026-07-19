@@ -66,7 +66,7 @@ export default function DraftingToolbox({
       {/* TITLE BLOCK — only when expanded */}
       {!collapsed && (
         <div
-          className="flex items-center justify-between border-b px-4 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+          className="flex items-center justify-between border-b px-4 py-2.5 text-[13px] tracking-[0.16em] uppercase"
           style={{ borderColor: T_CANVAS.rule, color: T_CANVAS.muted }}
         >
           <span style={{ color: T_CANVAS.graphite }}>TOOLBOX · v0.1</span>
@@ -182,13 +182,13 @@ export default function DraftingToolbox({
                 {tab.icon}
               </span>
               {!collapsed && (
-                <span className="text-[10px] tracking-[0.16em] uppercase">
+                <span className="text-[13px] tracking-[0.16em] uppercase">
                   {tab.label}
                 </span>
               )}
               {tab.badge && tab.badge > 0 ? (
                 <span
-                  className="ml-auto inline-flex h-3.5 min-w-[14px] items-center justify-center px-1 text-[9px] tracking-[0.04em]"
+                  className="ml-auto inline-flex h-3.5 min-w-[14px] items-center justify-center px-1 text-[12px] tracking-[0.04em]"
                   style={{
                     background: isActive ? T_CANVAS.paper : T_CANVAS.cobalt,
                     color: isActive ? T_CANVAS.graphite : T_CANVAS.paper,

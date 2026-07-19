@@ -49,7 +49,7 @@ function ErrorFallback({
       <div
         role="alert"
         aria-live="polite"
-        className="flex items-center gap-3 px-3 py-2 text-[12px]"
+        className="flex items-center gap-3 px-3 py-2 text-[13px]"
         style={{
           background: `${T.error}10`,
           border: `1px solid ${T.error}`,
@@ -58,7 +58,7 @@ function ErrorFallback({
         }}
       >
         <span
-          className="px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
+          className="px-1.5 py-0.5 text-[12px] tracking-[0.18em] uppercase"
           style={{
             border: `1px solid currentColor`,
             fontFamily: MONO,
@@ -70,7 +70,7 @@ function ErrorFallback({
         <button
           type="button"
           onClick={onRetry}
-          className="px-2 py-1 text-[10px] tracking-[0.18em] uppercase transition-colors"
+          className="px-2 py-1 text-[13px] tracking-[0.18em] uppercase transition-colors"
           style={{
             background: T.paper,
             border: `1px solid ${T.error}`,
@@ -112,7 +112,7 @@ function ErrorFallback({
       >
         {/* Title strip */}
         <div
-          className="flex items-center justify-between border-b px-5 py-2 text-[10px] tracking-[0.16em] uppercase"
+          className="flex items-center justify-between border-b px-5 py-2 text-[13px] tracking-[0.16em] uppercase"
           style={{
             background: `${T.error}10`,
             borderColor: T.error,
@@ -154,7 +154,7 @@ function ErrorFallback({
             {title}
           </h2>
           <p
-            className="mt-1.5 text-[12px] leading-[1.55]"
+            className="mt-1.5 text-[13px] leading-[1.55]"
             style={{ color: T.muted, fontFamily: SANS }}
           >
             {message}
@@ -172,7 +172,7 @@ function ErrorFallback({
           <button
             type="button"
             onClick={onRefresh}
-            className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+            className="px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
             style={{
               background: T.paper,
               border: `1px solid ${T.rule}`,
@@ -196,7 +196,7 @@ function ErrorFallback({
           <button
             type="button"
             onClick={onRetry}
-            className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+            className="px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
             style={{
               background: T.cobalt,
               border: `1px solid ${T.cobalt}`,

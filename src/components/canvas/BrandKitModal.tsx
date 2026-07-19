@@ -200,7 +200,7 @@ export default function BrandKitModal({
           value={font}
           onChange={(e) => setFont(e.target.value)}
           aria-label="Brand font family"
-          className="h-9 w-full px-2 text-[12px] outline-none"
+          className="h-9 w-full px-2 text-[13px] outline-none"
           style={{
             background: T_CANVAS.paper,
             border: `1px solid ${T_CANVAS.rule}`,
@@ -235,14 +235,14 @@ export default function BrandKitModal({
       </ModalSection>
 
       {!projectId ? (
-        <p className="text-[11px]" style={{ color: T_CANVAS.muted }}>
+        <p className="text-[13px]" style={{ color: T_CANVAS.muted }}>
           The project is not saved yet, so this kit applies to this session
           only. Save the project to keep it.
         </p>
       ) : null}
 
       {error ? (
-        <p className="mt-2 text-[11px]" style={{ color: T_CANVAS.error }}>
+        <p className="mt-2 text-[13px]" style={{ color: T_CANVAS.error }}>
           {error}
         </p>
       ) : null}
@@ -279,7 +279,7 @@ function ColorRow({
       />
       <div className="min-w-0 flex-1">
         <div
-          className="text-[10px] tracking-[0.16em] uppercase"
+          className="text-[13px] tracking-[0.16em] uppercase"
           style={{
             color: T_CANVAS.graphite,
             fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -287,7 +287,7 @@ function ColorRow({
         >
           {label}
         </div>
-        <div className="truncate text-[10px]" style={{ color: T_CANVAS.muted }}>
+        <div className="truncate text-[13px]" style={{ color: T_CANVAS.muted }}>
           {hint}
         </div>
       </div>
@@ -297,7 +297,7 @@ function ColorRow({
         onChange={(e) => onChange(e.target.value.trim())}
         placeholder="#000000"
         aria-label={`${label} hex value`}
-        className="h-7 w-24 px-2 text-[11px] uppercase outline-none"
+        className="h-7 w-24 px-2 text-[13px] uppercase outline-none"
         style={{
           background: T_CANVAS.vellum,
           border: `1px solid ${T_CANVAS.rule}`,
@@ -310,7 +310,7 @@ function ColorRow({
           type="button"
           onClick={() => onChange("")}
           aria-label={`Clear ${label} color`}
-          className="flex h-5 w-5 shrink-0 items-center justify-center text-[11px] transition-colors"
+          className="flex h-5 w-5 shrink-0 items-center justify-center text-[13px] transition-colors"
           style={{ color: T_CANVAS.muted }}
           onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.error)}
           onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}

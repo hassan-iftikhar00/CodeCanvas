@@ -56,7 +56,7 @@ export default function TextInputModal({
         <div>
           <label
             htmlFor="text-input-modal-value"
-            className="mb-2 block text-[10px] tracking-[0.18em] uppercase"
+            className="mb-2 block text-[13px] tracking-[0.18em] uppercase"
             style={{
               color: T_CANVAS.muted,
               fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",

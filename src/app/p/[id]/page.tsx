@@ -103,13 +103,13 @@ export default function PublicPreviewPage() {
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <CanvasMark size={18} color={T_CANVAS.graphite} />
           <span
-            className="min-w-0 truncate text-[11px] tracking-[0.14em] uppercase"
+            className="min-w-0 truncate text-[13px] tracking-[0.14em] uppercase"
             style={{ color: T_CANVAS.graphite }}
           >
             {state === "ready" ? project?.title : "Shared preview"}
           </span>
           <span
-            className="hidden text-[10px] tracking-[0.16em] uppercase sm:inline"
+            className="hidden text-[13px] tracking-[0.16em] uppercase sm:inline"
             style={{ color: T_CANVAS.muted }}
           >
             · READ ONLY
@@ -117,7 +117,7 @@ export default function PublicPreviewPage() {
         </div>
         <Link
           href="/"
-          className="flex h-7 items-center px-2.5 text-[10px] tracking-[0.16em] uppercase transition-opacity hover:opacity-85"
+          className="flex h-7 items-center px-2.5 text-[13px] tracking-[0.16em] uppercase transition-opacity hover:opacity-85"
           style={{
             background: T_CANVAS.graphite,
             color: T_CANVAS.paper,
@@ -175,7 +175,7 @@ function CenterNotice({ title, body }: { title: string; body: string }) {
           {title}
         </div>
         <p
-          className="mt-2 text-[12px] leading-relaxed"
+          className="mt-2 text-[13px] leading-relaxed"
           style={{
             color: T_CANVAS.muted,
             fontFamily:

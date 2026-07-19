@@ -322,11 +322,11 @@ function TopBar() {
         <span className="text-[13px] tracking-[0.18em] uppercase">
           CodeCanvas
         </span>
-        <span className="text-[10px]" style={{ color: "var(--d5-muted)" }}>
+        <span className="text-[13px]" style={{ color: "var(--d5-muted)" }}>
           / DRAFTING ROOM v0.1
         </span>
       </div>
-      <nav className="flex items-center gap-6 text-[11px] tracking-[0.16em] uppercase">
+      <nav className="flex items-center gap-6 text-[13px] tracking-[0.16em] uppercase">
         <a href="#palette">Palette</a>
         <a href="#typography">Type</a>
         <a href="#workspace">Workspace</a>
@@ -334,7 +334,7 @@ function TopBar() {
         <a href="#motion">Motion</a>
       </nav>
       <div
-        className="flex items-center gap-2 text-[10px]"
+        className="flex items-center gap-2 text-[13px]"
         style={{ color: "var(--d5-muted)" }}
       >
         <Cross size={8} />
@@ -398,7 +398,7 @@ function Hero() {
       <div className="relative px-10 pt-20 pb-28 max-w-[1400px] mx-auto">
         {/* slug + counter row */}
         <div
-          className="d5-mono flex items-center justify-between mb-12 text-[10px] tracking-[0.16em] uppercase"
+          className="d5-mono flex items-center justify-between mb-12 text-[13px] tracking-[0.16em] uppercase"
           style={{ color: "var(--d5-muted)" }}
         >
           <span>FIG. 01 / DRAFT — TOOL VIEW</span>
@@ -513,7 +513,7 @@ function SpecBlock() {
       }}
     >
       <div
-        className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-3 pb-2 border-b"
+        className="d5-mono text-[13px] tracking-[0.18em] uppercase mb-3 pb-2 border-b"
         style={{
           borderColor: "var(--d5-rule)",
           color: "var(--d5-graphite)",
@@ -521,7 +521,7 @@ function SpecBlock() {
       >
         SHEET INFO
       </div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 d5-mono text-[11px]">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 d5-mono text-[13px]">
         {rows.map(([k, v]) => (
           <div
             key={k}
@@ -553,7 +553,7 @@ function StatusBar() {
 
   return (
     <div
-      className="d5-mono relative border-t flex items-center justify-between px-6 py-2 text-[10px] tracking-[0.14em] uppercase"
+      className="d5-mono relative border-t flex items-center justify-between px-6 py-2 text-[13px] tracking-[0.14em] uppercase"
       style={{
         borderColor: "var(--d5-rule)",
         background: "var(--d5-paper)",
@@ -687,7 +687,7 @@ function Section({
         <div className="flex items-baseline justify-between border-b pb-5 mb-12 d5-hair">
           <div className="flex items-baseline gap-6">
             <span
-              className="d5-mono text-[12px] tracking-[0.2em]"
+              className="d5-mono text-[13px] tracking-[0.2em]"
               style={{ color: "var(--d5-cobalt)" }}
             >
               {index}
@@ -705,7 +705,7 @@ function Section({
             </h2>
           </div>
           <span
-            className="d5-mono text-[11px] tracking-[0.14em] uppercase"
+            className="d5-mono text-[13px] tracking-[0.14em] uppercase"
             style={{ color: "var(--d5-muted)" }}
           >
             {caption}
@@ -764,7 +764,7 @@ function PaletteBlock() {
           style={{ background: s.hex, color: s.fg ?? LIGHT.graphite }}
         >
           <div className="flex items-start justify-between">
-            <span className="d5-mono text-[10px] tracking-[0.16em] uppercase opacity-60">
+            <span className="d5-mono text-[13px] tracking-[0.16em] uppercase opacity-60">
               {s.role}
             </span>
             <Cross size={8} />
@@ -776,7 +776,7 @@ function PaletteBlock() {
             >
               {s.name}
             </div>
-            <div className="d5-mono text-[11px] mt-1 tracking-[0.12em]">
+            <div className="d5-mono text-[13px] mt-1 tracking-[0.12em]">
               {s.hex.toUpperCase()}
             </div>
           </div>
@@ -795,7 +795,7 @@ function TypographyBlock() {
       {/* Display serif */}
       <div className="col-span-12 grid grid-cols-12 gap-x-8 items-end border-b d5-hair pb-10">
         <div
-          className="col-span-2 d5-mono text-[10px] tracking-[0.16em] uppercase"
+          className="col-span-2 d5-mono text-[13px] tracking-[0.16em] uppercase"
           style={{ color: "var(--d5-muted)" }}
         >
           DISPLAY / SERIF
@@ -816,7 +816,7 @@ function TypographyBlock() {
       {/* Sans body */}
       <div className="col-span-12 grid grid-cols-12 gap-x-8 items-start border-b d5-hair pb-10">
         <div
-          className="col-span-2 d5-mono text-[10px] tracking-[0.16em] uppercase"
+          className="col-span-2 d5-mono text-[13px] tracking-[0.16em] uppercase"
           style={{ color: "var(--d5-muted)" }}
         >
           BODY / SANS
@@ -844,7 +844,7 @@ function TypographyBlock() {
       {/* Mono technical */}
       <div className="col-span-12 grid grid-cols-12 gap-x-8 items-start">
         <div
-          className="col-span-2 d5-mono text-[10px] tracking-[0.16em] uppercase"
+          className="col-span-2 d5-mono text-[13px] tracking-[0.16em] uppercase"
           style={{ color: "var(--d5-muted)" }}
         >
           TECHNICAL / MONO
@@ -859,13 +859,13 @@ function TypographyBlock() {
             {"}"});
           </div>
           <div
-            className="text-[11px] tracking-[0.12em] uppercase"
+            className="text-[13px] tracking-[0.12em] uppercase"
             style={{ color: "var(--d5-graphite)" }}
           >
             ROBOFLOW DETECTION · CONFIDENCE 0.93 · CARD ×6 · SECTION ×2
           </div>
           <div
-            className="text-[10px] tracking-[0.16em] uppercase"
+            className="text-[13px] tracking-[0.16em] uppercase"
             style={{ color: "var(--d5-muted)" }}
           >
             STATUS · SHEET 01 / 09 · REV 2026-06-11 · GEMINI 2.5
@@ -890,7 +890,7 @@ function WorkspaceBlock() {
     >
       {/* title block bar */}
       <div
-        className="d5-mono flex items-center justify-between px-4 py-2 border-b text-[10px] tracking-[0.16em] uppercase"
+        className="d5-mono flex items-center justify-between px-4 py-2 border-b text-[13px] tracking-[0.16em] uppercase"
         style={{
           borderColor: "var(--d5-rule)",
           color: "var(--d5-muted)",
@@ -931,13 +931,13 @@ function WorkspaceBlock() {
 
           {/* bottom-left mono label */}
           <div
-            className="absolute bottom-3 left-4 d5-mono text-[9px] tracking-[0.18em] uppercase"
+            className="absolute bottom-3 left-4 d5-mono text-[12px] tracking-[0.18em] uppercase"
             style={{ color: "var(--d5-muted)" }}
           >
             CANVAS / 6 ELEMENTS / SNAP ON
           </div>
           <div
-            className="absolute bottom-3 right-4 d5-mono text-[9px] tracking-[0.18em] uppercase"
+            className="absolute bottom-3 right-4 d5-mono text-[12px] tracking-[0.18em] uppercase"
             style={{ color: "var(--d5-muted)" }}
           >
             ZOOM 100%
@@ -955,7 +955,7 @@ function WorkspaceBlock() {
 
       {/* bottom command rail */}
       <div
-        className="d5-mono flex items-center justify-between px-4 py-2 border-t text-[10px] tracking-[0.14em] uppercase"
+        className="d5-mono flex items-center justify-between px-4 py-2 border-t text-[13px] tracking-[0.14em] uppercase"
         style={{
           borderColor: "var(--d5-rule)",
           background: "var(--d5-paper)",
@@ -1228,7 +1228,7 @@ function CodeWell() {
     <div className="relative h-full">
       {/* tab bar */}
       <div
-        className="d5-mono flex items-center gap-1 text-[10px] tracking-[0.14em] uppercase mb-3"
+        className="d5-mono flex items-center gap-1 text-[13px] tracking-[0.14em] uppercase mb-3"
         style={{ color: "rgba(242,241,236,0.55)" }}
       >
         <span
@@ -1250,7 +1250,7 @@ function CodeWell() {
 
       {/* code body */}
       <pre
-        className="d5-mono text-[12px] leading-[1.7] overflow-hidden"
+        className="d5-mono text-[13px] leading-[1.7] overflow-hidden"
         style={{ color: "rgba(242,241,236,0.85)" }}
       >
         {lines.map((l) => (
@@ -1268,7 +1268,7 @@ function CodeWell() {
 
       {/* bottom status */}
       <div
-        className="d5-mono absolute bottom-0 left-0 right-0 flex items-center justify-between text-[9px] tracking-[0.16em] uppercase pt-2 border-t"
+        className="d5-mono absolute bottom-0 left-0 right-0 flex items-center justify-between text-[12px] tracking-[0.16em] uppercase pt-2 border-t"
         style={{
           color: "rgba(242,241,236,0.45)",
           borderColor: "rgba(242,241,236,0.12)",
@@ -1425,7 +1425,7 @@ function PanelCard({
       }}
     >
       <div
-        className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-5 pb-2 border-b d5-hair"
+        className="d5-mono text-[13px] tracking-[0.18em] uppercase mb-5 pb-2 border-b d5-hair"
         style={{ color: "var(--d5-graphite)" }}
       >
         {title}
@@ -1451,7 +1451,7 @@ function Field({
   return (
     <div>
       <div
-        className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-1"
+        className="d5-mono text-[13px] tracking-[0.18em] uppercase mb-1"
         style={{ color: "var(--d5-muted)" }}
       >
         {label}
@@ -1464,7 +1464,7 @@ function Field({
       />
       {focused && (
         <div
-          className="d5-mono text-[10px] tracking-[0.12em] uppercase mt-1.5"
+          className="d5-mono text-[13px] tracking-[0.12em] uppercase mt-1.5"
           style={{ color: "var(--d5-cobalt)" }}
         >
           ✓ KEY VERIFIED
@@ -1485,13 +1485,13 @@ function ProjectCard() {
     >
       <div className="flex items-start justify-between mb-4">
         <span
-          className="d5-mono text-[10px] tracking-[0.18em] uppercase"
+          className="d5-mono text-[13px] tracking-[0.18em] uppercase"
           style={{ color: "var(--d5-cobalt)" }}
         >
           P-0247
         </span>
         <span
-          className="d5-mono text-[10px]"
+          className="d5-mono text-[13px]"
           style={{ color: "var(--d5-muted)" }}
         >
           ITER 12
@@ -1504,13 +1504,13 @@ function ProjectCard() {
         Pricing page
       </div>
       <div
-        className="d5-mono text-[10px] tracking-[0.14em] uppercase mt-2"
+        className="d5-mono text-[13px] tracking-[0.14em] uppercase mt-2"
         style={{ color: "var(--d5-muted)" }}
       >
         EDITED 2 MIN AGO · 6 ELEMENTS
       </div>
       <div
-        className="mt-5 pt-3 border-t d5-hair flex items-center justify-between d5-mono text-[10px] tracking-[0.14em] uppercase"
+        className="mt-5 pt-3 border-t d5-hair flex items-center justify-between d5-mono text-[13px] tracking-[0.14em] uppercase"
         style={{ color: "var(--d5-muted)" }}
       >
         <span>EXPORT</span>
@@ -1532,7 +1532,7 @@ function Toast({ type }: { type: "success" | "error" }) {
       }}
     >
       <span
-        className="d5-mono text-[10px] tracking-[0.18em] uppercase"
+        className="d5-mono text-[13px] tracking-[0.18em] uppercase"
         style={{ color: isOk ? "var(--d5-cobalt)" : "var(--d5-cobalt)" }}
       >
         {isOk ? "✓ SAVED" : "✕ ERROR"}
@@ -1540,7 +1540,7 @@ function Toast({ type }: { type: "success" | "error" }) {
       <span className="text-[13px]">
         {isOk ? "Project committed." : "Couldn't reach Roboflow."}
       </span>
-      <span className="d5-mono ml-auto text-[10px] tracking-[0.14em] uppercase opacity-60">
+      <span className="d5-mono ml-auto text-[13px] tracking-[0.14em] uppercase opacity-60">
         {isOk ? "0.4s ago" : "RETRY"}
       </span>
     </div>
@@ -1558,7 +1558,7 @@ function DropdownMock() {
       }}
     >
       <div
-        className="d5-mono text-[10px] tracking-[0.16em] uppercase px-3 py-2 border-b d5-hair"
+        className="d5-mono text-[13px] tracking-[0.16em] uppercase px-3 py-2 border-b d5-hair"
         style={{ color: "var(--d5-muted)" }}
       >
         ACTIONS
@@ -1574,7 +1574,7 @@ function DropdownMock() {
         >
           <span>{it}</span>
           <span
-            className="d5-mono text-[10px] tracking-[0.12em]"
+            className="d5-mono text-[13px] tracking-[0.12em]"
             style={{ color: "var(--d5-muted)" }}
           >
             ⌘{i + 1}
@@ -1593,7 +1593,7 @@ function Tabs() {
         {tabs.map((t, i) => (
           <div
             key={t}
-            className="d5-mono text-[11px] tracking-[0.18em] uppercase pb-2 relative"
+            className="d5-mono text-[13px] tracking-[0.18em] uppercase pb-2 relative"
             style={{
               color: i === 1 ? "var(--d5-graphite)" : "var(--d5-muted)",
             }}
@@ -1609,7 +1609,7 @@ function Tabs() {
         ))}
       </div>
       <div
-        className="mt-5 d5-mono text-[12px]"
+        className="mt-5 d5-mono text-[13px]"
         style={{ color: "var(--d5-muted)" }}
       >
         Preview is selected. The cobalt tick anchors the active tab.
@@ -1638,7 +1638,7 @@ function Badge({
       : {};
   return (
     <span
-      className="d5-mono text-[10px] tracking-[0.2em] uppercase px-2 py-1 inline-flex items-center"
+      className="d5-mono text-[13px] tracking-[0.2em] uppercase px-2 py-1 inline-flex items-center"
       style={{ border: "1px solid var(--d5-rule)", ...style }}
     >
       {children}
@@ -1694,7 +1694,7 @@ function MotionDemo({
       }}
     >
       <div
-        className="d5-mono text-[10px] tracking-[0.16em] uppercase mb-4 pb-2 border-b d5-hair"
+        className="d5-mono text-[13px] tracking-[0.16em] uppercase mb-4 pb-2 border-b d5-hair"
         style={{ color: "var(--d5-graphite)" }}
       >
         {title}
@@ -1800,7 +1800,7 @@ function CompassLoader() {
         </g>
       </svg>
       <div
-        className="d5-mono text-[9px] tracking-[0.2em] uppercase"
+        className="d5-mono text-[12px] tracking-[0.2em] uppercase"
         style={{ color: "var(--d5-muted)" }}
       >
         DRAFTING…
@@ -1828,7 +1828,7 @@ function NumeralRoll() {
         {n.toLocaleString()}
       </div>
       <div
-        className="d5-mono text-[9px] tracking-[0.2em] uppercase"
+        className="d5-mono text-[12px] tracking-[0.2em] uppercase"
         style={{ color: "var(--d5-muted)" }}
       >
         COMPONENTS RENDERED
@@ -1901,7 +1901,7 @@ function ThemePreview({ tokens, label }: { tokens: Tokens; label: string }) {
   return (
     <div style={css} className="relative">
       <div
-        className="d5-mono text-[10px] tracking-[0.2em] uppercase pb-2 border-b mb-6 flex items-center justify-between"
+        className="d5-mono text-[13px] tracking-[0.2em] uppercase pb-2 border-b mb-6 flex items-center justify-between"
         style={{ borderColor: tokens.rule, color: tokens.muted }}
       >
         <span>{label}</span>
@@ -1963,13 +1963,13 @@ function ThemePreview({ tokens, label }: { tokens: Tokens; label: string }) {
         }}
       >
         <div
-          className="d5-mono text-[10px] tracking-[0.18em] uppercase pb-2 mb-3 border-b"
+          className="d5-mono text-[13px] tracking-[0.18em] uppercase pb-2 mb-3 border-b"
           style={{ borderColor: tokens.rule, color: tokens.muted }}
         >
           P-0247 · PRICING PAGE
         </div>
         <div
-          className="d5-mono text-[10px] tracking-[0.14em] uppercase"
+          className="d5-mono text-[13px] tracking-[0.14em] uppercase"
           style={{ color: tokens.muted }}
         >
           EDITED 2 MIN AGO · 6 ELEMENTS
@@ -1977,7 +1977,7 @@ function ThemePreview({ tokens, label }: { tokens: Tokens; label: string }) {
       </div>
 
       <div
-        className="d5-mono text-[10px] tracking-[0.14em] uppercase mt-8 flex items-center gap-5"
+        className="d5-mono text-[13px] tracking-[0.14em] uppercase mt-8 flex items-center gap-5"
         style={{ color: tokens.muted }}
       >
         <span style={{ color: tokens.cobalt }}>● SAVED</span>
@@ -1993,7 +1993,7 @@ function ThemePreview({ tokens, label }: { tokens: Tokens; label: string }) {
 function Colophon() {
   return (
     <footer
-      className="px-10 py-16 max-w-[1400px] mx-auto d5-mono text-[11px] tracking-[0.14em] uppercase"
+      className="px-10 py-16 max-w-[1400px] mx-auto d5-mono text-[13px] tracking-[0.14em] uppercase"
       style={{ color: "var(--d5-muted)" }}
     >
       <div className="border-t d5-hair pt-6 grid grid-cols-3 gap-8">

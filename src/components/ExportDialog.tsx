@@ -178,7 +178,7 @@ export default function ExportDialog({
           {generatedCode && codeFormat === "copy" && (
             <ModalSection label="PREVIEW">
               <div
-                className="text-[11px]"
+                className="text-[13px]"
                 style={{
                   background: T_CANVAS.vellum,
                   border: `1px solid ${T_CANVAS.rule}`,
@@ -190,7 +190,7 @@ export default function ExportDialog({
                   }
                 `}</style>
                 <div
-                  className="flex items-center justify-between border-b px-3 py-1.5 text-[10px] tracking-[0.14em] uppercase"
+                  className="flex items-center justify-between border-b px-3 py-1.5 text-[13px] tracking-[0.14em] uppercase"
                   style={{
                     borderColor: T_CANVAS.rule,
                     color: T_CANVAS.muted,
@@ -202,7 +202,7 @@ export default function ExportDialog({
                   <span>{generatedCode.length} CHARS</span>
                 </div>
                 <pre
-                  className="export-preview-scroll max-h-32 overflow-auto p-3 text-[11px] leading-normal"
+                  className="export-preview-scroll max-h-32 overflow-auto p-3 text-[13px] leading-normal"
                   style={{
                     color: T_CANVAS.graphite,
                     scrollbarColor: `${T_CANVAS.graphite} transparent`,
@@ -254,7 +254,7 @@ export default function ExportDialog({
                   }}
                 />
                 <span
-                  className="w-12 text-right text-[10px] tabular-nums tracking-[0.06em]"
+                  className="w-12 text-right text-[13px] tabular-nums tracking-[0.06em]"
                   style={{
                     color: T_CANVAS.graphite,
                     fontFamily:

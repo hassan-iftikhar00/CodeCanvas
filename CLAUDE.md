@@ -435,6 +435,7 @@ Warn me about side effects before making changes.
 
 | File | When to read |
 |------|--------------|
+| `Audits/PROJECT_CONTEXT.md` | Single-source documentation dossier (tech stack versions, full API surface, DB schema, AI pipeline stages, model metrics, env vars, test inventory, numbers bank, gaps) — code-derived with source tags; read when writing FYP docs or needing one exhaustive reference |
 | `Audits/REFERENCE_FILE_MAP.md` | Need to find where a specific component, hook, or backend module lives |
 | `Audits/COMPLETED_TASKS.md` | Debugging regressions, understanding context behind a prior decision, tracing when a feature landed |
 | `Audits/ARCHITECTURE_DETAILS.md` | Debugging Roboflow detection issues, writing FYP dissertation sections, checking model performance numbers, full known-failure-modes table |

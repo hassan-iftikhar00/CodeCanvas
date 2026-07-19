@@ -209,7 +209,7 @@ export default function AuthShell({
             CodeCanvas
           </span>
           <span
-            className="hidden sm:inline text-[10px] tracking-[0.16em] uppercase"
+            className="hidden sm:inline text-[13px] tracking-[0.16em] uppercase"
             style={{ color: T_AUTH.muted }}
           >
             / DRAFTING ROOM
@@ -217,7 +217,7 @@ export default function AuthShell({
         </Link>
         <Link
           href="/"
-          className="text-[11px] tracking-[0.16em] uppercase"
+          className="text-[13px] tracking-[0.16em] uppercase"
           style={{ color: T_AUTH.muted }}
         >
           <span className="hidden sm:inline">← BACK TO HOME</span>
@@ -251,7 +251,7 @@ export default function AuthShell({
         >
           {/* title block — mirrors UNTITLED · DRAFT / BRIEF · v0.1 from landing */}
           <div
-            className="d5-mono flex items-center justify-between border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+            className="d5-mono flex items-center justify-between border-b px-5 py-2.5 text-[13px] tracking-[0.16em] uppercase"
             style={{ borderColor: T_AUTH.rule, color: T_AUTH.muted }}
           >
             <span style={{ color: T_AUTH.graphite }}>{slug}</span>
@@ -306,7 +306,7 @@ export default function AuthShell({
 
           {footerNote && (
             <div
-              className="d5-mono border-t px-6 py-3 text-[10px] tracking-[0.14em] uppercase sm:px-8"
+              className="d5-mono border-t px-6 py-3 text-[13px] tracking-[0.14em] uppercase sm:px-8"
               style={{
                 borderColor: T_AUTH.rule,
                 background: T_AUTH.vellum,
@@ -321,7 +321,7 @@ export default function AuthShell({
 
       {/* ─── BOTTOM STATUS LINE ─────────────────────────────────── */}
       <div
-        className="d5-mono relative border-t flex items-center justify-between px-5 py-2 text-[10px] tracking-[0.14em] uppercase sm:px-6"
+        className="d5-mono relative border-t flex items-center justify-between px-5 py-2 text-[13px] tracking-[0.14em] uppercase sm:px-6"
         style={{
           borderColor: T_AUTH.rule,
           background: T_AUTH.paper,

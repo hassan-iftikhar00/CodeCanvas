@@ -262,7 +262,7 @@ export default forwardRef(function MonacoCodeEditor(
         }}
       >
         <div
-          className="flex items-center gap-2 text-[10px] tracking-[0.14em] uppercase"
+          className="flex items-center gap-2 text-[13px] tracking-[0.14em] uppercase"
           style={{ color: T_DARK.inkMuted }}
         >
           <span
@@ -279,7 +279,7 @@ export default forwardRef(function MonacoCodeEditor(
           {!readOnly && (
             <button
               onClick={handleFormat}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] tracking-[0.14em] uppercase transition-colors"
+              className="flex items-center gap-1 px-2 py-1 text-[13px] tracking-[0.14em] uppercase transition-colors"
               style={{
                 background: T_DARK.surfaceSoft,
                 border: `1px solid ${T_DARK.rule}`,
@@ -312,7 +312,7 @@ export default forwardRef(function MonacoCodeEditor(
             </button>
           )}
           <span
-            className="text-[10px] tracking-[0.14em] uppercase"
+            className="text-[13px] tracking-[0.14em] uppercase"
             style={{ color: T_DARK.inkFaint }}
           >
             {readOnly ? "READ-ONLY" : "Ctrl+S TO SAVE"}

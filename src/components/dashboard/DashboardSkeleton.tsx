@@ -22,7 +22,7 @@ function Bar({ className }: { className?: string }) {
 function Strip({ slug }: { slug: string }) {
   return (
     <div
-      className="flex items-center justify-between border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
+      className="flex items-center justify-between border-b px-4 py-2 text-[13px] tracking-[0.16em] uppercase"
       style={{
         background: T.vellum,
         borderColor: T.rule,

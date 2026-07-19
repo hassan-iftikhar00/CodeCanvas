@@ -210,7 +210,7 @@ export default function ResetPasswordPage() {
           REQUEST NEW LINK <span aria-hidden="true">→</span>
         </Link>
         <p
-          className="d5-mono mt-5 text-center text-[10px] tracking-[0.16em] uppercase"
+          className="d5-mono mt-5 text-center text-[13px] tracking-[0.16em] uppercase"
           style={{ color: T_AUTH.muted }}
         >
           OR{" "}

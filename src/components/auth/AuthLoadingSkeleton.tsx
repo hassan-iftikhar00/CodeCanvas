@@ -19,7 +19,7 @@ export default function AuthLoadingSkeleton() {
         style={{ background: T_AUTH.paper, border: `1px solid ${T_AUTH.rule}` }}
       >
         <div
-          className="border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+          className="border-b px-5 py-2.5 text-[13px] tracking-[0.16em] uppercase"
           style={{
             borderColor: T_AUTH.rule,
             color: T_AUTH.muted,

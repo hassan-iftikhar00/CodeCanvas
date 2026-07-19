@@ -111,7 +111,7 @@ export default function ShareDialog({
     >
       {!projectId ? (
         <p
-          className="text-[12px] leading-relaxed"
+          className="text-[13px] leading-relaxed"
           style={{ color: T_CANVAS.muted }}
         >
           Save the project first. Sharing needs a saved project to point the
@@ -137,7 +137,7 @@ export default function ShareDialog({
                   }}
                 />
                 <span
-                  className="text-[11px] tracking-[0.14em] uppercase"
+                  className="text-[13px] tracking-[0.14em] uppercase"
                   style={{
                     color: T_CANVAS.graphite,
                     fontFamily:
@@ -173,7 +173,7 @@ export default function ShareDialog({
                   value={shareUrl}
                   onFocus={(e) => e.currentTarget.select()}
                   aria-label="Public share link"
-                  className="min-w-0 flex-1 px-3 py-2 text-[11px] outline-none"
+                  className="min-w-0 flex-1 px-3 py-2 text-[13px] outline-none"
                   style={{
                     background: T_CANVAS.paper,
                     color: T_CANVAS.graphite,
@@ -184,7 +184,7 @@ export default function ShareDialog({
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="px-3 text-[10px] tracking-[0.16em] uppercase transition-opacity hover:opacity-85"
+                  className="px-3 text-[13px] tracking-[0.16em] uppercase transition-opacity hover:opacity-85"
                   style={{
                     background: T_CANVAS.graphite,
                     color: T_CANVAS.paper,
@@ -197,7 +197,7 @@ export default function ShareDialog({
                 </button>
               </div>
               <p
-                className="mt-2 text-[11px] leading-relaxed"
+                className="mt-2 text-[13px] leading-relaxed"
                 style={{ color: T_CANVAS.muted }}
               >
                 The preview shows the last saved code. Save (Ctrl+S) after
@@ -207,7 +207,7 @@ export default function ShareDialog({
           ) : null}
 
           {error ? (
-            <p className="text-[11px]" style={{ color: T_CANVAS.error }}>
+            <p className="text-[13px]" style={{ color: T_CANVAS.error }}>
               {error}
             </p>
           ) : null}

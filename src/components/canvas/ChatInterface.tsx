@@ -264,7 +264,7 @@ export default function ChatInterface({
     >
       {/* SUB-HEADER — sketch state indicator */}
       <div
-        className="flex items-center justify-between border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
+        className="flex items-center justify-between border-b px-4 py-2 text-[13px] tracking-[0.16em] uppercase"
         style={{
           borderColor: T_CANVAS.rule,
           color: T_CANVAS.muted,
@@ -319,7 +319,7 @@ export default function ChatInterface({
         {isProcessing ? (
           <div className="flex justify-start">
             <div
-              className="flex items-center gap-2 px-3 py-2 text-[11px] tracking-[0.16em] uppercase"
+              className="flex items-center gap-2 px-3 py-2 text-[13px] tracking-[0.16em] uppercase"
               style={{
                 background: T_CANVAS.vellum,
                 border: `1px solid ${T_CANVAS.rule}`,
@@ -354,7 +354,7 @@ export default function ChatInterface({
               key={s}
               type="button"
               onClick={() => setInput(s)}
-              className="px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase transition-colors"
+              className="px-2.5 py-1 text-[13px] tracking-[0.14em] uppercase transition-colors"
               style={{
                 background: T_CANVAS.paper,
                 border: `1px solid ${T_CANVAS.rule}`,
@@ -519,7 +519,7 @@ export default function ChatInterface({
 function StatusPill({ ready }: { ready: boolean }) {
   return (
     <span
-      className="flex items-center gap-1.5 px-2 py-0.5 text-[10px] tracking-[0.14em] uppercase"
+      className="flex items-center gap-1.5 px-2 py-0.5 text-[13px] tracking-[0.14em] uppercase"
       style={{
         background: ready ? T_CANVAS.cobaltWash : T_CANVAS.vellum,
         color: ready ? T_CANVAS.cobaltInk : T_CANVAS.muted,

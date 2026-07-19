@@ -64,7 +64,7 @@ export default function ZoomPill({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex h-7 min-w-[52px] items-center justify-center px-2 text-[10px] tracking-[0.16em] tabular-nums transition-colors"
+        className="flex h-7 min-w-[52px] items-center justify-center px-2 text-[13px] tracking-[0.16em] tabular-nums transition-colors"
         style={{
           color: T_CANVAS.graphite,
           fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -143,7 +143,7 @@ export default function ZoomPill({
                   onZoomChange(p);
                   setOpen(false);
                 }}
-                className="flex w-full items-center justify-between px-3 py-1.5 text-[10px] tracking-[0.14em] uppercase transition-colors"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-[13px] tracking-[0.14em] uppercase transition-colors"
                 style={{
                   background: zoom === p ? T_CANVAS.cobaltWash : "transparent",
                   color: zoom === p ? T_CANVAS.cobaltInk : T_CANVAS.muted,
@@ -166,7 +166,7 @@ export default function ZoomPill({
                 <span>{p}%</span>
                 {p === ZOOM_DEFAULT ? (
                   <kbd
-                    className="px-1.5 py-0.5 text-[9px]"
+                    className="px-1.5 py-0.5 text-[12px]"
                     style={{
                       background: T_CANVAS.vellum,
                       color: T_CANVAS.muted,

@@ -114,7 +114,7 @@ export default function DraftingModal({
           >
             {/* TITLE BLOCK */}
             <div
-              className="flex items-center justify-between border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase shrink-0"
+              className="flex items-center justify-between border-b px-5 py-2.5 text-[13px] tracking-[0.16em] uppercase shrink-0"
               style={{
                 borderColor: T_CANVAS.rule,
                 color: T_CANVAS.muted,
@@ -257,7 +257,7 @@ export function ModalButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="flex items-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex items-center gap-2 px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       style={{
         background: bg,
         border: `1px solid ${border}`,
@@ -308,7 +308,7 @@ export function ModalSection({
   return (
     <div className="mb-5">
       <div
-        className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+        className="mb-2 text-[13px] tracking-[0.18em] uppercase"
         style={{
           color: T_CANVAS.muted,
           fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -364,7 +364,7 @@ export function ModalOption({
         </span>
       )}
       <span
-        className="text-[11px] tracking-[0.14em] uppercase"
+        className="text-[13px] tracking-[0.14em] uppercase"
         style={{
           color: active ? T_CANVAS.cobaltInk : T_CANVAS.graphite,
           fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -373,7 +373,7 @@ export function ModalOption({
         {label}
       </span>
       {hint && (
-        <span className="text-[11px]" style={{ color: T_CANVAS.muted }}>
+        <span className="text-[13px]" style={{ color: T_CANVAS.muted }}>
           {hint}
         </span>
       )}

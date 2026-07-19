@@ -9,7 +9,7 @@ export function AuthError({ message }: { message: string | null }) {
   if (!message) return null;
   return (
     <div
-      className="d5-mono d5-shake mb-5 flex items-start gap-3 border px-3 py-2.5 text-[11px] tracking-[0.04em] leading-[1.5]"
+      className="d5-mono d5-shake mb-5 flex items-start gap-3 border px-3 py-2.5 text-[13px] tracking-[0.04em] leading-[1.5]"
       style={{
         borderColor: T_AUTH.error,
         background: `${T_AUTH.error}0F`,
@@ -18,7 +18,7 @@ export function AuthError({ message }: { message: string | null }) {
       role="alert"
     >
       <span
-        className="d5-mono mt-[1px] inline-block flex-shrink-0 text-[11px] font-bold"
+        className="d5-mono mt-[1px] inline-block flex-shrink-0 text-[13px] font-bold"
         aria-hidden="true"
       >
         [!]
@@ -85,7 +85,7 @@ export function AuthInput({
       />
       {error && (
         <p
-          className="d5-mono mt-2 text-[10px] tracking-[0.06em]"
+          className="d5-mono mt-2 text-[13px] tracking-[0.06em]"
           style={{ color: T_AUTH.error, textTransform: "none" }}
         >
           {error}
@@ -152,7 +152,7 @@ export function AuthPasswordInput({
           type="button"
           onClick={() => setVisible((v) => !v)}
           disabled={disabled}
-          className="d5-mono absolute right-0 bottom-[10px] text-[10px] tracking-[0.16em] uppercase"
+          className="d5-mono absolute right-0 bottom-[10px] text-[13px] tracking-[0.16em] uppercase"
           style={{
             color: T_AUTH.muted,
             background: "transparent",
@@ -167,7 +167,7 @@ export function AuthPasswordInput({
       </div>
       {error && (
         <p
-          className="d5-mono mt-2 text-[10px] tracking-[0.06em]"
+          className="d5-mono mt-2 text-[13px] tracking-[0.06em]"
           style={{ color: T_AUTH.error, textTransform: "none" }}
         >
           {error}
@@ -262,7 +262,7 @@ export function AuthDivider({
         style={{ background: T_AUTH.rule, opacity: 0.4 }}
       />
       <span
-        className="d5-mono text-[10px] tracking-[0.18em] uppercase"
+        className="d5-mono text-[13px] tracking-[0.18em] uppercase"
         style={{ color: T_AUTH.muted }}
       >
         {label}
@@ -357,7 +357,7 @@ export function PasswordStrengthMeter({
   }[level];
   return (
     <div className="mb-5 -mt-3">
-      <div className="d5-mono mb-1.5 flex items-center justify-between text-[10px] tracking-[0.16em] uppercase">
+      <div className="d5-mono mb-1.5 flex items-center justify-between text-[13px] tracking-[0.16em] uppercase">
         <span style={{ color: T_AUTH.muted }}>PASSWORD STRENGTH</span>
         <span style={{ color: config.color }}>{config.label}</span>
       </div>
@@ -382,7 +382,7 @@ export function AuthSuccess({
 }) {
   return (
     <div
-      className="d5-mono mb-5 border px-4 py-3 text-[11px] leading-[1.55]"
+      className="d5-mono mb-5 border px-4 py-3 text-[13px] leading-[1.55]"
       style={{
         borderColor: T_AUTH.success,
         background: `${T_AUTH.success}0D`,
@@ -393,7 +393,7 @@ export function AuthSuccess({
       role="status"
     >
       <div
-        className="mb-1.5 text-[10px] tracking-[0.18em] uppercase"
+        className="mb-1.5 text-[13px] tracking-[0.18em] uppercase"
         style={{ color: T_AUTH.success }}
       >
         [OK] {title}

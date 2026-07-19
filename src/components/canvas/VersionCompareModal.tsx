@@ -102,7 +102,7 @@ export default function VersionCompareModal({
       footer={
         <div className="flex items-center justify-between">
           <span
-            className="text-[10px] tracking-[0.14em] uppercase tabular-nums"
+            className="text-[13px] tracking-[0.14em] uppercase tabular-nums"
             style={{
               color: T_CANVAS.muted,
               fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -146,7 +146,7 @@ export default function VersionCompareModal({
                 type="button"
                 onClick={() => setView(mode)}
                 aria-pressed={active}
-                className="px-3 py-1.5 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                className="px-3 py-1.5 text-[13px] tracking-[0.16em] uppercase transition-colors"
                 style={{
                   background: active ? T_CANVAS.graphite : T_CANVAS.paper,
                   color: active ? T_CANVAS.paper : T_CANVAS.muted,
@@ -205,7 +205,7 @@ function VersionSelect({
   return (
     <label className="flex flex-col gap-1.5">
       <span
-        className="text-[10px] tracking-[0.18em] uppercase"
+        className="text-[13px] tracking-[0.18em] uppercase"
         style={{
           color: T_CANVAS.muted,
           fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -216,7 +216,7 @@ function VersionSelect({
       <select
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="h-8 min-w-[220px] px-2 text-[11px] outline-none"
+        className="h-8 min-w-[220px] px-2 text-[13px] outline-none"
         style={{
           background: T_CANVAS.paper,
           border: `1px solid ${T_CANVAS.rule}`,
@@ -271,7 +271,7 @@ function VersionPane({
         style={{ borderColor: T_CANVAS.rule, background: T_CANVAS.vellum }}
       >
         <span
-          className="truncate text-[10px] tracking-[0.14em] uppercase"
+          className="truncate text-[13px] tracking-[0.14em] uppercase"
           style={{
             color: T_CANVAS.graphite,
             fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -283,7 +283,7 @@ function VersionPane({
           <button
             type="button"
             onClick={() => onRollback(version)}
-            className="ml-2 shrink-0 px-2 py-0.5 text-[9px] tracking-[0.16em] uppercase transition-opacity hover:opacity-85"
+            className="ml-2 shrink-0 px-2 py-0.5 text-[12px] tracking-[0.16em] uppercase transition-opacity hover:opacity-85"
             style={{
               background: T_CANVAS.cobalt,
               color: T_CANVAS.paper,
@@ -303,7 +303,7 @@ function VersionPane({
         />
       ) : (
         <div
-          className="flex h-[340px] items-center justify-center px-4 text-center text-[11px]"
+          className="flex h-[340px] items-center justify-center px-4 text-center text-[13px]"
           style={{ color: T_CANVAS.muted, background: T_CANVAS.paper }}
         >
           This iteration has no generated code (canvas checkpoint only).
@@ -326,7 +326,7 @@ function DiffView({ rows }: { rows: DisplayRow[] }) {
   if (rows.length === 0) {
     return (
       <div
-        className="px-4 py-8 text-center text-[11px]"
+        className="px-4 py-8 text-center text-[13px]"
         style={{ color: T_CANVAS.muted }}
       >
         No differences. The two versions have identical code.
@@ -336,7 +336,7 @@ function DiffView({ rows }: { rows: DisplayRow[] }) {
 
   return (
     <div
-      className="max-h-[420px] overflow-auto text-[11px] leading-[1.6]"
+      className="max-h-[420px] overflow-auto text-[13px] leading-[1.6]"
       style={{
         border: `1px solid ${T_CANVAS.rule}`,
         background: T_CANVAS.paper,
@@ -348,7 +348,7 @@ function DiffView({ rows }: { rows: DisplayRow[] }) {
           return (
             <div
               key={i}
-              className="px-3 py-1 text-center text-[10px] tracking-[0.14em] uppercase"
+              className="px-3 py-1 text-center text-[13px] tracking-[0.14em] uppercase"
               style={{
                 color: T_CANVAS.muted,
                 background: T_CANVAS.vellum,

@@ -184,7 +184,7 @@ function ToolButton({
       {/* Tooltip — mono, paper bg, hairline border */}
       <span
         role="tooltip"
-        className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap px-2 py-1 text-[10px] tracking-[0.14em] uppercase opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-hover:delay-150"
+        className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap px-2 py-1 text-[13px] tracking-[0.14em] uppercase opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-hover:delay-150"
         style={{
           background: T_CANVAS.paper,
           border: `1px solid ${T_CANVAS.rule}`,
@@ -194,7 +194,7 @@ function ToolButton({
       >
         {tool.label}
         <kbd
-          className="ml-2 px-1.5 py-0.5 text-[10px]"
+          className="ml-2 px-1.5 py-0.5 text-[13px]"
           style={{
             background: T_CANVAS.vellum,
             color: T_CANVAS.muted,

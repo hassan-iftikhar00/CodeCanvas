@@ -586,7 +586,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div
-                className="text-[10px] tracking-[0.18em] uppercase"
+                className="text-[13px] tracking-[0.18em] uppercase"
                 style={{ color: T.muted, fontFamily: MONO }}
               >
                 Workspace · Projects
@@ -626,7 +626,7 @@ export default function DashboardPage() {
             }}
           >
             <div
-              className="flex items-center justify-between gap-2 border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
+              className="flex items-center justify-between gap-2 border-b px-4 py-2 text-[13px] tracking-[0.16em] uppercase"
               style={{
                 background: T.vellum,
                 borderColor: T.rule,
@@ -641,7 +641,7 @@ export default function DashboardPage() {
             <div className="p-4">
               {recentProjectCards.length === 0 ? (
                 <div
-                  className="px-4 py-8 text-center text-[12px]"
+                  className="px-4 py-8 text-center text-[13px]"
                   style={{
                     border: `1px dashed ${T.rule}`,
                     background: T.paper,
@@ -682,7 +682,7 @@ export default function DashboardPage() {
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span
-                          className="px-1.5 py-0.5 text-[9px] tracking-[0.18em] uppercase"
+                          className="px-1.5 py-0.5 text-[12px] tracking-[0.18em] uppercase"
                           style={{
                             background: T.cobaltWash,
                             color: T.cobaltInk,
@@ -693,7 +693,7 @@ export default function DashboardPage() {
                           {entry.type}
                         </span>
                         <span
-                          className="text-[10px] tracking-[0.14em] uppercase"
+                          className="text-[13px] tracking-[0.14em] uppercase"
                           style={{ color: T.muted, fontFamily: MONO }}
                         >
                           {formatDistanceToNow(new Date(entry.timestamp), {
@@ -712,7 +712,7 @@ export default function DashboardPage() {
                         {project.title}
                       </div>
                       <div
-                        className="mt-1 truncate text-[10px] tracking-[0.14em] uppercase"
+                        className="mt-1 truncate text-[13px] tracking-[0.14em] uppercase"
                         style={{ color: T.muted, fontFamily: MONO }}
                       >
                         {project.framework.toUpperCase()} · Updated{" "}
@@ -734,7 +734,7 @@ export default function DashboardPage() {
             }}
           >
             <div
-              className="flex items-center justify-between border-b px-4 py-2 text-[10px] tracking-[0.16em] uppercase"
+              className="flex items-center justify-between border-b px-4 py-2 text-[13px] tracking-[0.16em] uppercase"
               style={{
                 background: T.vellum,
                 borderColor: T.rule,
@@ -824,7 +824,7 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               role="alert"
               aria-live="polite"
-              className="px-4 py-3 text-[12px]"
+              className="px-4 py-3 text-[13px]"
               style={{
                 border: `1px solid ${T.error}`,
                 background: `${T.error}10`,
@@ -868,7 +868,7 @@ export default function DashboardPage() {
                 </svg>
               </div>
               <div
-                className="text-[10px] tracking-[0.18em] uppercase"
+                className="text-[13px] tracking-[0.18em] uppercase"
                 style={{ color: T.muted, fontFamily: MONO }}
               >
                 {projects.length === 0 ? "Nothing here yet" : "No matches"}
@@ -886,7 +886,7 @@ export default function DashboardPage() {
                   : "Nothing matches those filters."}
               </h3>
               <p
-                className="mt-1.5 text-[12px]"
+                className="mt-1.5 text-[13px]"
                 style={{ color: T.muted, fontFamily: SANS }}
               >
                 {projects.length === 0
@@ -904,7 +904,7 @@ export default function DashboardPage() {
                         setSortBy("recent");
                       }
                 }
-                className="mt-5 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                className="mt-5 px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
                 style={{
                   background: projects.length === 0 ? T.cobalt : T.paper,
                   color: projects.length === 0 ? T.paper : T.graphite,
@@ -1005,7 +1005,7 @@ export default function DashboardPage() {
                   }}
                 >
                   <div
-                    className="flex items-center justify-between border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                    className="flex items-center justify-between border-b px-5 py-2.5 text-[13px] tracking-[0.16em] uppercase"
                     style={{
                       background: T.vellum,
                       borderColor: T.rule,
@@ -1058,7 +1058,7 @@ export default function DashboardPage() {
                     </h2>
                     <p
                       id="delete-project-description"
-                      className="mt-2 text-[12px] leading-[1.55]"
+                      className="mt-2 text-[13px] leading-[1.55]"
                       style={{ color: T.muted, fontFamily: SANS }}
                     >
                       This action cannot be undone. The project and all its
@@ -1078,7 +1078,7 @@ export default function DashboardPage() {
                       />
                       <div className="min-w-0 flex-1">
                         <div
-                          className="text-[10px] tracking-[0.16em] uppercase"
+                          className="text-[13px] tracking-[0.16em] uppercase"
                           style={{ color: T.muted, fontFamily: MONO }}
                         >
                           Target
@@ -1109,7 +1109,7 @@ export default function DashboardPage() {
                       type="button"
                       onClick={closeDeleteDialog}
                       disabled={Boolean(deletingProjectId)}
-                      className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      className="px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       style={{
                         background: T.paper,
                         border: `1px solid ${T.rule}`,
@@ -1136,7 +1136,7 @@ export default function DashboardPage() {
                       onClick={handleConfirmDelete}
                       disabled={Boolean(deletingProjectId)}
                       aria-busy={Boolean(deletingProjectId)}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-70"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                       style={{
                         background: T.error,
                         border: `1px solid ${T.error}`,
@@ -1202,7 +1202,7 @@ export default function DashboardPage() {
                   }}
                 >
                   <div
-                    className="border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                    className="border-b px-5 py-2.5 text-[13px] tracking-[0.16em] uppercase"
                     style={{
                       background: T.vellum,
                       borderColor: T.rule,
@@ -1227,7 +1227,7 @@ export default function DashboardPage() {
                     </h2>
                     <p
                       id="onboarding-description"
-                      className="mt-2 text-[12px] leading-[1.55]"
+                      className="mt-2 text-[13px] leading-[1.55]"
                       style={{ color: T.muted, fontFamily: SANS }}
                     >
                       We will walk you through Draw, Generate, and Export in the
@@ -1245,7 +1245,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={handleSkipOnboarding}
-                      className="px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                      className="px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
                       style={{
                         background: T.paper,
                         border: `1px solid ${T.rule}`,
@@ -1269,7 +1269,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={handleStartOnboarding}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[10px] tracking-[0.18em] uppercase transition-colors"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-[13px] tracking-[0.18em] uppercase transition-colors"
                       style={{
                         background: T.cobalt,
                         border: `1px solid ${T.cobalt}`,
@@ -1311,7 +1311,7 @@ function StatPill({ label, value }: { label: string; value: string }) {
       }}
     >
       <span
-        className="text-[10px] tracking-[0.16em] uppercase"
+        className="text-[13px] tracking-[0.16em] uppercase"
         style={{ color: T.muted }}
       >
         {label}
@@ -1338,7 +1338,7 @@ function NewProjectButton({
       whileTap={{ scale: 0.96 }}
       ref={forwardRef}
       onClick={onClick}
-      className="flex items-center gap-2 px-3.5 text-[10px] tracking-[0.18em] uppercase transition-colors"
+      className="flex items-center gap-2 px-3.5 text-[13px] tracking-[0.18em] uppercase transition-colors"
       style={{
         background: T.cobalt,
         color: T.paper,
@@ -1389,7 +1389,7 @@ function FilterSelect({
       style={{ background: T.paper }}
     >
       <div
-        className="text-[10px] tracking-[0.16em] uppercase"
+        className="text-[13px] tracking-[0.16em] uppercase"
         style={{ color: T.muted, fontFamily: MONO }}
       >
         {label}

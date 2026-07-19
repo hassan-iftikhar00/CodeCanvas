@@ -47,7 +47,7 @@ export default function StatusBar({
     <div
       role="status"
       aria-live="polite"
-      className="flex h-7 flex-shrink-0 items-center justify-between border-t px-3 text-[10px] tracking-[0.14em] uppercase"
+      className="flex h-7 flex-shrink-0 items-center justify-between border-t px-3 text-[13px] tracking-[0.14em] uppercase"
       style={{
         borderColor: T_CANVAS.rule,
         background: T_CANVAS.paper,
@@ -101,7 +101,7 @@ export default function StatusBar({
           type="button"
           onClick={onZoomReset}
           aria-label="Reset zoom"
-          className="flex h-5 min-w-[44px] items-center justify-center px-1.5 text-[10px] tabular-nums transition-colors"
+          className="flex h-5 min-w-[44px] items-center justify-center px-1.5 text-[13px] tabular-nums transition-colors"
           style={{ color: T_CANVAS.graphite }}
           onMouseEnter={(e) =>
             (e.currentTarget.style.background = T_CANVAS.vellum)

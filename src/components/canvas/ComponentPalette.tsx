@@ -162,7 +162,7 @@ export default function ComponentPalette({
               <ComponentGlyph id={component.id} />
             </span>
             <h3
-              className="text-[11px] tracking-[0.16em] uppercase"
+              className="text-[13px] tracking-[0.16em] uppercase"
               style={{
                 color: T_CANVAS.graphite,
                 fontFamily:
@@ -172,7 +172,7 @@ export default function ComponentPalette({
               {component.name}
             </h3>
             <p
-              className="text-[11px] leading-[1.4]"
+              className="text-[13px] leading-[1.4]"
               style={{
                 color: T_CANVAS.muted,
                 fontFamily:
@@ -182,7 +182,7 @@ export default function ComponentPalette({
               {component.description}
             </p>
             <span
-              className="mt-1 inline-flex items-center gap-1 text-[10px] tracking-[0.16em] uppercase opacity-0 transition-opacity group-hover:opacity-100"
+              className="mt-1 inline-flex items-center gap-1 text-[13px] tracking-[0.16em] uppercase opacity-0 transition-opacity group-hover:opacity-100"
               style={{ color: T_CANVAS.cobalt }}
             >
               + INSERT →

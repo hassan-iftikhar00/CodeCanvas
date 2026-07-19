@@ -91,7 +91,7 @@ export default function GenerationProgress({
       <div className="w-full max-w-md">
         {/* MONO SLUG */}
         <div
-          className="mb-5 flex items-center justify-between text-[10px] tracking-[0.18em] uppercase"
+          className="mb-5 flex items-center justify-between text-[13px] tracking-[0.18em] uppercase"
           style={{ color: T_DARK.inkMuted }}
         >
           <span style={{ color: T_DARK.inkBright }}>
@@ -112,7 +112,7 @@ export default function GenerationProgress({
           {stage.title.toLowerCase()}.
         </div>
         <div
-          className="mt-2 text-[12px] leading-[1.5]"
+          className="mt-2 text-[13px] leading-[1.5]"
           style={{
             color: T_DARK.inkMuted,
             fontFamily:
@@ -154,7 +154,7 @@ export default function GenerationProgress({
                   }}
                 />
                 <span
-                  className="text-[9px] tracking-[0.14em] uppercase"
+                  className="text-[12px] tracking-[0.14em] uppercase"
                   style={{
                     color: current
                       ? T_DARK.inkBright

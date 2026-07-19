@@ -120,7 +120,7 @@ function SectionShell({
         <div className="grid grid-cols-12 gap-8 pb-10">
           <div className="col-span-3">
             <div
-              className="text-[10px] uppercase tracking-[0.22em]"
+              className="text-[13px] uppercase tracking-[0.22em]"
               style={{
                 color: T.light.muted,
                 fontFamily: "var(--font-jetbrains)",
@@ -163,7 +163,7 @@ function Label({
 }) {
   return (
     <div
-      className="text-[10px] uppercase tracking-[0.22em]"
+      className="text-[13px] uppercase tracking-[0.22em]"
       style={{
         color: T[mode].muted,
         fontFamily: "var(--font-jetbrains)",
@@ -192,7 +192,7 @@ function ModePanel({
       <div className="mb-4 flex items-center justify-between">
         <Label mode={mode}>{mode}</Label>
         <span
-          className="text-[10px]"
+          className="text-[13px]"
           style={{
             color: t.muted,
             fontFamily: "var(--font-jetbrains)",
@@ -346,7 +346,7 @@ function DSNav() {
           <Logo size={22} color={T.light.accent} />
           <Wordmark color={T.light.ink} size={16} />
           <span
-            className="ml-3 rounded-full border px-2 py-0.5 text-[10px]"
+            className="ml-3 rounded-full border px-2 py-0.5 text-[13px]"
             style={{
               borderColor: T.light.hairline,
               color: T.light.muted,
@@ -361,7 +361,7 @@ function DSNav() {
             <li key={href}>
               <a
                 href={href}
-                className="rounded-full px-3 py-1.5 text-[11px] transition"
+                className="rounded-full px-3 py-1.5 text-[13px] transition"
                 style={{ color: T.light.muted }}
               >
                 {label}
@@ -382,7 +382,7 @@ function Hero() {
         <div className="col-span-3">
           <Label>00 / Foundation</Label>
           <div
-            className="mt-2 text-[11px]"
+            className="mt-2 text-[13px]"
             style={{
               color: T.light.muted,
               fontFamily: "var(--font-jetbrains)",
@@ -391,7 +391,7 @@ function Hero() {
             warm studio · v0.1
           </div>
           <div
-            className="mt-6 inline-flex items-center gap-2 text-[11px]"
+            className="mt-6 inline-flex items-center gap-2 text-[13px]"
             style={{
               color: T.light.counter,
               fontFamily: "var(--font-jetbrains)",
@@ -456,7 +456,7 @@ function BrandSection() {
             <Logo size={120} color={T.light.accent} />
           </div>
           <div
-            className="mt-6 flex items-center justify-between text-[10px]"
+            className="mt-6 flex items-center justify-between text-[13px]"
             style={{
               color: T.light.muted,
               fontFamily: "var(--font-jetbrains)",
@@ -479,7 +479,7 @@ function BrandSection() {
             <Logo size={120} color={T.dark.accent} />
           </div>
           <div
-            className="mt-6 flex items-center justify-between text-[10px]"
+            className="mt-6 flex items-center justify-between text-[13px]"
             style={{
               color: T.dark.muted,
               fontFamily: "var(--font-jetbrains)",
@@ -504,7 +504,7 @@ function BrandSection() {
             <Logo size={18} color={T.light.ink} />
           </div>
           <div
-            className="mt-6 text-[10px]"
+            className="mt-6 text-[13px]"
             style={{
               color: T.light.muted,
               fontFamily: "var(--font-jetbrains)",
@@ -551,7 +551,7 @@ function BrandSection() {
             <div>
               <Wordmark color={T.dark.ink} size={32} />
               <div
-                className="mt-1 text-[10px] uppercase tracking-[0.24em]"
+                className="mt-1 text-[13px] uppercase tracking-[0.24em]"
                 style={{
                   color: T.dark.muted,
                   fontFamily: "var(--font-jetbrains)",
@@ -600,7 +600,7 @@ function TokensSection() {
       >
         {/* Header row */}
         <div
-          className="grid grid-cols-12 border-b text-[10px] uppercase tracking-[0.22em]"
+          className="grid grid-cols-12 border-b text-[13px] uppercase tracking-[0.22em]"
           style={{
             borderColor: T.light.hairline,
             background: T.light.surface,
@@ -635,7 +635,7 @@ function TokensSection() {
         {semantic.map((row) => (
           <div
             key={row.name}
-            className="grid grid-cols-12 border-b text-[12px]"
+            className="grid grid-cols-12 border-b text-[13px]"
             style={{ borderColor: T.light.hairline }}
           >
             <div
@@ -667,7 +667,7 @@ function TokensSection() {
                 }}
               />
               <span
-                className="text-[11px]"
+                className="text-[13px]"
                 style={{
                   fontFamily: "var(--font-jetbrains)",
                   color: T.light.ink,
@@ -691,7 +691,7 @@ function TokensSection() {
                 }}
               />
               <span
-                className="text-[11px]"
+                className="text-[13px]"
                 style={{
                   fontFamily: "var(--font-jetbrains)",
                   color: T.dark.ink,
@@ -769,7 +769,7 @@ function TypographySection() {
             >
               <div className="col-span-2">
                 <div
-                  className="text-[10px] uppercase tracking-[0.18em]"
+                  className="text-[13px] uppercase tracking-[0.18em]"
                   style={{
                     color: T.light.muted,
                     fontFamily: "var(--font-jetbrains)",
@@ -778,7 +778,7 @@ function TypographySection() {
                   {name}
                 </div>
                 <div
-                  className="mt-1 text-[10px]"
+                  className="mt-1 text-[13px]"
                   style={{
                     color: T.light.subtle,
                     fontFamily: "var(--font-jetbrains)",
@@ -804,7 +804,7 @@ function TypographySection() {
                 </div>
               </div>
               <div
-                className="col-span-3 text-[10px]"
+                className="col-span-3 text-[13px]"
                 style={{
                   color: T.light.muted,
                   fontFamily: "var(--font-jetbrains)",
@@ -858,13 +858,13 @@ function RadiusSection() {
               }}
             />
             <div
-              className="mt-4 text-[12px] font-medium"
+              className="mt-4 text-[13px] font-medium"
               style={{ color: T.light.ink }}
             >
               {r.name}
             </div>
             <div
-              className="text-[10px]"
+              className="text-[13px]"
               style={{
                 color: T.light.muted,
                 fontFamily: "var(--font-jetbrains)",
@@ -872,7 +872,7 @@ function RadiusSection() {
             >
               {r.value}
             </div>
-            <div className="mt-1 text-[10px]" style={{ color: T.light.subtle }}>
+            <div className="mt-1 text-[13px]" style={{ color: T.light.subtle }}>
               {r.use}
             </div>
           </div>
@@ -977,7 +977,7 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
         >
           Disabled
         </button>
-        <span className="text-[10px]" style={{ color: t.muted }}>
+        <span className="text-[13px]" style={{ color: t.muted }}>
           -
         </span>
       </BtnDemo>
@@ -1012,7 +1012,7 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
         >
           Disabled
         </button>
-        <span className="text-[10px]" style={{ color: t.muted }}>
+        <span className="text-[13px]" style={{ color: t.muted }}>
           -
         </span>
       </BtnDemo>
@@ -1058,7 +1058,7 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
         >
           Disabled
         </button>
-        <span className="text-[10px]" style={{ color: t.muted }}>
+        <span className="text-[13px]" style={{ color: t.muted }}>
           -
         </span>
       </BtnDemo>
@@ -1108,7 +1108,7 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
         >
           <PlayIcon />
         </button>
-        <span className="text-[10px]" style={{ color: t.muted }}>
+        <span className="text-[13px]" style={{ color: t.muted }}>
           -
         </span>
       </BtnDemo>
@@ -1134,13 +1134,13 @@ function ButtonStateRow({ mode }: { mode: "light" | "dark" }) {
         >
           <DownloadIcon /> Export
         </button>
-        <span className="text-[10px]" style={{ color: t.muted }}>
+        <span className="text-[13px]" style={{ color: t.muted }}>
           -
         </span>
-        <span className="text-[10px]" style={{ color: t.muted }}>
+        <span className="text-[13px]" style={{ color: t.muted }}>
           -
         </span>
-        <span className="text-[10px]" style={{ color: t.muted }}>
+        <span className="text-[13px]" style={{ color: t.muted }}>
           -
         </span>
       </BtnDemo>
@@ -1160,7 +1160,7 @@ function BtnDemo({
   return (
     <div className="flex flex-col gap-3">
       <div
-        className="text-[10px] uppercase tracking-[0.18em]"
+        className="text-[13px] uppercase tracking-[0.18em]"
         style={{
           color: T[mode].muted,
           fontFamily: "var(--font-jetbrains)",
@@ -1394,7 +1394,7 @@ function FormPrimitives({ mode }: { mode: "light" | "dark" }) {
             className="mt-2 w-full px-3.5 py-2 text-[13px] outline-none"
             style={{ ...baseInput, borderColor: t.danger }}
           />
-          <div className="mt-1.5 text-[11px]" style={{ color: t.danger }}>
+          <div className="mt-1.5 text-[13px]" style={{ color: t.danger }}>
             Project names cannot contain spaces or symbols.
           </div>
         </div>
@@ -1431,7 +1431,7 @@ function FormPrimitives({ mode }: { mode: "light" | "dark" }) {
               style={{ color: t.ink }}
             />
             <span
-              className="rounded border px-1.5 py-0.5 text-[10px]"
+              className="rounded border px-1.5 py-0.5 text-[13px]"
               style={{
                 borderColor: t.hairline,
                 color: t.muted,
@@ -1686,12 +1686,12 @@ function SurfacesSection() {
                 ].map(([label, key]) => (
                   <div
                     key={label}
-                    className="flex items-center justify-between px-3 py-1.5 text-[12px]"
+                    className="flex items-center justify-between px-3 py-1.5 text-[13px]"
                     style={{ color: T.light.ink }}
                   >
                     <span>{label}</span>
                     <span
-                      className="text-[10px]"
+                      className="text-[13px]"
                       style={{
                         color: T.light.muted,
                         fontFamily: "var(--font-jetbrains)",
@@ -1706,12 +1706,12 @@ function SurfacesSection() {
                   style={{ borderColor: T.light.hairline }}
                 />
                 <div
-                  className="flex items-center justify-between px-3 py-1.5 text-[12px]"
+                  className="flex items-center justify-between px-3 py-1.5 text-[13px]"
                   style={{ color: T.light.danger }}
                 >
                   <span>Delete</span>
                   <span
-                    className="text-[10px]"
+                    className="text-[13px]"
                     style={{ fontFamily: "var(--font-jetbrains)" }}
                   >
                     ⌫
@@ -1743,7 +1743,7 @@ function SurfacesSection() {
                   <PlayIcon />
                 </button>
                 <div
-                  className="absolute left-1/2 top-[-44px] -translate-x-1/2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[11px]"
+                  className="absolute left-1/2 top-[-44px] -translate-x-1/2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[13px]"
                   style={{
                     background: T.light.anchor,
                     color: T.light.surface,
@@ -1752,7 +1752,7 @@ function SurfacesSection() {
                 >
                   Run detection
                   <span
-                    className="ml-2 rounded px-1 py-0.5 text-[9px]"
+                    className="ml-2 rounded px-1 py-0.5 text-[12px]"
                     style={{
                       background: "rgba(255,255,255,0.1)",
                       fontFamily: "var(--font-jetbrains)",
@@ -1850,7 +1850,7 @@ function FeedbackSection() {
                   {t.title}
                 </div>
                 <div
-                  className="mt-0.5 text-[11px]"
+                  className="mt-0.5 text-[13px]"
                   style={{ color: T.light.muted }}
                 >
                   {t.body}
@@ -1909,7 +1909,7 @@ function FeedbackSection() {
             <Spinner color={T.light.accent} size={36} />
           </div>
           <div
-            className="text-[11px]"
+            className="text-[13px]"
             style={{
               color: T.light.muted,
               fontFamily: "var(--font-jetbrains)",
@@ -1928,7 +1928,7 @@ function FeedbackSection() {
         >
           <Label>Progress</Label>
           <div className="mt-4">
-            <div className="flex items-center justify-between text-[11px]">
+            <div className="flex items-center justify-between text-[13px]">
               <span style={{ color: T.light.ink }}>Detecting components</span>
               <span
                 style={{
@@ -1950,7 +1950,7 @@ function FeedbackSection() {
             </div>
           </div>
           <div className="mt-5">
-            <div className="flex items-center justify-between text-[11px]">
+            <div className="flex items-center justify-between text-[13px]">
               <span style={{ color: T.light.ink }}>Gemini generation</span>
               <span
                 style={{
@@ -2126,9 +2126,9 @@ function MotionSection() {
           <Label>Duration tokens</Label>
           <div className="mt-4 space-y-3">
             {timings.map((t) => (
-              <div key={t.name} className="flex items-center gap-4 text-[12px]">
+              <div key={t.name} className="flex items-center gap-4 text-[13px]">
                 <div
-                  className="w-16 text-[11px]"
+                  className="w-16 text-[13px]"
                   style={{
                     color: T.light.ink,
                     fontFamily: "var(--font-jetbrains)",
@@ -2137,7 +2137,7 @@ function MotionSection() {
                   t-{t.name}
                 </div>
                 <div
-                  className="w-16 text-[11px]"
+                  className="w-16 text-[13px]"
                   style={{
                     color: T.light.accent,
                     fontFamily: "var(--font-jetbrains)",
@@ -2160,7 +2160,7 @@ function MotionSection() {
           <Label>Easing tokens</Label>
           <div className="mt-4 space-y-3">
             {easings.map((e) => (
-              <div key={e.name} className="text-[12px]">
+              <div key={e.name} className="text-[13px]">
                 <div className="flex items-center gap-3">
                   <span
                     style={{
@@ -2172,7 +2172,7 @@ function MotionSection() {
                     e-{e.name}
                   </span>
                   <span
-                    className="text-[10px]"
+                    className="text-[13px]"
                     style={{
                       color: T.light.accent,
                       fontFamily: "var(--font-jetbrains)",
@@ -2234,7 +2234,7 @@ function MotionSection() {
               />
             </span>
             <span
-              className="text-[11px]"
+              className="text-[13px]"
               style={{
                 color: T.light.muted,
                 fontFamily: "var(--font-jetbrains)",
@@ -2281,7 +2281,7 @@ function MotionSection() {
           spec="generation reveal"
         >
           <div
-            className="ds-code-rain space-y-0.5 text-[11px]"
+            className="ds-code-rain space-y-0.5 text-[13px]"
             style={{
               fontFamily: "var(--font-jetbrains)",
               color: T.light.ink,
@@ -2370,7 +2370,7 @@ function MotionSection() {
               }}
             >
               <div
-                className="text-[10px] uppercase tracking-[0.2em]"
+                className="text-[13px] uppercase tracking-[0.2em]"
                 style={{
                   color: T.dark.muted,
                   fontFamily: "var(--font-jetbrains)",
@@ -2379,7 +2379,7 @@ function MotionSection() {
                 Choreography
               </div>
               <ol
-                className="mt-3 space-y-1.5 text-[11px]"
+                className="mt-3 space-y-1.5 text-[13px]"
                 style={{
                   color: T.dark.ink,
                   fontFamily: "var(--font-jetbrains)",
@@ -2421,11 +2421,11 @@ function MotionTile({
       }}
     >
       <div className="flex items-baseline justify-between">
-        <div className="text-[12px] font-medium" style={{ color: T.light.ink }}>
+        <div className="text-[13px] font-medium" style={{ color: T.light.ink }}>
           {title}
         </div>
         <div
-          className="text-[10px]"
+          className="text-[13px]"
           style={{
             color: T.light.muted,
             fontFamily: "var(--font-jetbrains)",
@@ -2435,7 +2435,7 @@ function MotionTile({
         </div>
       </div>
       <div className="my-4 min-h-[80px]">{children}</div>
-      <div className="text-[10px]" style={{ color: T.light.subtle }}>
+      <div className="text-[13px]" style={{ color: T.light.subtle }}>
         {spec}
       </div>
     </div>
@@ -2492,7 +2492,7 @@ function IconsSection() {
                 )}
               </span>
               <span
-                className="text-[10px]"
+                className="text-[13px]"
                 style={{
                   color: T.light.muted,
                   fontFamily: "var(--font-jetbrains)",
@@ -2540,7 +2540,7 @@ function DSFooter() {
             <div>
               <Label mode="dark">Next steps</Label>
               <ul
-                className="mt-3 space-y-1.5 text-[12px]"
+                className="mt-3 space-y-1.5 text-[13px]"
                 style={{ color: T.dark.ink }}
               >
                 <li>1 · Landing page pilot</li>
@@ -2553,7 +2553,7 @@ function DSFooter() {
             <div>
               <Label mode="dark">Files affected</Label>
               <ul
-                className="mt-3 space-y-1.5 text-[11px]"
+                className="mt-3 space-y-1.5 text-[13px]"
                 style={{
                   color: T.dark.muted,
                   fontFamily: "var(--font-jetbrains)",
@@ -2568,10 +2568,10 @@ function DSFooter() {
             </div>
             <div>
               <Label mode="dark">Owner</Label>
-              <div className="mt-3 text-[12px]" style={{ color: T.dark.ink }}>
+              <div className="mt-3 text-[13px]" style={{ color: T.dark.ink }}>
                 Maarij · Frontend
               </div>
-              <div className="mt-1 text-[11px]" style={{ color: T.dark.muted }}>
+              <div className="mt-1 text-[13px]" style={{ color: T.dark.muted }}>
                 Per CLAUDE_CONTEXT roles
               </div>
             </div>

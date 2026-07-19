@@ -282,7 +282,7 @@ function LoginPageInner() {
           rightSlot={
             <Link
               href="/auth/forgot-password"
-              className="d5-mono d5-link text-[10px] tracking-[0.16em] uppercase"
+              className="d5-mono d5-link text-[13px] tracking-[0.16em] uppercase"
             >
               FORGOT?
             </Link>
@@ -329,7 +329,7 @@ function LoginPageInner() {
         </div>
 
         <p
-          className="d5-sans mt-6 text-center text-[11px] leading-[1.5]"
+          className="d5-sans mt-6 text-center text-[13px] leading-[1.5]"
           style={{ color: T_AUTH.muted }}
         >
           By signing in, you agree to our{" "}

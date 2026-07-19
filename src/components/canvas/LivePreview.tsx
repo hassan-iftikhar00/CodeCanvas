@@ -609,7 +609,7 @@ export default function LivePreview({
               <button
                 key={key}
                 onClick={() => selectDevice(key as DeviceType)}
-                className="px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                className="px-2.5 py-1 text-[13px] tracking-[0.16em] uppercase transition-colors"
                 style={{
                   background: active ? T_CANVAS.graphite : T_CANVAS.paper,
                   color: active ? T_CANVAS.paper : T_CANVAS.muted,
@@ -670,7 +670,7 @@ export default function LivePreview({
               what clicking the preview does. */}
           <button
             onClick={toggleInspect}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] tracking-[0.16em] uppercase transition-colors"
             style={{
               background: inspectMode ? T_CANVAS.cobalt : T_CANVAS.paper,
               border: `1px solid ${T_CANVAS.cobalt}`,
@@ -703,7 +703,7 @@ export default function LivePreview({
           {onAnnotate && (
             <button
               onClick={toggleAnnotate}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] tracking-[0.16em] uppercase transition-colors"
               style={{
                 background: annotateMode ? T_CANVAS.error : T_CANVAS.paper,
                 border: `1px solid ${T_CANVAS.error}`,
@@ -734,7 +734,7 @@ export default function LivePreview({
 
           <button
             onClick={() => setShowConsole(!showConsole)}
-            className="px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+            className="px-2.5 py-1 text-[13px] tracking-[0.16em] uppercase transition-colors"
             style={{
               background: showConsole ? T_CANVAS.cobaltWash : T_CANVAS.paper,
               border: `1px solid ${showConsole ? T_CANVAS.cobalt : T_CANVAS.rule}`,
@@ -833,7 +833,7 @@ export default function LivePreview({
               </svg>
             </button>
             <span
-              className="min-w-[40px] text-center text-[10px] tracking-[0.06em] tabular-nums"
+              className="min-w-[40px] text-center text-[13px] tracking-[0.06em] tabular-nums"
               style={{ color: T_CANVAS.graphite }}
             >
               {Math.round(scale * 100)}%
@@ -868,7 +868,7 @@ export default function LivePreview({
             {manualZoom !== null && (
               <button
                 onClick={() => setManualZoom(null)}
-                className="ml-0.5 px-1.5 py-0.5 text-[9px] tracking-[0.16em] uppercase"
+                className="ml-0.5 px-1.5 py-0.5 text-[12px] tracking-[0.16em] uppercase"
                 style={{ color: T_CANVAS.cobalt }}
                 title="Reset to auto-fit"
               >
@@ -877,7 +877,7 @@ export default function LivePreview({
             )}
           </div>
           <span
-            className="ml-1 text-[10px] tabular-nums tracking-[0.04em]"
+            className="ml-1 text-[13px] tabular-nums tracking-[0.04em]"
             style={{ color: T_CANVAS.muted }}
           >
             {Math.round(dimensions.width)} ×{" "}
@@ -997,7 +997,7 @@ export default function LivePreview({
               placeholder="Describe the change for the marked area, e.g. make this button red"
               aria-label="Annotation instruction"
               disabled={annotateBusy}
-              className="min-w-0 flex-1 px-2.5 py-1.5 text-[11px] outline-none"
+              className="min-w-0 flex-1 px-2.5 py-1.5 text-[13px] outline-none"
               style={{
                 background: T_CANVAS.paper,
                 border: `1px solid ${T_CANVAS.rule}`,
@@ -1007,7 +1007,7 @@ export default function LivePreview({
             <button
               onClick={() => setStrokes([])}
               disabled={annotateBusy || strokes.length === 0}
-              className="px-2.5 py-1.5 text-[10px] tracking-[0.16em] uppercase transition-opacity disabled:opacity-40"
+              className="px-2.5 py-1.5 text-[13px] tracking-[0.16em] uppercase transition-opacity disabled:opacity-40"
               style={{
                 background: T_CANVAS.paper,
                 border: `1px solid ${T_CANVAS.rule}`,
@@ -1021,7 +1021,7 @@ export default function LivePreview({
               disabled={
                 annotateBusy || strokes.length === 0 || !annotateNote.trim()
               }
-              className="px-3 py-1.5 text-[10px] tracking-[0.16em] uppercase transition-opacity disabled:opacity-40"
+              className="px-3 py-1.5 text-[13px] tracking-[0.16em] uppercase transition-opacity disabled:opacity-40"
               style={{
                 background: T_CANVAS.error,
                 border: `1px solid ${T_CANVAS.error}`,
@@ -1032,7 +1032,7 @@ export default function LivePreview({
             </button>
           </div>
           <p
-            className="mt-1.5 text-[10px] tracking-[0.04em]"
+            className="mt-1.5 text-[13px] tracking-[0.04em]"
             style={{ color: T_CANVAS.muted }}
           >
             Draw on the preview to mark what should change, then describe the
@@ -1052,14 +1052,14 @@ export default function LivePreview({
         >
           <div className="mb-2 flex items-center justify-between">
             <h3
-              className="text-[10px] tracking-[0.18em] uppercase"
+              className="text-[13px] tracking-[0.18em] uppercase"
               style={{ color: T_CANVAS.graphite }}
             >
               CONSOLE OUTPUT
             </h3>
             <button
               onClick={() => setConsoleOutput([])}
-              className="text-[10px] tracking-[0.14em] uppercase transition-colors"
+              className="text-[13px] tracking-[0.14em] uppercase transition-colors"
               style={{ color: T_CANVAS.muted }}
               onMouseEnter={(e) =>
                 (e.currentTarget.style.color = T_CANVAS.cobalt)
@@ -1072,7 +1072,7 @@ export default function LivePreview({
             </button>
           </div>
           <div
-            className="max-h-32 overflow-auto p-2.5 text-[11px] leading-[1.5]"
+            className="max-h-32 overflow-auto p-2.5 text-[13px] leading-[1.5]"
             style={{
               background: T_CANVAS.paper,
               border: `1px solid ${T_CANVAS.rule}`,

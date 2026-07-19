@@ -436,7 +436,7 @@ export default function CommandPalette() {
               }}
             >
               <div
-                className="flex items-center gap-2 text-[10px] tracking-[0.18em] uppercase"
+                className="flex items-center gap-2 text-[13px] tracking-[0.18em] uppercase"
                 style={{ color: T.muted }}
               >
                 <span
@@ -449,7 +449,7 @@ export default function CommandPalette() {
                 <span>NAVIGATE</span>
               </div>
               <kbd
-                className="px-2 py-0.5 text-[10px] tracking-[0.14em] uppercase"
+                className="px-2 py-0.5 text-[13px] tracking-[0.14em] uppercase"
                 style={{
                   background: T.paper,
                   border: `1px solid ${T.rule}`,
@@ -505,7 +505,7 @@ export default function CommandPalette() {
                   }}
                 />
                 <kbd
-                  className="px-1.5 py-0.5 text-[10px] tracking-[0.14em] uppercase"
+                  className="px-1.5 py-0.5 text-[13px] tracking-[0.14em] uppercase"
                   style={{
                     background: T.vellum,
                     border: `1px solid ${T.rule}`,
@@ -560,13 +560,13 @@ export default function CommandPalette() {
                   }}
                 >
                   <p
-                    className="text-[11px] tracking-[0.14em] uppercase"
+                    className="text-[13px] tracking-[0.14em] uppercase"
                     style={{ color: T.muted, fontFamily: MONO }}
                   >
                     NO RESULTS
                   </p>
                   <p
-                    className="mt-1 text-[12px]"
+                    className="mt-1 text-[13px]"
                     style={{ color: T.muted, fontFamily: SANS }}
                   >
                     Nothing matches &ldquo;{query}&rdquo;.
@@ -576,7 +576,7 @@ export default function CommandPalette() {
                 groupedActions.map(({ group, items, startIndex }) => (
                   <div key={group}>
                     <div
-                      className="border-b px-4 py-1 text-[10px] tracking-[0.2em] uppercase"
+                      className="border-b px-4 py-1 text-[13px] tracking-[0.2em] uppercase"
                       style={{
                         background: T.vellum,
                         borderColor: T.rule,
@@ -625,7 +625,7 @@ export default function CommandPalette() {
                               {action.title}
                             </div>
                             <div
-                              className="mt-0.5 truncate text-[11px]"
+                              className="mt-0.5 truncate text-[13px]"
                               style={{
                                 color: T.muted,
                                 fontFamily: SANS,
@@ -637,7 +637,7 @@ export default function CommandPalette() {
                           <div className="ml-3 flex flex-none items-center gap-2">
                             {action.kind === "command" && action.shortcut ? (
                               <kbd
-                                className="px-1.5 py-0.5 text-[10px] tracking-[0.06em]"
+                                className="px-1.5 py-0.5 text-[13px] tracking-[0.06em]"
                                 style={{
                                   background: T.vellum,
                                   border: `1px solid ${T.rule}`,
@@ -649,7 +649,7 @@ export default function CommandPalette() {
                               </kbd>
                             ) : null}
                             <span
-                              className="px-2 py-0.5 text-[10px] tracking-[0.18em] uppercase"
+                              className="px-2 py-0.5 text-[13px] tracking-[0.18em] uppercase"
                               style={{
                                 background:
                                   action.kind === "project"
@@ -678,7 +678,7 @@ export default function CommandPalette() {
 
             {/* Footer · mono hint bar */}
             <div
-              className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t px-4 py-1.5 text-[10px] tracking-[0.16em] uppercase"
+              className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t px-4 py-1.5 text-[13px] tracking-[0.16em] uppercase"
               style={{
                 background: T.vellum,
                 borderColor: T.rule,
@@ -707,7 +707,7 @@ function FooterHint({ k, label }: { k: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
       <kbd
-        className="px-1.5 py-0.5 text-[10px]"
+        className="px-1.5 py-0.5 text-[13px]"
         style={{
           background: T.paper,
           border: `1px solid ${T.rule}`,

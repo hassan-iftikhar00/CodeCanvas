@@ -65,7 +65,7 @@ export default function StyleRibbon({
     return (
       <div role="toolbar" aria-label="Drawing style" className="space-y-2">
         <span
-          className="text-[10px] tracking-[0.18em] uppercase"
+          className="text-[13px] tracking-[0.18em] uppercase"
           style={{
             color: T_CANVAS.muted,
             fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -74,7 +74,7 @@ export default function StyleRibbon({
           STYLE
         </span>
         <div
-          className="px-3 py-2 text-[11px] leading-normal"
+          className="px-3 py-2 text-[13px] leading-normal"
           style={{
             background: T_CANVAS.vellum,
             border: `1px dashed ${T_CANVAS.rule}`,
@@ -118,7 +118,7 @@ export default function StyleRibbon({
         </Section>
       ) : (
         <div
-          className="px-3 py-2 text-[11px] leading-normal"
+          className="px-3 py-2 text-[13px] leading-normal"
           style={{
             background: T_CANVAS.vellum,
             border: `1px dashed ${T_CANVAS.rule}`,
@@ -222,7 +222,7 @@ export default function StyleRibbon({
               }}
             />
             <span
-              className="w-8 text-right text-[10px] tabular-nums tracking-[0.04em]"
+              className="w-8 text-right text-[13px] tabular-nums tracking-[0.04em]"
               style={{ color: T_CANVAS.muted }}
             >
               {Math.round(opacity * 100)}%
@@ -244,7 +244,7 @@ function Section({
   return (
     <div className="space-y-1.5">
       <span
-        className="text-[10px] tracking-[0.18em] uppercase block"
+        className="text-[13px] tracking-[0.18em] uppercase block"
         style={{ color: T_CANVAS.muted }}
       >
         {label}
@@ -292,7 +292,7 @@ function ColorInputSwatch({
   return (
     <label
       title="Custom color"
-      className="relative flex h-6 w-full cursor-pointer items-center justify-center text-[9px] tracking-[0.18em] uppercase transition-colors"
+      className="relative flex h-6 w-full cursor-pointer items-center justify-center text-[12px] tracking-[0.18em] uppercase transition-colors"
       style={{
         background: T_CANVAS.paper,
         border: `1px dashed ${T_CANVAS.rule}`,

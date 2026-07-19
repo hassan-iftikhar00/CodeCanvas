@@ -203,7 +203,7 @@ export default function UploadSketchModal({
                 className="max-h-[240px] max-w-full object-contain"
                 style={{ border: `1px solid ${T_CANVAS.rule}` }}
               />
-              <span className="text-[11px]" style={{ color: T_CANVAS.muted }}>
+              <span className="text-[13px]" style={{ color: T_CANVAS.muted }}>
                 {fileName}
               </span>
               <div className="flex items-center gap-2">
@@ -214,7 +214,7 @@ export default function UploadSketchModal({
                     e.stopPropagation();
                     inputRef.current?.click();
                   }}
-                  className="px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
+                  className="px-2.5 py-1 text-[13px] uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
                   style={{
                     background: T_CANVAS.paper,
                     border: `1px solid ${T_CANVAS.rule}`,
@@ -233,7 +233,7 @@ export default function UploadSketchModal({
                     e.stopPropagation();
                     clearSelection();
                   }}
-                  className="px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
+                  className="px-2.5 py-1 text-[13px] uppercase tracking-[0.14em] transition-colors disabled:opacity-50"
                   style={{
                     background: T_CANVAS.paper,
                     border: `1px solid ${T_CANVAS.rule}`,
@@ -281,7 +281,7 @@ export default function UploadSketchModal({
               >
                 Click to browse or drag an image here
               </span>
-              <span className="text-[11px]" style={{ color: T_CANVAS.muted }}>
+              <span className="text-[13px]" style={{ color: T_CANVAS.muted }}>
                 {ACCEPTED_LABEL} · up to 10 MB
               </span>
             </>
@@ -295,7 +295,7 @@ export default function UploadSketchModal({
           className="hidden"
         />
         {error && (
-          <p className="mt-2 text-[11px]" style={{ color: T_CANVAS.error }}>
+          <p className="mt-2 text-[13px]" style={{ color: T_CANVAS.error }}>
             {error}
           </p>
         )}
@@ -317,7 +317,7 @@ export default function UploadSketchModal({
             hint="Exported from Figma, Balsamiq, draw.io, etc. Crisp lines are kept as-is, no cleanup applied."
           />
         </div>
-        <p className="mt-2 text-[11px]" style={{ color: T_CANVAS.muted }}>
+        <p className="mt-2 text-[13px]" style={{ color: T_CANVAS.muted }}>
           Works best with a clear wireframe on a light background. One sketch
           per image.
         </p>

@@ -100,7 +100,7 @@ export default function UploadedSketchPanel({
       {/* Source caption + filename, top-left */}
       <div className="absolute left-4 top-4 z-20 flex flex-col gap-1">
         <div
-          className="flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-[0.16em]"
+          className="flex items-center gap-2 px-3 py-1.5 text-[13px] uppercase tracking-[0.16em]"
           style={{
             background: T_CANVAS.paper,
             border: `1px solid ${T_CANVAS.rule}`,
@@ -116,7 +116,7 @@ export default function UploadedSketchPanel({
         </div>
         {fileName && (
           <div
-            className="px-3 py-1 text-[10px] truncate max-w-[220px]"
+            className="px-3 py-1 text-[13px] truncate max-w-[220px]"
             style={{
               background: T_CANVAS.paper,
               border: `1px solid ${T_CANVAS.rule}`,
@@ -135,7 +135,7 @@ export default function UploadedSketchPanel({
         <button
           onClick={onReplace}
           disabled={isGenerating}
-          className="flex items-center gap-2 px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-2 text-[13px] uppercase tracking-[0.16em] transition-colors disabled:opacity-50"
           style={{
             background: T_CANVAS.paper,
             border: `1px solid ${T_CANVAS.rule}`,
@@ -176,7 +176,7 @@ export default function UploadedSketchPanel({
         <button
           onClick={onBackToCanvas}
           disabled={isGenerating}
-          className="flex items-center gap-2 px-3 py-2 text-[10px] uppercase tracking-[0.16em] transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-2 text-[13px] uppercase tracking-[0.16em] transition-colors disabled:opacity-50"
           style={{
             background: T_CANVAS.paper,
             border: `1px solid ${T_CANVAS.rule}`,

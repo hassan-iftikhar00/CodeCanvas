@@ -124,7 +124,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           >
             <DraftingMark size={20} color={T.graphite} />
             <span
-              className="text-[11px] tracking-[0.18em] uppercase"
+              className="text-[13px] tracking-[0.18em] uppercase"
               style={{ color: T.graphite }}
             >
               CodeCanvas
@@ -153,7 +153,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Section slug */}
         <div
-          className="px-4 pt-4 pb-1 text-[10px] tracking-[0.18em] uppercase"
+          className="px-4 pt-4 pb-1 text-[13px] tracking-[0.18em] uppercase"
           style={{ color: T.muted, fontFamily: MONO }}
         >
           Navigate
@@ -231,13 +231,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
             <div className="flex-1 overflow-hidden">
               <p
-                className="truncate text-[12px]"
+                className="truncate text-[13px]"
                 style={{ color: T.graphite, fontFamily: SANS }}
               >
                 {displayName}
               </p>
               <p
-                className="text-[10px] tracking-[0.14em] uppercase"
+                className="text-[13px] tracking-[0.14em] uppercase"
                 style={{ color: T.muted, fontFamily: MONO }}
               >
                 View profile
@@ -250,7 +250,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               router.push("/");
               setIsSidebarOpen(false);
             }}
-            className="mt-1 w-full px-2 py-1.5 text-left text-[10px] tracking-[0.16em] uppercase transition-colors"
+            className="mt-1 w-full px-2 py-1.5 text-left text-[13px] tracking-[0.16em] uppercase transition-colors"
             style={{ color: T.muted, fontFamily: MONO }}
             onMouseEnter={(e) => (e.currentTarget.style.color = T.error)}
             onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}
@@ -299,7 +299,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <button
               onClick={openCommandPalette}
               aria-label="Open command palette"
-              className="group flex h-8 w-full items-center gap-2 px-3 text-[11px] tracking-[0.04em] transition-colors focus-visible:outline-none sm:w-auto sm:min-w-[280px]"
+              className="group flex h-8 w-full items-center gap-2 px-3 text-[13px] tracking-[0.04em] transition-colors focus-visible:outline-none sm:w-auto sm:min-w-[280px]"
               style={{
                 background: T.vellum,
                 border: `1px solid ${T.rule}`,
@@ -335,7 +335,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 style={{ color: T.muted }}
               >
                 <kbd
-                  className="px-1.5 py-0.5 text-[9px] tracking-[0.1em]"
+                  className="px-1.5 py-0.5 text-[12px] tracking-[0.1em]"
                   style={{
                     background: T.paper,
                     border: `1px solid ${T.rule}`,
@@ -356,7 +356,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   onClick={() => setShowUserMenu((v) => !v)}
                   aria-label="Open profile menu"
                   aria-expanded={showUserMenu}
-                  className="flex h-7 w-7 items-center justify-center overflow-hidden text-[10px] tracking-[0.12em] uppercase"
+                  className="flex h-7 w-7 items-center justify-center overflow-hidden text-[13px] tracking-[0.12em] uppercase"
                   style={{
                     background: T.graphite,
                     color: T.paper,
@@ -389,13 +389,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         style={{ borderColor: T.rule }}
                       >
                         <div
-                          className="truncate text-[12px]"
+                          className="truncate text-[13px]"
                           style={{ color: T.graphite, fontFamily: SANS }}
                         >
                           {displayName}
                         </div>
                         <div
-                          className="mt-0.5 truncate text-[10px] tracking-[0.04em]"
+                          className="mt-0.5 truncate text-[13px] tracking-[0.04em]"
                           style={{ color: T.muted, fontFamily: MONO }}
                         >
                           {user?.email}
@@ -447,7 +447,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             router.push("/");
                           }}
                           role="menuitem"
-                          className="flex w-full items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                          className="flex w-full items-center gap-2 px-3 py-2 text-[13px] tracking-[0.16em] uppercase transition-colors"
                           style={{ color: T.error, fontFamily: MONO }}
                           onMouseEnter={(e) =>
                             (e.currentTarget.style.opacity = "0.75")
@@ -515,7 +515,7 @@ function NavItem({
     <Link
       href={href}
       onClick={onNavigate}
-      className="group relative flex items-center gap-2.5 px-3 py-2 text-[11px] tracking-[0.16em] uppercase transition-colors"
+      className="group relative flex items-center gap-2.5 px-3 py-2 text-[13px] tracking-[0.16em] uppercase transition-colors"
       style={{
         background: active ? T.vellum : "transparent",
         color: active ? T.graphite : T.muted,
@@ -562,7 +562,7 @@ function MenuLink({
     <Link
       href={href}
       role="menuitem"
-      className="flex items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+      className="flex items-center gap-2 px-3 py-2 text-[13px] tracking-[0.16em] uppercase transition-colors"
       style={{ color: T.muted, fontFamily: MONO }}
       onMouseEnter={(e) => (e.currentTarget.style.color = T.graphite)}
       onMouseLeave={(e) => (e.currentTarget.style.color = T.muted)}

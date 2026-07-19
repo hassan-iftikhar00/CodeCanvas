@@ -202,7 +202,7 @@ function ToastCard({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mono slug bar — accent dot + variant + dismiss */}
         <div
-          className="flex items-center justify-between gap-2 border-b px-3 py-1.5 text-[10px] tracking-[0.16em] uppercase"
+          className="flex items-center justify-between gap-2 border-b px-3 py-1.5 text-[13px] tracking-[0.16em] uppercase"
           style={{
             borderColor: T.rule,
             background: T.vellum,
@@ -259,7 +259,7 @@ function ToastCard({
             </p>
           ) : null}
           <p
-            className="text-[12px] leading-[1.5] break-words"
+            className="text-[13px] leading-[1.5] break-words"
             style={{
               color: toast.title ? T.muted : T.graphite,
               fontFamily: SANS,

@@ -327,7 +327,7 @@ export default function Home() {
         }
         .d5-tag {
           font-family: var(--d5-mono), ui-monospace, monospace;
-          font-size: 10px;
+          font-size: 13px;
           letter-spacing: 0.16em;
           text-transform: uppercase;
           color: var(--d5-muted);
@@ -338,7 +338,7 @@ export default function Home() {
            pages, graphite fill on dark sections. See memory for full rule. */
         .d5-btn {
           font-family: var(--d5-mono);
-          font-size: 11px;
+          font-size: 13px;
           letter-spacing: 0.14em;
           text-transform: uppercase;
           padding: 12px 22px;
@@ -548,7 +548,7 @@ export default function Home() {
         <div className="relative z-10 mx-auto max-w-7xl px-6 pt-20 pb-24 sm:pt-24 sm:pb-28 lg:px-10 pointer-events-none">
           {/* slug + coord row — left: figure ID, right: live cursor coords (drafting tool readout) */}
           <div
-            className="d5-mono mb-12 flex items-center justify-between text-[10px] tracking-[0.16em] uppercase pointer-events-auto"
+            className="d5-mono mb-12 flex items-center justify-between text-[13px] tracking-[0.16em] uppercase pointer-events-auto"
             style={{ color: T.muted }}
           >
             <span>
@@ -588,7 +588,7 @@ export default function Home() {
             >
               {/* title block — mirrors the canvas card's UNTITLED · DRAFT strip */}
               <div
-                className="d5-mono flex items-center justify-between border-b px-5 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                className="d5-mono flex items-center justify-between border-b px-5 py-2.5 text-[13px] tracking-[0.16em] uppercase"
                 style={{ borderColor: T.rule, color: T.muted }}
               >
                 <span style={{ color: T.graphite }}>BRIEF · v0.1</span>
@@ -606,7 +606,7 @@ export default function Home() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-                  className="inline-flex items-center gap-2 d5-mono text-[10px] tracking-[0.18em] uppercase border px-3 py-1.5"
+                  className="inline-flex items-center gap-2 d5-mono text-[13px] tracking-[0.18em] uppercase border px-3 py-1.5"
                   style={{
                     borderColor: T.rule,
                     color: T.graphite,
@@ -697,7 +697,7 @@ export default function Home() {
                     (label) => (
                       <span
                         key={label}
-                        className="d5-mono inline-flex items-center gap-2 border px-3 py-1.5 text-[10px] tracking-[0.18em]"
+                        className="d5-mono inline-flex items-center gap-2 border px-3 py-1.5 text-[13px] tracking-[0.18em]"
                         style={{
                           borderColor: T.rule,
                           color: T.graphite,
@@ -733,7 +733,7 @@ export default function Home() {
               >
                 {/* title block */}
                 <div
-                  className="d5-mono flex items-center justify-between border-b px-4 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+                  className="d5-mono flex items-center justify-between border-b px-4 py-2.5 text-[13px] tracking-[0.16em] uppercase"
                   style={{ borderColor: T.rule, color: T.muted }}
                 >
                   <span style={{ color: T.graphite }}>UNTITLED · DRAFT</span>
@@ -794,7 +794,7 @@ export default function Home() {
                         Draw your UI here ~ No login required
                       </span>
 
-                      <span className="d5-mono text-[12px] tracking-[0.18em] uppercase">
+                      <span className="d5-mono text-[13px] tracking-[0.18em] uppercase">
                         Click and drag · any pen · rough is fine
                       </span>
                     </div>
@@ -821,7 +821,7 @@ export default function Home() {
 
                 {/* mono status strip */}
                 <div
-                  className="d5-mono flex items-center justify-between border-t px-4 py-2 text-[10px] tracking-[0.14em] uppercase"
+                  className="d5-mono flex items-center justify-between border-t px-4 py-2 text-[13px] tracking-[0.14em] uppercase"
                   style={{
                     borderColor: T.rule,
                     background: T.graphite,
@@ -884,20 +884,20 @@ function TopBar() {
         <Link href="/" className="flex items-center gap-3">
           <Mark size={22} color={T.graphite} />
           <span
-            className="text-[13px] tracking-[0.18em] uppercase"
+            className="text-[14px] tracking-[0.18em] uppercase"
             style={{ color: T.graphite }}
           >
             CodeCanvas
           </span>
           <span
-            className="hidden sm:inline text-[10px] tracking-[0.16em] uppercase"
+            className="hidden sm:inline text-[13px] tracking-[0.16em] uppercase"
             style={{ color: T.muted }}
           >
             / DRAFTING ROOM
           </span>
         </Link>
         <nav
-          className="hidden items-center gap-6 text-[11px] tracking-[0.16em] uppercase md:flex"
+          className="hidden items-center gap-6 text-[13px] tracking-[0.16em] uppercase md:flex"
           style={{ color: T.graphite }}
         >
           <Link href="#features">Features</Link>
@@ -907,7 +907,7 @@ function TopBar() {
         <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href="/auth/login"
-            className="hidden md:inline-block d5-mono text-[11px] tracking-[0.16em] uppercase px-3 py-2"
+            className="hidden md:inline-block d5-mono text-[13px] tracking-[0.16em] uppercase px-3 py-2"
             style={{ color: T.muted }}
           >
             Log in
@@ -915,7 +915,7 @@ function TopBar() {
           <Link
             href="/auth/signup"
             className="d5-btn d5-btn-primary"
-            style={{ padding: "8px 16px", fontSize: 10, minHeight: 44 }}
+            style={{ padding: "8px 16px", fontSize: 13, minHeight: 44 }}
           >
             Get Started →
           </Link>
@@ -985,7 +985,7 @@ function HeroStatusBar({ strokes }: { strokes: number }) {
   }, []);
   return (
     <div
-      className="d5-mono relative border-t flex items-center justify-between gap-3 px-4 py-2 text-[10px] tracking-[0.14em] uppercase sm:px-6"
+      className="d5-mono relative border-t flex items-center justify-between gap-3 px-4 py-2 text-[13px] tracking-[0.14em] uppercase sm:px-6"
       style={{ borderColor: T.rule, background: T.paper, color: T.muted }}
     >
       {/* 7 badges in one unwrapping flex row overflowed past 320-414px
@@ -1029,7 +1029,7 @@ function SectionHeader({
     >
       <div className="flex items-baseline gap-6">
         <span
-          className="d5-mono text-[12px] tracking-[0.2em]"
+          className="d5-mono text-[13px] tracking-[0.2em]"
           style={{ color: T.cobalt }}
         >
           {index}
@@ -1047,7 +1047,7 @@ function SectionHeader({
         </h2>
       </div>
       <span
-        className="d5-mono text-[11px] tracking-[0.14em] uppercase hidden sm:inline"
+        className="d5-mono text-[13px] tracking-[0.14em] uppercase hidden sm:inline"
         style={{ color: T.muted }}
       >
         {caption}
@@ -1075,7 +1075,7 @@ function SeeInAction() {
         >
           {/* title block bar */}
           <div
-            className="d5-mono flex items-center justify-between border-b px-4 py-2.5 text-[10px] tracking-[0.16em] uppercase"
+            className="d5-mono flex items-center justify-between border-b px-4 py-2.5 text-[13px] tracking-[0.16em] uppercase"
             style={{ borderColor: T.rule, color: T.muted, background: T.paper }}
           >
             <span style={{ color: T.graphite }}>demo-video.mp4</span>
@@ -1163,7 +1163,7 @@ function WhyCodeCanvas() {
             >
               <div className="flex items-start justify-between mb-6">
                 <span
-                  className="d5-mono text-[11px] tracking-[0.2em]"
+                  className="d5-mono text-[13px] tracking-[0.2em]"
                   style={{ color: T.cobalt }}
                 >
                   0{i + 1}
@@ -1242,11 +1242,11 @@ function TestimonialsBlock() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.45, delay: 0.1 }}
-              className="d5-mono mt-8 flex items-center gap-4 text-[11px] tracking-[0.18em] uppercase"
+              className="d5-mono mt-8 flex items-center gap-4 text-[13px] tracking-[0.18em] uppercase"
               style={{ color: T.muted }}
             >
               <span
-                className="inline-flex h-9 w-9 items-center justify-center border text-[11px]"
+                className="inline-flex h-9 w-9 items-center justify-center border text-[13px]"
                 style={{
                   borderColor: T.rule,
                   color: T.graphite,
@@ -1266,7 +1266,7 @@ function TestimonialsBlock() {
           {/* index column */}
           <div className="lg:col-span-3">
             <div
-              className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-3"
+              className="d5-mono text-[13px] tracking-[0.18em] uppercase mb-3"
               style={{ color: T.muted }}
             >
               INDEX
@@ -1279,7 +1279,7 @@ function TestimonialsBlock() {
                     setI(idx);
                     setAuto(false);
                   }}
-                  className="d5-mono w-full text-left text-[11px] tracking-[0.14em] uppercase flex items-center justify-between py-1.5 border-b transition-colors"
+                  className="d5-mono w-full text-left text-[13px] tracking-[0.14em] uppercase flex items-center justify-between py-1.5 border-b transition-colors"
                   style={{
                     borderColor: idx === i ? T.cobalt : T.tick,
                     color: idx === i ? T.graphite : T.muted,
@@ -1320,7 +1320,7 @@ function CTABlock({ onStart }: { onStart: () => void }) {
       />
       <div className="relative mx-auto max-w-5xl px-6 lg:px-10 py-28 text-center">
         <div
-          className="d5-mono inline-flex items-center gap-2 text-[10px] tracking-[0.18em] uppercase border px-3 py-1.5 mb-10"
+          className="d5-mono inline-flex items-center gap-2 text-[13px] tracking-[0.18em] uppercase border px-3 py-1.5 mb-10"
           style={{
             borderColor: "rgba(242,241,236,0.3)",
             color: T.paper,
@@ -1383,7 +1383,7 @@ function FooterBlock() {
             <Link href="/" className="flex items-center gap-3 mb-6">
               <Mark size={28} color={T.graphite} />
               <span
-                className="d5-mono text-[13px] tracking-[0.18em] uppercase"
+                className="d5-mono text-[14px] tracking-[0.18em] uppercase"
                 style={{ color: T.graphite }}
               >
                 CodeCanvas
@@ -1398,7 +1398,7 @@ function FooterBlock() {
             </p>
 
             <div
-              className="d5-mono text-[10px] tracking-[0.18em] uppercase mb-2"
+              className="d5-mono text-[13px] tracking-[0.18em] uppercase mb-2"
               style={{ color: T.muted }}
             >
               Newsletter
@@ -1420,7 +1420,7 @@ function FooterBlock() {
                   subscribed ? "Subscribed" : "Subscribe to newsletter"
                 }
                 className="d5-btn"
-                style={{ padding: "8px 14px", fontSize: 10 }}
+                style={{ padding: "8px 14px", fontSize: 13 }}
               >
                 {subscribed ? (
                   <Check className="h-3.5 w-3.5" />
@@ -1473,7 +1473,7 @@ function FooterBlock() {
             {FOOTER_COLS.map((col) => (
               <div key={col.title}>
                 <div
-                  className="d5-mono text-[10px] tracking-[0.2em] uppercase mb-4 pb-2 border-b"
+                  className="d5-mono text-[13px] tracking-[0.2em] uppercase mb-4 pb-2 border-b"
                   style={{ borderColor: T.rule, color: T.graphite }}
                 >
                   {col.title}
@@ -1483,7 +1483,7 @@ function FooterBlock() {
                     <li key={link.label}>
                       <Link
                         href={link.href}
-                        className="text-[13px] transition-colors hover:text-[var(--d5-cobalt)]"
+                        className="text-[14px] transition-colors hover:text-[var(--d5-cobalt)]"
                         style={{ color: T.muted }}
                       >
                         {link.label}
@@ -1498,7 +1498,7 @@ function FooterBlock() {
 
         {/* copyright row — single line, full width, no colophon */}
         <div
-          className="d5-mono mt-16 pt-6 border-t flex flex-col items-start justify-between gap-2 text-[10px] tracking-[0.14em] uppercase sm:flex-row sm:items-center"
+          className="d5-mono mt-16 pt-6 border-t flex flex-col items-start justify-between gap-2 text-[13px] tracking-[0.14em] uppercase sm:flex-row sm:items-center"
           style={{ borderColor: T.rule, color: T.muted }}
         >
           <span style={{ color: T.graphite }}>© {year} CodeCanvas</span>

@@ -309,12 +309,12 @@ export default function DetectionReviewOverlay({
         >
           <div>
             <div
-              className="text-[12px] font-bold tracking-[0.08em]"
+              className="text-[13px] font-bold tracking-[0.08em]"
               style={{ color: T_CANVAS.graphite }}
             >
               REVIEW DETECTIONS
             </div>
-            <div className="text-[11px]" style={{ color: T_CANVAS.muted }}>
+            <div className="text-[13px]" style={{ color: T_CANVAS.muted }}>
               Click a box to relabel or delete it. Use Draw box to add one the
               model missed. Generation uses exactly this set.
             </div>
@@ -326,7 +326,7 @@ export default function DetectionReviewOverlay({
               disabled={past.length === 0}
               title="Undo (Ctrl+Z)"
               aria-label="Undo (Ctrl+Z)"
-              className="px-3 py-1.5 text-[11px] font-bold tracking-[0.06em] disabled:opacity-40"
+              className="px-3 py-1.5 text-[13px] font-bold tracking-[0.06em] disabled:opacity-40"
               style={{
                 background: T_CANVAS.vellum,
                 color: T_CANVAS.graphite,
@@ -341,7 +341,7 @@ export default function DetectionReviewOverlay({
               disabled={future.length === 0}
               title="Redo (Ctrl+Y)"
               aria-label="Redo (Ctrl+Y)"
-              className="px-3 py-1.5 text-[11px] font-bold tracking-[0.06em] disabled:opacity-40"
+              className="px-3 py-1.5 text-[13px] font-bold tracking-[0.06em] disabled:opacity-40"
               style={{
                 background: T_CANVAS.vellum,
                 color: T_CANVAS.graphite,
@@ -357,7 +357,7 @@ export default function DetectionReviewOverlay({
                 setSelectedId(null);
               }}
               aria-pressed={drawMode}
-              className="px-3 py-1.5 text-[11px] font-bold tracking-[0.06em] whitespace-nowrap"
+              className="px-3 py-1.5 text-[13px] font-bold tracking-[0.06em] whitespace-nowrap"
               style={{
                 background: drawMode ? T_CANVAS.cobalt : T_CANVAS.vellum,
                 color: drawMode ? T_CANVAS.paper : T_CANVAS.graphite,
@@ -380,12 +380,12 @@ export default function DetectionReviewOverlay({
           {selected ? (
             <>
               <span
-                className="text-[11px] font-bold tracking-[0.06em]"
+                className="text-[13px] font-bold tracking-[0.06em]"
                 style={{ color: classColor(selected.type) }}
               >
                 SELECTED: {selected.type.toUpperCase()}
               </span>
-              <span className="text-[11px]" style={{ color: T_CANVAS.muted }}>
+              <span className="text-[13px]" style={{ color: T_CANVAS.muted }}>
                 relabel as
               </span>
               {ELEMENT_CLASSES.map((cls) => (
@@ -394,7 +394,7 @@ export default function DetectionReviewOverlay({
                   type="button"
                   onClick={() => relabelSelected(cls)}
                   disabled={selected.type === cls}
-                  className="px-2 py-1 text-[10px] font-bold tracking-[0.05em] disabled:opacity-40"
+                  className="px-2 py-1 text-[13px] font-bold tracking-[0.05em] disabled:opacity-40"
                   style={{
                     background:
                       selected.type === cls ? classColor(cls) : T_CANVAS.paper,
@@ -409,7 +409,7 @@ export default function DetectionReviewOverlay({
               <button
                 type="button"
                 onClick={deleteSelected}
-                className="ml-2 px-2 py-1 text-[10px] font-bold tracking-[0.05em]"
+                className="ml-2 px-2 py-1 text-[13px] font-bold tracking-[0.05em]"
                 style={{
                   background: T_CANVAS.paper,
                   color: T_CANVAS.error,
@@ -420,7 +420,7 @@ export default function DetectionReviewOverlay({
               </button>
             </>
           ) : (
-            <span className="text-[11px]" style={{ color: T_CANVAS.muted }}>
+            <span className="text-[13px]" style={{ color: T_CANVAS.muted }}>
               {drawMode
                 ? "Drag on the image to draw the missing element."
                 : "No box selected."}
@@ -475,7 +475,7 @@ export default function DetectionReviewOverlay({
                   }}
                 >
                   <span
-                    className="absolute left-0 top-0 px-1 py-[1px] text-[9px] font-bold tracking-[0.04em]"
+                    className="absolute left-0 top-0 px-1 py-[1px] text-[12px] font-bold tracking-[0.04em]"
                     style={{
                       background: color,
                       color: "#FFFFFF",
@@ -517,7 +517,7 @@ export default function DetectionReviewOverlay({
             {ELEMENT_CLASSES.map((cls) => (
               <span
                 key={cls}
-                className="flex items-center gap-1 text-[10px] font-bold tracking-[0.05em]"
+                className="flex items-center gap-1 text-[13px] font-bold tracking-[0.05em]"
                 style={{ color: T_CANVAS.muted }}
               >
                 <span
@@ -528,7 +528,7 @@ export default function DetectionReviewOverlay({
                 {cls.toUpperCase()}
               </span>
             ))}
-            <span className="text-[11px]" style={{ color: T_CANVAS.muted }}>
+            <span className="text-[13px]" style={{ color: T_CANVAS.muted }}>
               {elements.length} element{elements.length === 1 ? "" : "s"}
               {correctionCount > 0
                 ? ` · ${correctionCount} correction${correctionCount === 1 ? "" : "s"}`
@@ -539,7 +539,7 @@ export default function DetectionReviewOverlay({
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 text-[11px] font-bold tracking-[0.06em]"
+              className="px-4 py-2 text-[13px] font-bold tracking-[0.06em]"
               style={{
                 background: T_CANVAS.paper,
                 color: T_CANVAS.graphite,
@@ -554,7 +554,7 @@ export default function DetectionReviewOverlay({
                 onGenerate(elements, diffCorrections(initialElements, elements))
               }
               disabled={elements.length === 0}
-              className="px-4 py-2 text-[11px] font-bold tracking-[0.06em] disabled:opacity-40"
+              className="px-4 py-2 text-[13px] font-bold tracking-[0.06em] disabled:opacity-40"
               style={{
                 background: T_CANVAS.cobalt,
                 color: T_CANVAS.paper,

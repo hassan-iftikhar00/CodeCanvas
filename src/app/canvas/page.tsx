@@ -310,7 +310,7 @@ function DraftingToggle({
         border: `1px solid ${T_CANVAS.rule}`,
       }}
     >
-      <span className="text-[12px]" style={{ color: T_CANVAS.graphite }}>
+      <span className="text-[13px]" style={{ color: T_CANVAS.graphite }}>
         {label}
       </span>
       <button
@@ -2960,7 +2960,7 @@ function CanvasPageInner() {
             {!showCodePanel && (
               <button
                 onClick={() => setShowCodePanel(true)}
-                className="absolute bottom-4 right-4 z-30 flex items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                className="absolute bottom-4 right-4 z-30 flex items-center gap-2 px-3 py-2 text-[13px] tracking-[0.16em] uppercase transition-colors"
                 style={{
                   background: T_CANVAS.paper,
                   border: `1px solid ${T_CANVAS.rule}`,
@@ -3076,7 +3076,7 @@ function CanvasPageInner() {
                         <button
                           key={mode}
                           onClick={() => setCodeViewMode(mode)}
-                          className="px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                          className="px-2.5 py-1 text-[13px] tracking-[0.16em] uppercase transition-colors"
                           style={{
                             background: active
                               ? T_DARK.surfaceHover
@@ -3103,7 +3103,7 @@ function CanvasPageInner() {
                     <button
                       onClick={handleCopyCode}
                       disabled={!generatedCode && !editedCode}
-                      className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] tracking-[0.16em] uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                       style={{
                         background: codeCopied
                           ? T_DARK.cobaltWash
@@ -3224,7 +3224,7 @@ function CanvasPageInner() {
                 {(generatedCode || editedCode) &&
                   (usedFallback || detectedElements.length > 0) && (
                     <div
-                      className="flex items-center gap-2 border-b px-3 py-1.5 text-[10px] tracking-[0.14em] uppercase"
+                      className="flex items-center gap-2 border-b px-3 py-1.5 text-[13px] tracking-[0.14em] uppercase"
                       style={{
                         borderColor: T_DARK.ruleSoft,
                         background: usedFallback
@@ -3269,7 +3269,7 @@ function CanvasPageInner() {
                                   type="button"
                                   onClick={() => handleElementChipClick(ccId)}
                                   title={`Highlight this ${(el.type || "element").toLowerCase()} in the code and preview`}
-                                  className="shrink-0 px-1.5 py-0.5 text-[9px] tracking-[0.12em] uppercase transition-colors"
+                                  className="shrink-0 px-1.5 py-0.5 text-[12px] tracking-[0.12em] uppercase transition-colors"
                                   style={{
                                     background: T_DARK.surfaceSoft,
                                     border: `1px solid ${T_DARK.rule}`,
@@ -3360,7 +3360,7 @@ function CanvasPageInner() {
                               type="button"
                               onClick={() => setShowModelPanel(true)}
                               title="Model mode is forced. Click to open model control."
-                              className={`shrink-0 px-1.5 py-0.5 text-[9px] tracking-[0.12em] uppercase transition-colors ${
+                              className={`shrink-0 px-1.5 py-0.5 text-[12px] tracking-[0.12em] uppercase transition-colors ${
                                 isScoringFidelity || isRepairing || fidelity
                                   ? "ml-1.5"
                                   : "ml-auto"
@@ -3513,7 +3513,7 @@ function CanvasPageInner() {
                           </svg>
                         </span>
                         <p
-                          className="text-[11px] tracking-[0.16em] uppercase"
+                          className="text-[13px] tracking-[0.16em] uppercase"
                           style={{
                             color: T_DARK.inkBright,
                             fontFamily:
@@ -3523,7 +3523,7 @@ function CanvasPageInner() {
                           AWAITING SKETCH
                         </p>
                         <p
-                          className="mt-1 text-[10px] tracking-[0.14em] uppercase"
+                          className="mt-1 text-[13px] tracking-[0.14em] uppercase"
                           style={{
                             color: T_DARK.inkFaint,
                             fontFamily:
@@ -3626,7 +3626,7 @@ function CanvasPageInner() {
 
                     <div>
                       <div
-                        className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+                        className="mb-2 text-[13px] tracking-[0.18em] uppercase"
                         style={{
                           color: T_CANVAS.muted,
                           fontFamily:
@@ -3651,7 +3651,7 @@ function CanvasPageInner() {
 
                     <div>
                       <div
-                        className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+                        className="mb-2 text-[13px] tracking-[0.18em] uppercase"
                         style={{
                           color: T_CANVAS.muted,
                           fontFamily:
@@ -3662,7 +3662,7 @@ function CanvasPageInner() {
                       </div>
                       <button
                         onClick={handleCreateCheckpoint}
-                        className="w-full px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                        className="w-full px-3 py-2 text-[13px] tracking-[0.16em] uppercase transition-colors"
                         style={{
                           background: T_CANVAS.paper,
                           border: `1px dashed ${T_CANVAS.rule}`,
@@ -3692,7 +3692,7 @@ function CanvasPageInner() {
                           }
                           setShowVersionCompare(true);
                         }}
-                        className="mt-2 w-full px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                        className="mt-2 w-full px-3 py-2 text-[13px] tracking-[0.16em] uppercase transition-colors"
                         style={{
                           background: T_CANVAS.paper,
                           border: `1px solid ${T_CANVAS.rule}`,
@@ -3716,7 +3716,7 @@ function CanvasPageInner() {
                           {versionHistory.versions.slice(0, 5).map((v) => (
                             <div
                               key={v.id}
-                              className="flex items-center justify-between px-3 py-1.5 text-[11px]"
+                              className="flex items-center justify-between px-3 py-1.5 text-[13px]"
                               style={{
                                 background: T_CANVAS.vellum,
                                 border: `1px solid ${T_CANVAS.rule}`,
@@ -3729,7 +3729,7 @@ function CanvasPageInner() {
                               <div className="ml-2 flex flex-shrink-0 items-center gap-2">
                                 <button
                                   onClick={() => handleRestoreVersion(v.id)}
-                                  className="text-[10px] tracking-[0.14em] uppercase"
+                                  className="text-[13px] tracking-[0.14em] uppercase"
                                   style={{
                                     color: T_CANVAS.cobalt,
                                     fontFamily:
@@ -3751,7 +3751,7 @@ function CanvasPageInner() {
                                       label: v.description || "Checkpoint",
                                     })
                                   }
-                                  className="text-[10px] tracking-[0.14em] uppercase"
+                                  className="text-[13px] tracking-[0.14em] uppercase"
                                   style={{
                                     color: T_CANVAS.error,
                                     fontFamily:
@@ -3769,7 +3769,7 @@ function CanvasPageInner() {
 
                     <div>
                       <div
-                        className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+                        className="mb-2 text-[13px] tracking-[0.18em] uppercase"
                         style={{
                           color: T_CANVAS.muted,
                           fontFamily:
@@ -3780,7 +3780,7 @@ function CanvasPageInner() {
                       </div>
                       <button
                         onClick={() => setShowBrandKit(true)}
-                        className="flex w-full items-center justify-between px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+                        className="flex w-full items-center justify-between px-3 py-2 text-[13px] tracking-[0.16em] uppercase transition-colors"
                         style={{
                           background: T_CANVAS.paper,
                           border: `1px solid ${T_CANVAS.rule}`,
@@ -3889,7 +3889,7 @@ function CanvasPageInner() {
           }}
         >
           <div
-            className="text-[10px] tracking-[0.16em] uppercase"
+            className="text-[13px] tracking-[0.16em] uppercase"
             style={{
               color: T_CANVAS.muted,
               fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -3977,7 +3977,7 @@ function CanvasPageInner() {
               <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
             <span
-              className="text-[11px] tracking-[0.12em] uppercase"
+              className="text-[13px] tracking-[0.12em] uppercase"
               style={{
                 color: T_CANVAS.muted,
                 fontFamily:
@@ -4109,7 +4109,7 @@ function CanvasPageInner() {
             />
             <div className="text-center">
               <p
-                className="text-[11px] uppercase tracking-[0.18em]"
+                className="text-[13px] uppercase tracking-[0.18em]"
                 style={{
                   color: T_CANVAS.graphite,
                   fontFamily:
@@ -4119,7 +4119,7 @@ function CanvasPageInner() {
                 DETECTING ELEMENTS
               </p>
               <p
-                className="mt-1.5 text-[10px] uppercase tracking-[0.14em]"
+                className="mt-1.5 text-[13px] uppercase tracking-[0.14em]"
                 style={{
                   color: T_CANVAS.muted,
                   fontFamily:

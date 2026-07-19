@@ -83,7 +83,7 @@ export default function CanvasSurface({
               </svg>
             </span>
             <p
-              className="text-[11px] tracking-[0.16em] uppercase"
+              className="text-[13px] tracking-[0.16em] uppercase"
               style={{
                 color: T_CANVAS.graphite,
                 fontFamily:
@@ -93,7 +93,7 @@ export default function CanvasSurface({
               {emptyHint}
             </p>
             <p
-              className="text-[10px] tracking-[0.14em] uppercase"
+              className="text-[13px] tracking-[0.14em] uppercase"
               style={{
                 color: T_CANVAS.muted,
                 fontFamily:

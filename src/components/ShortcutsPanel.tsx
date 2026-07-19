@@ -78,7 +78,7 @@ export default function ShortcutsPanel({
       maxWidth={680}
       footer={
         <p
-          className="text-center text-[10px] tracking-[0.16em] uppercase"
+          className="text-center text-[13px] tracking-[0.16em] uppercase"
           style={{
             color: T_CANVAS.muted,
             fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -117,7 +117,7 @@ export default function ShortcutsPanel({
             aria-label="Search shortcuts"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 bg-transparent text-[11px] tracking-[0.14em] uppercase outline-none placeholder:opacity-60"
+            className="flex-1 bg-transparent text-[13px] tracking-[0.14em] uppercase outline-none placeholder:opacity-60"
             style={{
               color: T_CANVAS.graphite,
               fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -131,7 +131,7 @@ export default function ShortcutsPanel({
       {Object.entries(groupedShortcuts).map(([category, list]) => (
         <div key={category} className="mb-5 last:mb-0">
           <div
-            className="mb-2 text-[10px] tracking-[0.18em] uppercase"
+            className="mb-2 text-[13px] tracking-[0.18em] uppercase"
             style={{
               color: T_CANVAS.muted,
               fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -148,7 +148,7 @@ export default function ShortcutsPanel({
             {list.map((s, idx) => (
               <div
                 key={idx}
-                className="flex items-center justify-between px-3 py-2 text-[12px]"
+                className="flex items-center justify-between px-3 py-2 text-[13px]"
                 style={{
                   background: T_CANVAS.paper,
                   color: T_CANVAS.graphite,
@@ -180,7 +180,7 @@ export default function ShortcutsPanel({
           }}
         >
           <p
-            className="text-[12px] tracking-[0.14em] uppercase"
+            className="text-[13px] tracking-[0.14em] uppercase"
             style={{
               color: T_CANVAS.muted,
               fontFamily: "var(--font-jetbrains-mono, ui-monospace, monospace)",
@@ -189,7 +189,7 @@ export default function ShortcutsPanel({
             NO SHORTCUTS FOUND
           </p>
           <p
-            className="mt-2 text-[11px]"
+            className="mt-2 text-[13px]"
             style={{
               color: T_CANVAS.muted,
               fontFamily: "var(--font-inter, ui-sans-serif, system-ui)",
@@ -206,7 +206,7 @@ export default function ShortcutsPanel({
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
     <kbd
-      className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] tracking-[0.04em]"
+      className="inline-flex items-center justify-center px-1.5 py-0.5 text-[13px] tracking-[0.04em]"
       style={{
         background: T_CANVAS.vellum,
         border: `1px solid ${T_CANVAS.rule}`,

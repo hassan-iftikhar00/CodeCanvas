@@ -154,7 +154,7 @@ export default function ModelControlPanel({
           }}
         >
           <span
-            className="text-[11px] tracking-[0.14em] uppercase"
+            className="text-[13px] tracking-[0.14em] uppercase"
             style={{
               color: autoRepairEnabled ? T_CANVAS.cobaltInk : T_CANVAS.graphite,
               fontFamily: MONO,
@@ -162,7 +162,7 @@ export default function ModelControlPanel({
           >
             {autoRepairEnabled ? "Repair on" : "Repair off"}
           </span>
-          <span className="text-[11px]" style={{ color: T_CANVAS.muted }}>
+          <span className="text-[13px]" style={{ color: T_CANVAS.muted }}>
             {autoRepairEnabled
               ? "Low fidelity triggers one extra Gemini call."
               : "Skips the extra Gemini call. Saves quota during demos."}
@@ -173,7 +173,7 @@ export default function ModelControlPanel({
       <ModalSection label="Key pool">
         {error && (
           <div
-            className="mb-2 px-3 py-2 text-[12px]"
+            className="mb-2 px-3 py-2 text-[13px]"
             style={{
               color: T_CANVAS.error,
               border: `1px solid ${T_CANVAS.rule}`,
@@ -191,7 +191,7 @@ export default function ModelControlPanel({
             <table className="w-full" style={{ fontFamily: MONO }}>
               <thead>
                 <tr
-                  className="text-[9px] tracking-[0.14em] uppercase"
+                  className="text-[12px] tracking-[0.14em] uppercase"
                   style={{
                     color: T_CANVAS.muted,
                     background: T_CANVAS.vellum,
@@ -209,7 +209,7 @@ export default function ModelControlPanel({
                 {status.keys.map((k) => (
                   <tr
                     key={k.slot}
-                    className="text-[11px]"
+                    className="text-[13px]"
                     style={{ borderTop: `1px solid ${T_CANVAS.rule}` }}
                   >
                     <td
@@ -256,7 +256,7 @@ export default function ModelControlPanel({
         )}
         <div className="mt-2 flex items-center justify-between">
           <span
-            className="text-[10px]"
+            className="text-[13px]"
             style={{ color: T_CANVAS.muted, fontFamily: MONO }}
           >
             OK = serving · NNs = cooling · SPENT = daily quota hit · xN = wins
@@ -266,7 +266,7 @@ export default function ModelControlPanel({
             type="button"
             onClick={() => void fetchStatus()}
             disabled={loading}
-            className="px-3 py-1.5 text-[10px] tracking-[0.16em] uppercase transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 text-[13px] tracking-[0.16em] uppercase transition-colors disabled:opacity-50"
             style={{
               background: T_CANVAS.paper,
               border: `1px solid ${T_CANVAS.rule}`,

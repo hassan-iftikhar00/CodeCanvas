@@ -261,7 +261,7 @@ export default function CanvasTopBar({
           >
             <CanvasMark size={20} color={T_CANVAS.graphite} />
             <span
-              className="hidden text-[11px] tracking-[0.18em] uppercase sm:inline"
+              className="hidden text-[13px] tracking-[0.18em] uppercase sm:inline"
               style={{ color: T_CANVAS.graphite }}
             >
               CodeCanvas
@@ -287,7 +287,7 @@ export default function CanvasTopBar({
                   onBlur={commitNameEdit}
                   onKeyDown={onNameKey}
                   aria-label="Project name"
-                  className="h-7 min-w-[140px] max-w-[260px] px-2 text-[12px] outline-none"
+                  className="h-7 min-w-[140px] max-w-[260px] px-2 text-[13px] outline-none"
                   style={{
                     background: T_CANVAS.vellum,
                     border: `1px solid ${T_CANVAS.cobalt}`,
@@ -301,7 +301,7 @@ export default function CanvasTopBar({
                   onDoubleClick={() => setEditingName(true)}
                   onClick={() => setEditingName(true)}
                   title="Double-click to rename"
-                  className="group flex h-7 max-w-[280px] items-center gap-1.5 truncate px-2 text-[12px] tracking-[0.04em] transition-colors"
+                  className="group flex h-7 max-w-[280px] items-center gap-1.5 truncate px-2 text-[13px] tracking-[0.04em] transition-colors"
                   style={{
                     color: T_CANVAS.graphite,
                     fontFamily: "var(--font-inter, ui-sans-serif, system-ui)",
@@ -343,14 +343,14 @@ export default function CanvasTopBar({
                 }}
               />
               <span
-                className="hidden text-[10px] tracking-[0.16em] uppercase xl:inline"
+                className="hidden text-[13px] tracking-[0.16em] uppercase xl:inline"
                 style={{ color: T_CANVAS.muted }}
               >
                 {saveLabel[saveState]}
               </span>
               {isSavingName ? (
                 <span
-                  className="text-[11px]"
+                  className="text-[13px]"
                   style={{ color: T_CANVAS.cobalt }}
                 >
                   ·
@@ -439,7 +439,7 @@ export default function CanvasTopBar({
                   onClick={() => onFrameworkChange(f)}
                   aria-pressed={active}
                   title={f.toUpperCase()}
-                  className="px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase transition-colors"
+                  className="px-2.5 py-1 text-[13px] tracking-[0.14em] uppercase transition-colors"
                   style={{
                     background: active ? T_CANVAS.graphite : "transparent",
                     color: active ? T_CANVAS.paper : T_CANVAS.muted,
@@ -476,7 +476,7 @@ export default function CanvasTopBar({
               onClick={onExport}
               title="Export"
               data-onboarding="export-action"
-              className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] tracking-[0.16em] uppercase transition-colors"
               style={{ background: "transparent", color: T_CANVAS.muted }}
               onMouseEnter={(e) =>
                 (e.currentTarget.style.color = T_CANVAS.graphite)
@@ -495,7 +495,7 @@ export default function CanvasTopBar({
                 type="button"
                 onClick={onOpenStackBlitz}
                 title="Open in StackBlitz"
-                className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] tracking-[0.16em] uppercase transition-opacity hover:opacity-85"
+                className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] tracking-[0.16em] uppercase transition-opacity hover:opacity-85"
                 style={{
                   background: T_CANVAS.graphite,
                   color: T_CANVAS.paper,
@@ -516,7 +516,7 @@ export default function CanvasTopBar({
             onClick={onRunDetection}
             disabled={isGenerating}
             data-onboarding="generate-action"
-            className="ml-1 flex h-8 items-center gap-1.5 px-3 text-[11px] tracking-[0.16em] uppercase transition-colors"
+            className="ml-1 flex h-8 items-center gap-1.5 px-3 text-[13px] tracking-[0.16em] uppercase transition-colors"
             style={{
               background: isGenerating ? T_CANVAS.cobaltInk : T_CANVAS.cobalt,
               border: `1px solid ${isGenerating ? T_CANVAS.cobaltInk : T_CANVAS.cobalt}`,
@@ -555,7 +555,7 @@ export default function CanvasTopBar({
               aria-label="User menu"
               aria-expanded={showUserMenu}
               aria-haspopup="menu"
-              className="flex h-7 w-7 items-center justify-center text-[10px] tracking-[0.12em] uppercase"
+              className="flex h-7 w-7 items-center justify-center text-[13px] tracking-[0.12em] uppercase"
               style={{
                 background: T_CANVAS.graphite,
                 color: T_CANVAS.paper,
@@ -597,7 +597,7 @@ export default function CanvasTopBar({
                     style={{ borderColor: T_CANVAS.rule }}
                   >
                     <div
-                      className="truncate text-[12px]"
+                      className="truncate text-[13px]"
                       style={{
                         color: T_CANVAS.graphite,
                         fontFamily:
@@ -607,7 +607,7 @@ export default function CanvasTopBar({
                       {displayName}
                     </div>
                     <div
-                      className="truncate text-[10px] tracking-[0.04em]"
+                      className="truncate text-[13px] tracking-[0.04em]"
                       style={{ color: T_CANVAS.muted }}
                     >
                       {user.email}
@@ -631,7 +631,7 @@ export default function CanvasTopBar({
                         handleLogout();
                       }}
                       role="menuitem"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors hover:opacity-80"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[13px] tracking-[0.16em] uppercase transition-colors hover:opacity-80"
                       style={{ color: T_CANVAS.error }}
                     >
                       <LogoutIcon />
@@ -698,7 +698,7 @@ function ToolbarButton({
       disabled={disabled}
       title={shortcut ? `${label} (${shortcut})` : label}
       data-onboarding={dataOnboardingId}
-      className="flex h-8 items-center gap-1.5 px-2 text-[10px] tracking-[0.16em] uppercase transition-colors disabled:opacity-50"
+      className="flex h-8 items-center gap-1.5 px-2 text-[13px] tracking-[0.16em] uppercase transition-colors disabled:opacity-50"
       style={{
         background: active ? T_CANVAS.graphite : "transparent",
         color: active ? T_CANVAS.paper : T_CANVAS.muted,
@@ -736,7 +736,7 @@ function MenuLink({
     <Link
       href={href}
       role="menuitem"
-      className="flex items-center gap-2 px-3 py-2 text-[10px] tracking-[0.16em] uppercase transition-colors"
+      className="flex items-center gap-2 px-3 py-2 text-[13px] tracking-[0.16em] uppercase transition-colors"
       style={{ color: T_CANVAS.muted }}
       onMouseEnter={(e) => (e.currentTarget.style.color = T_CANVAS.graphite)}
       onMouseLeave={(e) => (e.currentTarget.style.color = T_CANVAS.muted)}
