@@ -183,7 +183,7 @@ export default function DemoTheatre() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-8 relative"
+      className="min-h-screen flex items-center justify-center p-4 sm:p-8 relative"
       style={{ background: T.paper }}
     >
       {/* Replay button */}
@@ -227,18 +227,23 @@ export default function DemoTheatre() {
             </div>
 
             <h1
-              className="text-5xl text-center"
+              className="text-3xl sm:text-4xl md:text-5xl text-center"
               style={{ color: T.graphite, fontFamily: SERIF }}
             >
               Draw your <span style={{ color: T.cobalt }}>vision.</span>
             </h1>
 
-            {/* Graph-paper canvas */}
+            {/* Graph-paper canvas — was a fixed 500x350px box that forced
+                horizontal overflow under ~560px viewports. Now fluid: the
+                outer box scales via aspect-ratio, the SVG uses a matching
+                viewBox, and the cursor dot is positioned by percentage
+                (of the same 500x350 logical space the draw animation runs
+                in) instead of raw pixels, so everything rescales together
+                without touching the animation's timing/math. */}
             <div
-              className="relative"
+              className="relative w-full max-w-125 mx-auto"
               style={{
-                width: 500,
-                height: 350,
+                aspectRatio: "500 / 350",
                 background: T.paper,
                 border: `1px solid ${T.rule}`,
                 backgroundImage: `linear-gradient(to right, ${T.tick} 1px, transparent 1px), linear-gradient(to bottom, ${T.tick} 1px, transparent 1px)`,
@@ -247,7 +252,8 @@ export default function DemoTheatre() {
             >
               <svg
                 className="absolute inset-0 pointer-events-none"
-                style={{ width: 500, height: 350 }}
+                viewBox="0 0 500 350"
+                style={{ width: "100%", height: "100%" }}
               >
                 <polyline
                   points={strokePath.map((p) => `${p.x},${p.y}`).join(" ")}
@@ -279,7 +285,11 @@ export default function DemoTheatre() {
               {strokePath.length < 200 && (
                 <div
                   className="absolute pointer-events-none"
-                  style={{ left: cursorPos.x - 2, top: cursorPos.y - 2 }}
+                  style={{
+                    left: `${(cursorPos.x / 500) * 100}%`,
+                    top: `${(cursorPos.y / 350) * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                  }}
                 >
                   <MousePointer2
                     style={{ color: T.cobalt }}
@@ -338,15 +348,16 @@ export default function DemoTheatre() {
               }}
             />
             <h2
-              className="text-4xl text-center"
+              className="text-2xl sm:text-3xl md:text-4xl text-center"
               style={{ color: T.graphite, fontFamily: SERIF }}
             >
               Generating code<span style={{ color: T.cobalt }}> with AI</span>
               ...
             </h2>
-            {/* 1px hairline progress bar */}
+            {/* 1px hairline progress bar — was a fixed 384px (w-96) that
+                overflowed under ~450px viewports with page padding. */}
             <div
-              className="w-96"
+              className="w-full max-w-96"
               style={{
                 background: T.vellum,
                 border: `1px solid ${T.rule}`,
@@ -383,14 +394,17 @@ export default function DemoTheatre() {
                 READY TO EXPORT
               </div>
               <h2
-                className="text-4xl"
+                className="text-2xl sm:text-3xl md:text-4xl"
                 style={{ color: T.graphite, fontFamily: SERIF }}
               >
                 Your code is <span style={{ color: T.cobalt }}>ready.</span>
               </h2>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            {/* Was a fixed 2-column grid — code + preview panels each need
+                room, so on mobile they stack (1 col) instead of squeezing
+                side-by-side. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Code panel — dark slab */}
               <div
                 className="p-6"

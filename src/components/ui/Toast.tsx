@@ -144,7 +144,7 @@ function ToastViewport({
 }) {
   return (
     <div
-      className="pointer-events-none fixed right-4 bottom-4 z-[80] flex w-full max-w-sm flex-col gap-2"
+      className="pointer-events-none fixed inset-x-4 bottom-4 z-[80] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:w-full sm:max-w-sm"
       aria-label="Notifications"
     >
       <AnimatePresence initial={false}>
@@ -222,7 +222,7 @@ function ToastCard({
             type="button"
             onClick={onDismiss}
             aria-label="Dismiss notification"
-            className="flex h-5 w-5 items-center justify-center transition-colors"
+            className="relative flex h-5 w-5 items-center justify-center transition-colors before:absolute before:-inset-3 before:content-['']"
             style={{ color: T.muted }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = T.graphite;

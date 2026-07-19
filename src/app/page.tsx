@@ -23,7 +23,16 @@ import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Instrument_Serif, Inter, JetBrains_Mono } from "next/font/google";
 import { createClient } from "@/lib/supabase/client";
-import { Instagram, Github, Twitter, Mail, Check, Send } from "lucide-react";
+import {
+  Instagram,
+  Github,
+  Twitter,
+  Mail,
+  Check,
+  Send,
+  Menu,
+  X,
+} from "lucide-react";
 import { DRAFTING_TOKENS as T } from "@/lib/drafting-room/tokens";
 import {
   DraftingMark as Mark,
@@ -622,9 +631,15 @@ export default function Home() {
                         delay: 0.1 + i * 0.1,
                         ease: [0.65, 0, 0.35, 1],
                       }}
-                      className="d5-serif"
+                      className="d5-serif break-words"
                       style={{
-                        fontSize: "clamp(56px, 9vw, 132px)",
+                        // Floor was 56px, a fixed value below the ~622px
+                        // viewport where 9vw stops exceeding it — every
+                        // phone (320-414px) rendered "Describe." at a fixed
+                        // 56px that overflowed its bordered box. Lowering
+                        // the floor to 36px lets 9vw take over at ~400px
+                        // instead, so widths below that scale down too.
+                        fontSize: "clamp(36px, 9vw, 132px)",
                         lineHeight: 0.92,
                         letterSpacing: "-0.03em",
                         color: i === 2 ? T.cobalt : T.graphite,
@@ -856,50 +871,100 @@ export default function Home() {
 // SUB-COMPONENTS
 
 function TopBar() {
+  // Mobile nav (< md): Features/Stories/Canvas/Log in collapse behind a
+  // hamburger — the plain `hidden md:flex` nav had no mobile equivalent,
+  // so those links were completely unreachable on small screens.
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <header
-      className="d5-mono sticky top-0 z-50 flex items-center justify-between border-b px-6 py-3"
+      className="d5-mono sticky top-0 z-50 border-b"
       style={{ background: T.paper, borderColor: T.rule }}
     >
-      <Link href="/" className="flex items-center gap-3">
-        <Mark size={22} color={T.graphite} />
-        <span
-          className="text-[13px] tracking-[0.18em] uppercase"
+      <div className="flex items-center justify-between px-6 py-3">
+        <Link href="/" className="flex items-center gap-3">
+          <Mark size={22} color={T.graphite} />
+          <span
+            className="text-[13px] tracking-[0.18em] uppercase"
+            style={{ color: T.graphite }}
+          >
+            CodeCanvas
+          </span>
+          <span
+            className="hidden sm:inline text-[10px] tracking-[0.16em] uppercase"
+            style={{ color: T.muted }}
+          >
+            / DRAFTING ROOM
+          </span>
+        </Link>
+        <nav
+          className="hidden items-center gap-6 text-[11px] tracking-[0.16em] uppercase md:flex"
           style={{ color: T.graphite }}
         >
-          CodeCanvas
-        </span>
-        <span
-          className="text-[10px] tracking-[0.16em] uppercase"
-          style={{ color: T.muted }}
-        >
-          / DRAFTING ROOM
-        </span>
-      </Link>
-      <nav
-        className="hidden items-center gap-6 text-[11px] tracking-[0.16em] uppercase md:flex"
-        style={{ color: T.graphite }}
-      >
-        <Link href="#features">Features</Link>
-        <Link href="#stories">Stories</Link>
-        <Link href="/canvas">Canvas</Link>
-      </nav>
-      <div className="flex items-center gap-3">
-        <Link
-          href="/auth/login"
-          className="d5-mono text-[11px] tracking-[0.16em] uppercase px-3 py-2"
-          style={{ color: T.muted }}
-        >
-          Log in
-        </Link>
-        <Link
-          href="/auth/signup"
-          className="d5-btn d5-btn-primary"
-          style={{ padding: "8px 16px", fontSize: 10 }}
-        >
-          Get Started →
-        </Link>
+          <Link href="#features">Features</Link>
+          <Link href="#stories">Stories</Link>
+          <Link href="/canvas">Canvas</Link>
+        </nav>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/auth/login"
+            className="hidden md:inline-block d5-mono text-[11px] tracking-[0.16em] uppercase px-3 py-2"
+            style={{ color: T.muted }}
+          >
+            Log in
+          </Link>
+          <Link
+            href="/auth/signup"
+            className="d5-btn d5-btn-primary"
+            style={{ padding: "8px 16px", fontSize: 10, minHeight: 44 }}
+          >
+            Get Started →
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            className="md:hidden inline-flex items-center justify-center border"
+            style={{
+              minWidth: 44,
+              minHeight: 44,
+              borderColor: T.rule,
+              color: T.graphite,
+              background: T.paper,
+            }}
+          >
+            {menuOpen ? (
+              <X className="h-4 w-4" />
+            ) : (
+              <Menu className="h-4 w-4" />
+            )}
+          </button>
+        </div>
       </div>
+
+      {menuOpen && (
+        <nav
+          className="md:hidden flex flex-col border-t text-[11px] tracking-[0.16em] uppercase"
+          style={{ borderColor: T.rule, background: T.paper }}
+        >
+          {[
+            { label: "Features", href: "#features" },
+            { label: "Stories", href: "#stories" },
+            { label: "Canvas", href: "/canvas" },
+            { label: "Log in", href: "/auth/login" },
+          ].map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center border-b px-6"
+              style={{ borderColor: T.rule, color: T.graphite, minHeight: 44 }}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      )}
     </header>
   );
 }
@@ -920,10 +985,14 @@ function HeroStatusBar({ strokes }: { strokes: number }) {
   }, []);
   return (
     <div
-      className="d5-mono relative border-t flex items-center justify-between px-6 py-2 text-[10px] tracking-[0.14em] uppercase"
+      className="d5-mono relative border-t flex items-center justify-between gap-3 px-4 py-2 text-[10px] tracking-[0.14em] uppercase sm:px-6"
       style={{ borderColor: T.rule, background: T.paper, color: T.muted }}
     >
-      <div className="flex items-center gap-5">
+      {/* 7 badges in one unwrapping flex row overflowed past 320-414px
+          viewports (no wrap, no scroll). Only the always-relevant status +
+          clock stay visible on phones; the rest reappear at sm/md where
+          there's room. */}
+      <div className="flex items-center gap-3 sm:gap-5">
         <span className="flex items-center gap-1.5">
           <span
             className="inline-block w-1.5 h-1.5"
@@ -931,13 +1000,13 @@ function HeroStatusBar({ strokes }: { strokes: number }) {
           />
           {strokes > 0 ? "DRAFTING" : "IDLE"}
         </span>
-        <span>ZOOM 100%</span>
-        <span>GRID 16PX</span>
-        <span>SNAP ON</span>
+        <span className="hidden sm:inline">ZOOM 100%</span>
+        <span className="hidden md:inline">GRID 16PX</span>
+        <span className="hidden md:inline">SNAP ON</span>
       </div>
-      <div className="flex items-center gap-5">
-        <span>GEMINI 2.5 · WARM</span>
-        <span>ROBOFLOW v4</span>
+      <div className="flex items-center gap-3 sm:gap-5">
+        <span className="hidden md:inline">GEMINI 2.5 · WARM</span>
+        <span className="hidden sm:inline">ROBOFLOW v4</span>
         <span style={{ color: T.graphite }}>{time}</span>
       </div>
     </div>
@@ -968,7 +1037,7 @@ function SectionHeader({
         <h2
           className="d5-serif"
           style={{
-            fontSize: 56,
+            fontSize: "clamp(36px, 8vw, 56px)",
             lineHeight: 1,
             letterSpacing: "-0.025em",
             fontWeight: 400,
@@ -1338,6 +1407,7 @@ function FooterBlock() {
               <input
                 type="email"
                 required
+                aria-label="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@studio.com"
@@ -1346,6 +1416,9 @@ function FooterBlock() {
               <button
                 type="submit"
                 disabled={subscribed}
+                aria-label={
+                  subscribed ? "Subscribed" : "Subscribe to newsletter"
+                }
                 className="d5-btn"
                 style={{ padding: "8px 14px", fontSize: 10 }}
               >

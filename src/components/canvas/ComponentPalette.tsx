@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import DraftingModal from "./DraftingModal";
 import { T_CANVAS } from "./canvasTokens";
 

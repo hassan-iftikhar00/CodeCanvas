@@ -58,7 +58,7 @@ export function buildReactScaffoldFiles(
 
   return {
     ...(multiScreen ?? { "src/App.tsx": opts.code.trim() + "\n" }),
-    "src/main.tsx": mainTsx(useTailwind),
+    "src/main.tsx": mainTsx(),
     "src/index.css": indexCss(opts.styling),
     "index.html": viteIndexHtml(opts.projectName),
     "vite.config.ts": viteConfig(useTailwind),
@@ -160,7 +160,7 @@ export default function App() {
   return files;
 }
 
-function mainTsx(_useTailwind: boolean): string {
+function mainTsx(): string {
   return `import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";

@@ -321,8 +321,10 @@ export default function ProfilePage() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5 px-5 py-5">
-                  {/* Avatar */}
-                  <div className="flex items-start gap-4">
+                  {/* Avatar — stacks above the fields on mobile so the
+                      64px square + label/button column don't get squeezed
+                      into a cramped row on a 320px viewport. */}
+                  <div className="flex flex-col items-start gap-4 sm:flex-row">
                     <div
                       className="flex h-16 w-16 flex-none items-center justify-center overflow-hidden text-[20px]"
                       style={{
@@ -338,6 +340,7 @@ export default function ProfilePage() {
                         <img
                           src={avatarUrl}
                           alt=""
+                          referrerPolicy="no-referrer"
                           className="h-16 w-16 object-cover"
                           onError={(e) => {
                             e.currentTarget.style.display = "none";
@@ -616,7 +619,7 @@ export default function ProfilePage() {
 
                 <div className="px-5">
                   {/* Sign out */}
-                  <div className="flex items-center justify-between gap-4 py-4">
+                  <div className="flex flex-col items-start gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
                       <div
                         className="text-[12px]"
@@ -663,7 +666,7 @@ export default function ProfilePage() {
 
                   {/* Delete account */}
                   <div
-                    className="flex items-center justify-between gap-4 border-t py-4"
+                    className="flex flex-col items-start gap-3 border-t py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
                     style={{ borderColor: T.rule }}
                   >
                     <div>

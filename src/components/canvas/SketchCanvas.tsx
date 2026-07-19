@@ -18,7 +18,6 @@ import {
   Transformer,
   Arrow,
   Ellipse,
-  RegularPolygon,
 } from "react-konva";
 import type Konva from "konva";
 import TextInputModal from "./TextInputModal";
@@ -205,9 +204,9 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       height: 600,
     });
     const containerRef = useRef<HTMLDivElement>(null);
-    const [isDrawing, setIsDrawing] = useState(false);
+    const [, setIsDrawing] = useState(false);
     const [currentShape, setCurrentShape] = useState<ShapeData | null>(null);
-    const [isPanning, setIsPanning] = useState(false);
+    const [, setIsPanning] = useState(false);
     const [spacePressed, setSpacePressed] = useState(false);
     const stageRef = useRef<Konva.Stage>(null);
 
@@ -262,7 +261,6 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
     const [selectedLineIndex, setSelectedLineIndex] = useState<number | null>(
       null
     );
-    const [isTransforming, setIsTransforming] = useState(false);
     const transformerRef = useRef<Konva.Transformer>(null);
     const selectedShapeRef = useRef<Konva.Shape | Konva.Group | null>(null);
     const gridGroupRef = useRef<Konva.Group>(null);
@@ -500,11 +498,12 @@ const SketchCanvas = forwardRef<SketchCanvasRef, SketchCanvasProps>(
       };
       updateSize();
       const ro = new ResizeObserver(updateSize);
-      if (containerRef.current) {
-        ro.observe(containerRef.current);
+      const container = containerRef.current;
+      if (container) {
+        ro.observe(container);
       }
       return () => {
-        if (containerRef.current) ro.unobserve(containerRef.current);
+        if (container) ro.unobserve(container);
         ro.disconnect();
       };
     }, [zoom]);

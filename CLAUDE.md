@@ -439,3 +439,4 @@ Warn me about side effects before making changes.
 | `Audits/COMPLETED_TASKS.md` | Debugging regressions, understanding context behind a prior decision, tracing when a feature landed |
 | `Audits/ARCHITECTURE_DETAILS.md` | Debugging Roboflow detection issues, writing FYP dissertation sections, checking model performance numbers, full known-failure-modes table |
 | `Audits/FYP_FEATURE_ROADMAP.md` | The ranked feature roadmap (fidelity loop, benchmark, HITL editor, Urdu support...) + per-idea status tracker — check before starting the next feature |
+| `Audits/RESPONSIVE_ZERO_BUG_PLAN.md` | Phased plan to make the app 100% responsive + zero console/build errors. Implement one phase at a time ("Implement Phase N from Audits/RESPONSIVE_ZERO_BUG_PLAN.md"). Canvas editor is intentionally desktop-gated `< md`. |

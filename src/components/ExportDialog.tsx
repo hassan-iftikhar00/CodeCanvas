@@ -38,7 +38,6 @@ export default function ExportDialog({
   isOpen,
   onClose,
   onExport,
-  canvasData,
   generatedCode,
 }: ExportDialogProps) {
   const [exportType, setExportType] = useState<"image" | "code">("code");
@@ -46,8 +45,8 @@ export default function ExportDialog({
   const [codeFormat, setCodeFormat] = useState<
     "zip" | "json" | "copy" | "stackblitz"
   >("copy");
-  const [framework, setFramework] = useState<CodeFramework>("react");
-  const [styling, setStyling] = useState<StylingOption>("tailwind");
+  const [framework] = useState<CodeFramework>("react");
+  const [styling] = useState<StylingOption>("tailwind");
   const [quality, setQuality] = useState(100);
   const [copied, setCopied] = useState(false);
 
@@ -60,7 +59,7 @@ export default function ExportDialog({
       await navigator.clipboard.writeText(generatedCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } catch {
       alert("Failed to copy code to clipboard.");
     }
   };
@@ -248,6 +247,7 @@ export default function ExportDialog({
                   max={100}
                   value={quality}
                   onChange={(e) => setQuality(Number(e.target.value))}
+                  aria-label="Export quality"
                   className="h-px flex-1 cursor-pointer appearance-none"
                   style={{
                     background: `linear-gradient(to right, ${T_CANVAS.cobalt} 0%, ${T_CANVAS.cobalt} ${quality}%, ${T_CANVAS.rule} ${quality}%, ${T_CANVAS.rule} 100%)`,

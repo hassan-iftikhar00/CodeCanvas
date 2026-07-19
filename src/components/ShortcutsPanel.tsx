@@ -114,6 +114,7 @@ export default function ShortcutsPanel({
           <input
             type="text"
             placeholder="SEARCH SHORTCUTS..."
+            aria-label="Search shortcuts"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 bg-transparent text-[11px] tracking-[0.14em] uppercase outline-none placeholder:opacity-60"

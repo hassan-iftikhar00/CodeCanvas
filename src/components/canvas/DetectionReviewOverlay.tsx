@@ -286,7 +286,7 @@ export default function DetectionReviewOverlay({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto px-4 py-4"
       style={{ background: "rgba(14,14,15,0.62)" }}
       role="dialog"
       aria-modal="true"
@@ -299,12 +299,12 @@ export default function DetectionReviewOverlay({
           border: `1px solid ${T_CANVAS.rule}`,
           boxShadow: "6px 6px 0 rgba(14,14,15,0.18)",
           maxWidth: "94vw",
-          maxHeight: "94vh",
+          maxHeight: "94dvh",
         }}
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between gap-4 px-4 py-2.5"
+          className="flex flex-wrap items-center justify-between gap-4 px-4 py-2.5"
           style={{ borderBottom: `1px solid ${T_CANVAS.rule}` }}
         >
           <div>
@@ -369,9 +369,9 @@ export default function DetectionReviewOverlay({
           </div>
         </div>
 
-        {/* Selection action row (fixed height so the layout never jumps) */}
+        {/* Selection action row */}
         <div
-          className="flex h-10 items-center gap-2 px-4"
+          className="flex min-h-10 flex-wrap items-center gap-2 px-4 py-1.5"
           style={{
             borderBottom: `1px solid ${T_CANVAS.rule}`,
             background: T_CANVAS.vellum,
@@ -510,10 +510,10 @@ export default function DetectionReviewOverlay({
 
         {/* Footer */}
         <div
-          className="flex items-center justify-between gap-4 px-4 py-2.5"
+          className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5"
           style={{ borderTop: `1px solid ${T_CANVAS.rule}` }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {ELEMENT_CLASSES.map((cls) => (
               <span
                 key={cls}

@@ -396,7 +396,7 @@ export default function CommandPalette() {
       {isOpen ? (
         <motion.div
           key="palette"
-          className="fixed inset-0 z-(--z-modal,50) flex items-start justify-center px-4 pt-20"
+          className="fixed inset-0 z-(--z-modal,50) flex items-start justify-center overflow-y-auto px-4 pt-6 pb-6 sm:pt-20"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -418,7 +418,7 @@ export default function CommandPalette() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.22, ease: [0.22, 1.4, 0.32, 1] }}
-            className="relative z-(--z-popover,60) w-full max-w-2xl overflow-hidden"
+            className="relative z-(--z-popover,60) flex max-h-[85dvh] w-full max-w-2xl flex-col overflow-hidden"
             style={{
               background: T.paper,
               border: `1px solid ${T.rule}`,
@@ -428,7 +428,7 @@ export default function CommandPalette() {
           >
             {/* Header slug · same editorial spine as DraftingModal */}
             <div
-              className="flex items-center justify-between border-b px-4 py-2"
+              className="flex shrink-0 items-center justify-between border-b px-4 py-2"
               style={{
                 background: T.vellum,
                 borderColor: T.rule,
@@ -463,7 +463,7 @@ export default function CommandPalette() {
 
             {/* Search row */}
             <div
-              className="border-b px-4 py-3"
+              className="shrink-0 border-b px-4 py-3"
               style={{ borderColor: T.rule, background: T.paper }}
             >
               <div
@@ -524,7 +524,7 @@ export default function CommandPalette() {
               id="palette-listbox"
               role="listbox"
               aria-label="Available commands"
-              className="max-h-112 overflow-y-auto"
+              className="min-h-0 flex-1 overflow-y-auto max-h-112"
               style={{
                 background: T.paper,
                 scrollbarColor: `${T.graphite} transparent`,
@@ -678,7 +678,7 @@ export default function CommandPalette() {
 
             {/* Footer · mono hint bar */}
             <div
-              className="flex items-center justify-between border-t px-4 py-1.5 text-[10px] tracking-[0.16em] uppercase"
+              className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t px-4 py-1.5 text-[10px] tracking-[0.16em] uppercase"
               style={{
                 background: T.vellum,
                 borderColor: T.rule,

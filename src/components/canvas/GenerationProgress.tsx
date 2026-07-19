@@ -139,7 +139,7 @@ export default function GenerationProgress({
 
         {/* STAGE TICKS */}
         <div className="mt-3 flex items-center justify-between">
-          {STAGES.slice(0, -1).map((s, i) => {
+          {STAGES.slice(0, -1).map((s) => {
             const reached = elapsed >= s.startAt;
             const current = s === stage;
             return (
